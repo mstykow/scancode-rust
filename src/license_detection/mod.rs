@@ -171,7 +171,7 @@ fn is_redundant_same_expression_seq_container(
         .difference(&bridge_positions)
         .count();
 
-    if container_only_positions.len() == 1
+    if container_only_positions.count() == 1
         && container_only_boundary_positions == 0
         && child_only_positions.is_empty()
     {
@@ -179,7 +179,7 @@ fn is_redundant_same_expression_seq_container(
     }
 
     if child_only_positions.is_empty()
-        && container_only_positions.len() == container_only_boundary_positions
+        && container_only_positions.count() == container_only_boundary_positions
         && container_only_boundary_positions <= 3
     {
         let earliest_child = contained
@@ -211,9 +211,9 @@ fn is_redundant_same_expression_seq_container(
         MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP * (contained.len() - 1);
     let max_child_only_positions = MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP + 1;
 
-    container_only_positions.len() <= max_container_only_positions
+    container_only_positions.count() <= max_container_only_positions
         && container_only_boundary_positions <= max_container_boundary_positions
-        && child_only_positions.len() <= max_child_only_positions
+        && child_only_positions.count() <= max_child_only_positions
 }
 
 fn filter_redundant_same_expression_seq_containers(
@@ -291,7 +291,7 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
         .count();
 
     child_only_positions.is_empty()
-        && container_only_positions.len() <= MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
+        && container_only_positions.count() <= MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
         && container_only_boundary_positions <= MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
 }
 
