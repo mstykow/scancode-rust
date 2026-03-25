@@ -14,7 +14,10 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
         progress,
         None,
         false,
-        &TextDetectionOptions::default(),
+        &TextDetectionOptions {
+            detect_packages: true,
+            ..TextDetectionOptions::default()
+        },
     );
 
     let mut files = result.files;

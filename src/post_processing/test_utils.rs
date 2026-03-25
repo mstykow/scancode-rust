@@ -455,7 +455,10 @@ pub(crate) fn compute_fixture_summary(
         progress,
         Some(test_license_engine()),
         false,
-        &TextDetectionOptions::default(),
+        &TextDetectionOptions {
+            detect_packages: true,
+            ..TextDetectionOptions::default()
+        },
     );
 
     let mut files = scan_result.files;
@@ -558,7 +561,10 @@ pub(crate) fn assert_classify_fixture_matches_expected(
         progress,
         Some(test_license_engine()),
         false,
-        &TextDetectionOptions::default(),
+        &TextDetectionOptions {
+            detect_packages: true,
+            ..TextDetectionOptions::default()
+        },
     );
 
     let mut files = scan_result.files;
@@ -621,7 +627,10 @@ pub(crate) fn scan_and_assemble_with_keyfiles(
         progress,
         None,
         false,
-        &TextDetectionOptions::default(),
+        &TextDetectionOptions {
+            detect_packages: true,
+            ..TextDetectionOptions::default()
+        },
     );
 
     let mut files = result.files;
