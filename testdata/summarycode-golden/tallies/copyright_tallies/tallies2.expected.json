@@ -1,0 +1,70 @@
+{
+  "tallies": {
+    "copyrights": [
+      {
+        "value": "Copyright (c) Mort Bay Consulting Pty. Ltd. (Australia) and others",
+        "count": 1
+      },
+      {
+        "value": "copyright Sun Microsystems Inc.",
+        "count": 1
+      }
+    ],
+    "holders": [
+      {
+        "value": "Mort Bay Consulting Pty. Ltd. (Australia) and others",
+        "count": 1
+      },
+      {
+        "value": "Sun Microsystems",
+        "count": 1
+      }
+    ],
+    "authors": [
+      {
+        "value": null,
+        "count": 1
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "scan2",
+      "type": "directory",
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "scan_errors": []
+    },
+    {
+      "path": "scan2/jetty.LICENSE",
+      "type": "file",
+      "copyrights": [
+        {
+          "copyright": "Copyright (c) Mort Bay Consulting Pty. Ltd. (Australia) and others",
+          "start_line": 44,
+          "end_line": 45
+        },
+        {
+          "copyright": "copyright Sun Microsystems Inc.",
+          "start_line": 46,
+          "end_line": 46
+        }
+      ],
+      "holders": [
+        {
+          "holder": "Mort Bay Consulting Pty. Ltd. (Australia) and others",
+          "start_line": 44,
+          "end_line": 45
+        },
+        {
+          "holder": "Sun Microsystems Inc.",
+          "start_line": 46,
+          "end_line": 46
+        }
+      ],
+      "authors": [],
+      "scan_errors": []
+    }
+  ]
+}

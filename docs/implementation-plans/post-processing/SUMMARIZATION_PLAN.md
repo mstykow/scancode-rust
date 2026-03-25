@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, and complete active `score/` + generated/classify fixture parity are implemented; package tallies, a few summary edge cases, and broader parity follow-up remain open here
+> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet fixtures, package-preferred summary origin, and active `score/` + generated/classify parity are implemented; residual summary edge cases and detector-dependent `full_tallies` follow-up remain open here
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -9,7 +9,7 @@
 
 This plan covers the remaining ScanCode-compatible **summary and tally surface**: codebase summary output, codebase/file/directory tallies, license clarity scoring, key-file classification, facets, and generated-code detection.
 
-These features are the main post-processing value layer that turns raw file/package findings into project-level answers users actually consume: what the project is primarily licensed under, which files are key licensing files, how clear the licensing story is, and which licenses/copyrights/packages dominate the scan.
+These features are the main post-processing value layer that turns raw file/package findings into project-level answers users actually consume: what the project is primarily licensed under, which files are key licensing files, how clear the licensing story is, and which licenses/copyrights dominate the scan.
 
 Upstream implements these behaviors across multiple plugins (`--summary`, `--tallies`, `--license-clarity-score`, `--classify`, `--facet`, `--generated`). Provenant tracks them in one plan because they share the same data flow and should be implemented against one coherent summary model.
 
@@ -89,7 +89,6 @@ Summarization must also remain a **reducer**, not a second scanner.
 - **Scan Summary**: Top-level project summary output (`declared_license_expression`, holder/language summaries, other values)
 - **License Tallies**: Count and categorize licenses across the codebase
 - **Copyright Tallies**: Aggregate copyright holders and statements
-- **Package Tallies**: Count packages by ecosystem
 - **License Clarity Score**: Calculate project-level license clarity metrics
 - **Key-File Classification**: Mark likely licensing/manifest/readme files for summary logic and user inspection
 - **Facet Assignment**: Tag files with facets (`core`, `dev`, `tests`, `docs`, `data`, `examples`)
@@ -161,6 +160,9 @@ Provenant should match the useful behavior surface without inheriting those stru
 - ✅ Per-resource `files[*].tallies` rollups for files and directories over those same tally families
 - ✅ File-level `facets` assignment with the ScanCode facet set (`core`, `dev`, `tests`, `docs`, `data`, `examples`)
 - ✅ Top-level `tallies_by_facet` buckets over the existing five tally families
+- ✅ Local copied fixture coverage for:
+  - `facet/cli.expected.json`
+  - the `tallies/` fixture corpus under `testdata/summarycode-golden/`
 - ✅ Initial non-license-dependent summary fields:
   - `declared_holder`
   - `primary_language`
@@ -218,15 +220,13 @@ The remaining hot spots are localized and should stay explicit in this plan:
 
 - ⚠️ `assign_facets()` is roughly `O(files × facet_rules)`
 - ⚠️ generated-file fallback rereads still exist for paths that arrive without scanner-populated `is_generated` values (for example preloaded/legacy inputs), so that path should remain narrow and intentional
-- ⚠️ package tallies and the remaining summary/classify edge cases may still introduce new aggregation pressure when they land, so they should be added onto the indexed/in-place design rather than around it
+- ⚠️ residual `full_tallies` parity is now mostly gated by file-level detector/classifier outputs, so reducer-side follow-up should stay narrow and avoid papering over missing scan data with inference
 
 ### Missing
 
-- ❌ Package tallies
-- ❌ Full Python-parity license clarity scoring heuristics
-- ❌ Full ScanCode `--classify` parity (including remaining classification nuances)
-- ❌ Remaining CLI gating/compatibility edge cases for summary/tally/classify/facet/generated options
-- ❌ Comprehensive scan summary parity
+- ❌ Residual summary package-precedence and edge-case parity
+- ❌ Remaining CLI/tally compatibility follow-up around the localized `tallies/` corpus
+- ❌ Detector-dependent `full_tallies` parity outside the reducer layer (missing per-file license/language/copyright normalization inputs)
 
 ### Already handled elsewhere
 
@@ -247,17 +247,17 @@ The remaining hot spots are localized and should stay explicit in this plan:
 3. **Phase 2**: Package/file metadata promotion foundations ✅
 4. **Phase 3**: Initial summary model/output structure ✅
 5. **Phase 4**: Initial non-license-dependent summary fields ✅
-6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; package tallies remain open.
-7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; package tallies and some CLI gating remain open.
+6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; remaining `full_tallies` red now points at missing file-level detector/classifier inputs rather than absent reducer structure.
+7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; localized fixture coverage is in place, and the remaining deltas are mostly detector-driven rather than shape/wiring gaps.
 8. **Phase 7**: Full license clarity parity. ✅ Complete for the active emitted ScanCode `score/` fixture surface (`basic`, `no_license_text`, `no_license_or_copyright`, `no_license_ambiguity`, `inconsistent_licenses_copyleft`, and `jar`), including joined-expression resolution, score-only key-file evidence, manifest allowlist behavior, ambiguity/conflict penalties, and the current holder-driven score cases.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
-11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated` gating. Remaining work: package-tally CLI surface and broader compatibility edge cases.
+11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage. Remaining work: resolve the copied `full_tallies` fixture deltas through detector-side follow-up rather than new tally inference.
 12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns.
 
 ## Success Criteria
 
-- [ ] Generates accurate codebase tallies for licenses, copyrights, packages, holders, authors, and languages where upstream does
+- [ ] Generates accurate codebase tallies for licenses, copyrights, holders, authors, and languages where upstream does
 - [ ] Produces `--summary` output compatible with the ScanCode reference for covered scenarios
 - [ ] Calculates license clarity score matching Python semantics
 - [ ] Classifies key files and broader file categories compatibly with ScanCode
