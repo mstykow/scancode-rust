@@ -1,19 +1,32 @@
+#[cfg(feature = "golden-tests")]
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::path::Path;
+#[cfg(feature = "golden-tests")]
+use std::path::PathBuf;
+use std::sync::Arc;
+#[cfg(feature = "golden-tests")]
+use std::sync::OnceLock;
 
+#[cfg(feature = "golden-tests")]
 use flate2::read::GzDecoder;
+#[cfg(feature = "golden-tests")]
 use glob::Pattern;
+#[cfg(feature = "golden-tests")]
 use serde_json::{Value, json};
+#[cfg(feature = "golden-tests")]
 use tar::Archive;
+#[cfg(feature = "golden-tests")]
 use tempfile::{TempDir, tempdir};
 
 use super::*;
 use crate::assembly;
+#[cfg(feature = "golden-tests")]
 use crate::cache::DEFAULT_CACHE_DIR_NAME;
+#[cfg(feature = "golden-tests")]
 use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{FileInfo, FileType, Package, PackageType};
 use crate::progress::{ProgressMode, ScanProgress};
+#[cfg(feature = "golden-tests")]
 use crate::scan_result_shaping::normalize_paths;
 use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
@@ -138,6 +151,7 @@ pub(crate) fn package(uid: &str, path: &str) -> Package {
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn test_license_engine() -> Arc<LicenseDetectionEngine> {
     static ENGINE: OnceLock<Arc<LicenseDetectionEngine>> = OnceLock::new();
     ENGINE
@@ -150,12 +164,14 @@ pub(crate) fn test_license_engine() -> Arc<LicenseDetectionEngine> {
         .clone()
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) struct FixtureScanRoot {
     pub(crate) scan_root: PathBuf,
     pub(crate) normalize_root: PathBuf,
     _temp_dir: Option<TempDir>,
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn compare_scan_json_values(
     actual: &Value,
     expected: &Value,
@@ -260,6 +276,7 @@ pub(crate) fn compare_scan_json_values(
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
     match value {
         Value::Array(values) => {
@@ -291,6 +308,7 @@ pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
     [
         format!("{DEFAULT_CACHE_DIR_NAME}/*"),
@@ -301,6 +319,7 @@ pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
     .collect()
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn extract_archive_fixture(archive_path: &Path) -> FixtureScanRoot {
     let temp_dir = tempdir().expect("tempdir should be created");
     let extracted_root = temp_dir.path().join(
@@ -326,6 +345,7 @@ pub(crate) fn extract_archive_fixture(archive_path: &Path) -> FixtureScanRoot {
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn resolve_fixture_scan_root(fixture_root: &Path) -> FixtureScanRoot {
     if !fixture_root.exists()
         && let Some(file_name) = fixture_root.file_name().and_then(|name| name.to_str())
@@ -385,6 +405,7 @@ pub(crate) fn resolve_fixture_scan_root(fixture_root: &Path) -> FixtureScanRoot 
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn strip_root_prefix_for_test(path: &Path, root: &Path) -> Option<PathBuf> {
     if let Ok(stripped) = path.strip_prefix(root)
         && !stripped.as_os_str().is_empty()
@@ -402,10 +423,12 @@ pub(crate) fn strip_root_prefix_for_test(path: &Path, root: &Path) -> Option<Pat
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn normalize_paths_for_test(files: &mut [FileInfo], scan_root: &str) {
     normalize_paths(files, scan_root, true, false);
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn normalize_package_datafile_paths(packages: &mut [Package], scan_root: &Path) {
     for package in packages {
         for path in &mut package.datafile_paths {
@@ -416,6 +439,7 @@ pub(crate) fn normalize_package_datafile_paths(packages: &mut [Package], scan_ro
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn compute_fixture_summary(
     fixture_dir: &str,
     include_summary: bool,
@@ -456,6 +480,7 @@ pub(crate) fn compute_fixture_summary(
     .expect("fixture summary should serialize")
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn assert_summary_fixture_matches_expected(
     fixture_dir: &str,
     expected_file: &str,
@@ -484,6 +509,7 @@ pub(crate) fn assert_summary_fixture_matches_expected(
     }
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn project_classify_fields(value: &Value) -> Value {
     let bool_or_false =
         |file: &Value, key: &str| file.get(key).cloned().unwrap_or(Value::Bool(false));
@@ -516,6 +542,7 @@ pub(crate) fn project_classify_fields(value: &Value) -> Value {
     })
 }
 
+#[cfg(feature = "golden-tests")]
 pub(crate) fn assert_classify_fixture_matches_expected(
     fixture_dir: &str,
     expected_file: &str,

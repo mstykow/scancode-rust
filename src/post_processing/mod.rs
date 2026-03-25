@@ -24,6 +24,8 @@ mod classify_test;
 mod facet_test;
 #[cfg(test)]
 mod generated_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod golden_test;
 #[cfg(test)]
 mod output_test;
 #[cfg(test)]

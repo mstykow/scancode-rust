@@ -60,18 +60,27 @@ jobs:
           - shard: copyright
             filter: "copyright::golden_test::tests::"
             profile: release
+            test-target: lib
           - shard: assembly
             filter: "assembly::assembly_golden_test::"
             profile: debug
+            test-target: lib
           - shard: finder
             filter: "finder::golden_test::tests::"
             profile: debug
+            test-target: lib
           - shard: license-detection
             filter: "license_detection::golden_test::golden_tests::"
             profile: release
+            test-target: lib
+          - shard: post-processing
+            filter: "post_processing::golden_test::tests::"
+            profile: release
+            test-target: bin
           - shard: parsers
             filter: "parsers::golden_test::"
             profile: debug
+            test-target: lib
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
@@ -90,11 +99,17 @@ jobs:
         run: |
           set -euo pipefail
           cargo_args=(test --lib --verbose --features golden-tests "${{ matrix.filter }}")
+          if [[ "${{ matrix.test-target }}" == "bin" ]]; then
+            cargo_args=(test --bin provenant --verbose --features golden-tests "${{ matrix.filter }}")
+          fi
           if [[ "${{ matrix.profile }}" == "release" ]]; then
             cargo_args=(test --lib --release --verbose --features golden-tests "${{ matrix.filter }}")
+            if [[ "${{ matrix.test-target }}" == "bin" ]]; then
+              cargo_args=(test --bin provenant --release --verbose --features golden-tests "${{ matrix.filter }}")
+            fi
           fi
 
-          echo "Running golden filter: ${{ matrix.filter }} (${{ matrix.profile }})"
+          echo "Running golden filter: ${{ matrix.filter }} (${{ matrix.profile }}, ${{ matrix.test-target }})"
           cargo "${cargo_args[@]}"
 
   docs-quality:

@@ -1,8 +1,6 @@
 use std::fs;
 
-use super::test_utils::{
-    assert_classify_fixture_matches_expected, dir, file, package, scan_and_assemble_with_keyfiles,
-};
+use super::test_utils::{dir, file, package, scan_and_assemble_with_keyfiles};
 use super::*;
 use crate::models::{Copyright, DatasourceId, FileReference, Holder, Match, Package, PackageType};
 
@@ -264,24 +262,6 @@ fn classify_key_files_uses_lowest_common_parent_for_archive_like_tree() {
     assert!(copying.is_key_file);
     assert!(!source.is_top_level);
     assert!(!source.is_key_file);
-}
-
-#[test]
-fn active_classify_cli_fixture_matches_expected_output() {
-    assert_classify_fixture_matches_expected(
-        "testdata/summarycode-golden/classify/cli",
-        "testdata/summarycode-golden/classify/cli.expected.json",
-        true,
-    );
-}
-
-#[test]
-fn active_classify_with_package_data_fixture_matches_expected_output() {
-    assert_classify_fixture_matches_expected(
-        "testdata/summarycode-golden/score/jar",
-        "testdata/summarycode-golden/classify/with_package_data.expected.json",
-        false,
-    );
 }
 
 #[test]
