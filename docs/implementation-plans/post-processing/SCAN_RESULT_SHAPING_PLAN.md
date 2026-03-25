@@ -1,6 +1,6 @@
 # Scan Result Shaping Implementation Plan
 
-> **Status**: 🟡 Active — the core shaping pipeline is implemented in `src/scan_result_shaping.rs`, but this document is now the explicit scope record for the non-summary post-processing layer
+> **Status**: 🟡 Active — the core shaping pipeline is implemented in `src/scan_result_shaping.rs`, and this document records the remaining shaping-specific compatibility and scaling work
 > **Priority**: P2 - Medium (important user-facing output semantics, but downstream of core scan correctness)
 > **Dependencies**: [CLI_PLAN.md](../infrastructure/CLI_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md), [SUMMARIZATION_PLAN.md](SUMMARIZATION_PLAN.md)
 
@@ -76,31 +76,15 @@ This already differs favorably from Python's plugin-oriented summarycode approac
 - ✅ Only-findings filtering with ancestor-directory preservation
 - ✅ Redundant-clue deduplication by exact value/line-span identity
 - ✅ Relative and absolute path normalization
+- ✅ Explicit rejection of ambiguous `--from-json` + `--strip-root` / `--full-root` combinations
 - ✅ Source-heavy directory marking using descendant source ratios
-- ✅ Dedicated unit coverage in `src/scan_result_shaping_test.rs`
+- ✅ Expanded invariant coverage in `src/scan_result_shaping_test.rs` for `full_root`, broader findings retention, clue dedupe, nested `mark_source`, and normalized package file-reference paths
 
 ### Remaining / Watch Items
 
 - ❌ Full ScanCode compatibility review for path-pattern edge cases and root-handling nuances
 - ❌ Clear documentation of the ordering contract relative to assembly and summary generation
 - ❌ Performance review for large include-pattern sets if real-world profiling shows pressure
-
-### Immediate hardening backlog before more shaping complexity
-
-1. **Lock down `--from-json` path-shaping behavior**
-   - `normalize_paths()` currently derives its root context from runtime CLI inputs; in `--from-json` mode that can mean the JSON file path rather than the original scan root.
-   - Add regressions for `--from-json` combined with `--strip-root` and `--full-root`, then decide the intended compatibility behavior explicitly.
-
-2. **Expand `scan_result_shaping` invariant coverage**
-   - Add tests for:
-     - `full_root` path normalization
-     - all `has_findings()` branches (license detections, holders, authors, package data, scan errors)
-     - clue dedupe for copyrights/holders and for non-identical line ranges that must be preserved
-     - deeper nested `mark_source()` directory propagation
-
-3. **Review include/only-findings scaling on large trees**
-   - Current filtering uses repeated prefix checks over retained path sets and included-directory vectors.
-   - If profiling shows pressure, replace repeated retain-time prefix scans with cheaper preindexed ancestry checks.
 
 ## Architectural Boundary
 

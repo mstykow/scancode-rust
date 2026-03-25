@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, complete active `score/` fixture parity, and complete active generated/classify fixture parity are implemented; package tallies, a few summary edge cases, and the remaining performance hardening work stay open here
+> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, and complete active `score/` + generated/classify fixture parity are implemented; package tallies, a few summary edge cases, and broader parity follow-up remain open here
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -80,7 +80,7 @@ Summarization must also remain a **reducer**, not a second scanner.
 - Do not re-expand already-counted tallies back into discrete `[value] * count` lists only to count them again.
 - Do not repeatedly convert nested package/resource mappings back into heavyweight objects during post-processing.
 - Prefer in-place mutation of the already-built Rust `Vec<FileInfo>` / `Vec<Package>` plus one-time indexes for package↔file joins.
-- Treat extra file reads as an explicit cost center. Today generated-code detection rereads files from disk; any future post-processing feature should justify similar rescans rather than silently adding them.
+- Treat extra file reads as an explicit cost center. Generated-code detection now uses scanner-time hints on normal scans, and any fallback rereads should remain exceptional rather than becoming the default path again.
 
 ## Scope
 
@@ -214,40 +214,9 @@ Implemented Rust behavior is already materially leaner than Python:
 
 The remaining hot spots are localized and should stay explicit in this plan:
 
-- ⚠️ `mark_generated_files()` rereads file contents from disk after scanning
 - ⚠️ `assign_facets()` is roughly `O(files × facet_rules)`
-- ⚠️ `promote_package_metadata_from_key_files()` currently scans files for each package
-- ⚠️ summary helpers such as `package_declared_license_expression()`, `compute_declared_holders()`, and `top_level_package_uids()` still perform repeated package↔file lookups that should eventually move to prebuilt indexes if profiling justifies it
-
-### Immediate hardening backlog before more parity work
-
-Before expanding the feature surface further, the current branch should harden these known hot paths:
-
-1. **Stop computing directory tallies for facet-only output**
-   - `create_output()` currently routes `--tallies-by-facet` through full `compute_detailed_tallies()` even though `compute_tallies_by_facet()` only consumes file-level `file.tallies`.
-   - Split file-only tally preparation from full file+directory detailed tallies.
-
-2. **Precompute package↔file lookup indexes once per output build**
-   - Replace repeated `files.iter().find(...)` / `files.iter().any(...)` and package × file scans in:
-     - `promote_package_metadata_from_key_files()`
-     - `package_declared_license_expression()`
-     - `compute_declared_holders()`
-     - `top_level_package_uids()`
-   - Build indexes only after classification/facet assignment has finalized the file annotations these helpers depend on.
-
-3. **Remove generated-file rereads from the post-processing path**
-   - `mark_generated_files()` currently performs a second filesystem pass via `fs::read`.
-   - Move generated-file hint extraction into scan-time data capture, or preserve just enough scan-time data to avoid reopening every file during `create_output()`.
-
-4. **Rewrite by-facet tally aggregation to accumulate counts directly**
-   - `compute_tallies_by_facet()` currently pays extra churn through repeated `merge_non_null_tally_entries()` map/vector rebuilding.
-   - Accumulate per-facet counts in maps and materialize sorted vectors once at the end.
-
-5. **Add a dedicated release-mode post-processing benchmark/regression harness**
-   - Current repo benchmarking does not exercise summary/tallies/generated/facet-heavy output builds.
-   - Add a small, repeatable benchmark path for `create_output()` option combinations so later parity work cannot silently reintroduce Python-style overhead.
-
-These hardening steps should come before larger new parity work because they remove guaranteed redundant work from the current branch without changing the high-level architecture.
+- ⚠️ generated-file fallback rereads still exist for paths that arrive without scanner-populated `is_generated` values (for example preloaded/legacy inputs), so that path should remain narrow and intentional
+- ⚠️ package tallies and the remaining summary/classify edge cases may still introduce new aggregation pressure when they land, so they should be added onto the indexed/in-place design rather than around it
 
 ### Missing
 
@@ -256,8 +225,6 @@ These hardening steps should come before larger new parity work because they rem
 - ❌ Full ScanCode `--classify` parity (including remaining classification nuances)
 - ❌ Remaining CLI gating/compatibility edge cases for summary/tally/classify/facet/generated options
 - ❌ Comprehensive scan summary parity
-- ❌ Explicit performance hardening for repeated package↔file summary joins and generated-file rereads
-- ❌ Dedicated post-processing benchmark/regression harness for summary/tally/generated/facet-heavy output builds
 
 ### Already handled elsewhere
 
@@ -284,7 +251,7 @@ These hardening steps should come before larger new parity work because they rem
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated` gating. Remaining work: package-tally CLI surface and broader compatibility edge cases.
-12. **Phase 11**: Performance hardening. 🟡 Keep the current in-place design, avoid Python-style recount/copy patterns, and introduce prebuilt package↔file indexes or scanner-fed generated-file hints where profiling shows real cost.
+12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns.
 
 ## Success Criteria
 
