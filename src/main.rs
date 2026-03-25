@@ -61,7 +61,6 @@ fn run() -> Result<()> {
 
     validate_scan_option_compatibility(&cli)?;
 
-    let exclude_patterns = compile_exclude_patterns(&cli.exclude);
     let include_patterns = compile_include_patterns(&cli.include);
 
     progress.start_discovery();
@@ -133,6 +132,7 @@ fn run() -> Result<()> {
             .ok_or_else(|| anyhow!("No directory input path provided"))?;
 
         let cache_config = prepare_cache_for_scan(scan_path, &cli)?;
+        let exclude_patterns = compile_exclude_patterns(&cli.exclude, cache_config.root_dir());
 
         progress.start_discovery();
         let collected = collect_paths(scan_path, cli.max_depth, &exclude_patterns);
@@ -323,11 +323,19 @@ fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
     Ok(config)
 }
 
-fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
-    patterns
+fn compile_exclude_patterns(patterns: &[String], cache_dir: &Path) -> Vec<Pattern> {
+    let mut compiled: Vec<Pattern> = patterns
         .iter()
         .filter_map(|pattern| Pattern::new(pattern).ok())
-        .collect()
+        .collect();
+
+    if let Some(cache_name) = cache_dir.file_name().and_then(|n| n.to_str())
+        && let Ok(cache_pattern) = Pattern::new(&format!("*{cache_name}*"))
+    {
+        compiled.push(cache_pattern);
+    }
+
+    compiled
 }
 
 fn compile_include_patterns(patterns: &[String]) -> Vec<Pattern> {
