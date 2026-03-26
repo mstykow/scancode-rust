@@ -196,9 +196,8 @@ hoisting.
 In addition to the top-level integration suite, some parsers benefit from a small number of
 ecosystem-local scanner/assembly tests under `src/parsers/*_scan_test.rs`.
 
-For broad retroactive coverage work across many existing parsers, a shared audit suite such as
-`src/parsers/downstream_scan_test.rs` is also appropriate, as long as each test still protects a
-clear ecosystem-specific downstream contract.
+For broad retroactive coverage work across many existing parsers, use parser-local `*_scan_test.rs`
+files even when the effort is planned and implemented as one audit batch.
 
 These are appropriate when behavior depends on scanner wiring or assembly/file-reference handling,
 for example:
