@@ -75,7 +75,7 @@
         }
       ],
       "extracted_license_statement": "- MIT\n",
-      "name": "@myorg/app",
+      "name": "app",
       "namespace": "@myorg",
       "package_uid": "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "parties": [],

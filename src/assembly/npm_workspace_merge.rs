@@ -263,8 +263,8 @@ fn process_workspace(
     // Build a map of member package names to versions for workspace: resolution
     let mut member_versions: HashMap<String, String> = HashMap::new();
     for (pkg, _deps) in &member_packages {
-        if let (Some(name), Some(version)) = (&pkg.name, &pkg.version) {
-            member_versions.insert(name.clone(), version.clone());
+        if let (Some(name), Some(version)) = (workspace_member_name(pkg), &pkg.version) {
+            member_versions.insert(name, version.clone());
         }
     }
 
@@ -779,6 +779,14 @@ fn extract_package_name_from_purl(purl: &str) -> Option<String> {
     Some(decoded)
 }
 
+fn workspace_member_name(package: &Package) -> Option<String> {
+    match (package.namespace.as_deref(), package.name.as_deref()) {
+        (Some(namespace), Some(name)) => Some(format!("{namespace}/{name}")),
+        (None, Some(name)) => Some(name.to_string()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -845,6 +853,7 @@ mod tests {
     fn test_resolve_workspace_requirement() {
         let mut versions = HashMap::new();
         versions.insert("my-package".to_string(), "1.2.3".to_string());
+        versions.insert("@myorg/core".to_string(), "1.0.0".to_string());
 
         let purl = Some("pkg:npm/my-package@1.2.3".to_string());
 
@@ -863,6 +872,12 @@ mod tests {
         assert_eq!(
             resolve_workspace_requirement("workspace:", &purl, &versions),
             Some("1.2.3".to_string())
+        );
+
+        let scoped_purl = Some("pkg:npm/%40myorg%2Fcore@1.0.0".to_string());
+        assert_eq!(
+            resolve_workspace_requirement("workspace:^", &scoped_purl, &versions),
+            Some("^1.0.0".to_string())
         );
     }
 
