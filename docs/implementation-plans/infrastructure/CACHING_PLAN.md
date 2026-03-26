@@ -26,9 +26,10 @@ Persistent caching of scan results and compiled data structures to speed up repe
 
 ### Critical Findings from Python Reference
 
-1. **Python ScanCode does NOT cache per-file scan results.** It only caches the license index and package pattern index (compiled data structures). There is no mechanism to skip re-scanning unchanged files. This means **scan result caching and incremental scanning are beyond-parity features**.
-2. **`--no-cache` is not a current parity flag upstream** (it was removed). Current scan-time cache/memory behavior is primarily controlled by `--max-in-memory`.
-3. **`--from-json` is not incremental scan mode** upstream; it loads previous scan JSON for downstream processing.
+1. **Python ScanCode does NOT cache per-file scan results across runs.** It persistently caches only the license index and package pattern index (compiled data structures). There is no upstream mechanism to skip re-scanning unchanged files on a later run. This means **scan result caching and incremental scanning are beyond-parity features**.
+2. **Python ScanCode also has a separate per-run disk-spill mechanism** controlled by `--max-in-memory`. When the in-memory codebase/resource threshold is exceeded, scan details can be stored on disk for the duration of that run. This is **not** a reusable cross-run scan-result cache.
+3. **`--no-cache` is not a current parity flag upstream** (it was removed). Current scan-time cache/memory behavior is primarily controlled by `--max-in-memory`.
+4. **`--from-json` is not incremental scan mode** upstream; it loads previous scan JSON for downstream processing.
 
 ### Scope
 
