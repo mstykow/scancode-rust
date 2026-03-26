@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet fixtures, package-preferred summary origin, and active `score/` + generated/classify parity are implemented; residual summary edge cases and detector-dependent `full_tallies` follow-up remain open here
+> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, and active score/generated/classify/tally parity are implemented; residual summary edge cases remain open here
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -218,13 +218,10 @@ The remaining hot spots are localized and should stay explicit in this plan:
 
 - ⚠️ `assign_facets()` is roughly `O(files × facet_rules)`
 - ⚠️ generated-file fallback rereads still exist for paths that arrive without scanner-populated `is_generated` values (for example preloaded/legacy inputs), so that path should remain narrow and intentional
-- ⚠️ residual `full_tallies` parity is now mostly gated by file-level detector/classifier outputs, so reducer-side follow-up should stay narrow and avoid papering over missing scan data with inference
 
 ### Missing
 
 - ❌ Residual summary package-precedence and edge-case parity
-- ❌ Remaining localized `tallies/` follow-up is now package-aware fixture parity and detector/parser-driven `full_tallies` gaps, not missing `--package` CLI wiring
-- ❌ Detector-dependent `full_tallies` parity outside the reducer layer (missing per-file license/language/copyright normalization inputs)
 
 ### Already handled elsewhere
 
@@ -245,12 +242,12 @@ The remaining hot spots are localized and should stay explicit in this plan:
 3. **Phase 2**: Package/file metadata promotion foundations ✅
 4. **Phase 3**: Initial summary model/output structure ✅
 5. **Phase 4**: Initial non-license-dependent summary fields ✅
-6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; remaining `full_tallies` red now points at missing file-level detector/classifier inputs rather than absent reducer structure.
-7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; localized fixture coverage is in place, and the remaining deltas are mostly detector-driven rather than shape/wiring gaps.
+6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅
+7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). ✅
 8. **Phase 7**: Full license clarity parity. ✅ Complete for the active emitted ScanCode `score/` fixture surface (`basic`, `no_license_text`, `no_license_or_copyright`, `no_license_ambiguity`, `inconsistent_licenses_copyleft`, and `jar`), including joined-expression resolution, score-only key-file evidence, manifest allowlist behavior, ambiguity/conflict penalties, and the current holder-driven score cases.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
-11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage. Remaining work: resolve the copied `full_tallies` fixture deltas through detector-side follow-up rather than new tally inference.
+11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. ✅ Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage with localized fixture coverage.
 12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns.
 
 ## Success Criteria

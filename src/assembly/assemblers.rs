@@ -262,7 +262,12 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::JavaJarManifest,
             DatasourceId::JavaOsgiManifest,
         ],
-        sibling_file_patterns: &["pom.xml", "pom.properties", "**/META-INF/MANIFEST.MF"],
+        sibling_file_patterns: &[
+            "pom.xml",
+            "*.pom",
+            "pom.properties",
+            "**/META-INF/MANIFEST.MF",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     AssemblerConfig {

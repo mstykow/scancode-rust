@@ -1601,7 +1601,7 @@ fn compute_direct_file_tallies(file: &FileInfo) -> Tallies {
         copyrights: build_direct_tally_entries(copyright_values(file), true),
         holders: build_direct_tally_entries(holder_values(file), true),
         authors: build_direct_tally_entries(author_values(file), true),
-        programming_language: build_direct_tally_entries(programming_language_values(file), false),
+        programming_language: build_direct_tally_entries(programming_language_values(file), true),
     }
 }
 
@@ -1624,7 +1624,7 @@ fn aggregate_child_tallies(child_indices: &[usize], files: &[FileInfo]) -> Talli
         merge_tally_entries(&mut copyrights, &child_tallies.copyrights);
         merge_tally_entries(&mut holders, &child_tallies.holders);
         merge_tally_entries(&mut authors, &child_tallies.authors);
-        merge_tally_entries(
+        merge_non_null_entries_into_counts(
             &mut programming_language,
             &child_tallies.programming_language,
         );
@@ -1737,6 +1737,7 @@ fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
         .license_detections
         .iter()
         .map(|detection| canonicalize_summary_expression(&detection.license_expression))
+        .filter(|expression| expression != "unknown-license-reference")
         .collect();
 
     if detection_expressions.is_empty() {
@@ -1802,6 +1803,16 @@ fn normalize_tally_copyright_value(value: &str) -> String {
         .trim()
         .trim_end_matches(" as indicated by the @authors tag");
 
+    if let Some(rest) = trimmed.strip_prefix("Copyright (c) ") {
+        let normalized_rest = rest.trim_start_matches(|ch: char| {
+            ch.is_ascii_digit() || ch == ' ' || ch == ',' || ch == '-'
+        });
+
+        if !normalized_rest.is_empty() && normalized_rest != rest {
+            return format!("Copyright (c) {}", normalized_rest.trim());
+        }
+    }
+
     if let Some(rest) = trimmed.strip_prefix("Copyright ")
         && let Some((yearish, remainder)) = rest.split_once(',')
         && !yearish.is_empty()
@@ -1810,6 +1821,19 @@ fn normalize_tally_copyright_value(value: &str) -> String {
             .all(|ch| ch.is_ascii_digit() || ch == ' ' || ch == ',' || ch == '-')
     {
         return format!("Copyright {}", remainder.trim());
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("Copyright ") {
+        let mut parts = rest.rsplitn(2, ' ');
+        let trailing = parts.next().unwrap_or_default();
+        let leading = parts.next().unwrap_or_default();
+        if !leading.is_empty()
+            && trailing
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || ch == ',' || ch == '-')
+        {
+            return format!("Copyright {}", leading.trim());
+        }
     }
 
     trimmed.to_string()

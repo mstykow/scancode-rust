@@ -21,9 +21,11 @@ mod tests {
     #[test]
     fn test_is_match() {
         let valid_path = PathBuf::from("/some/path/pom.xml");
+        let repo_pom_path = PathBuf::from("/some/path/aopalliance-1.0.pom");
         let invalid_path = PathBuf::from("/some/path/not_pom.xml");
 
         assert!(MavenParser::is_match(&valid_path));
+        assert!(MavenParser::is_match(&repo_pom_path));
         assert!(!MavenParser::is_match(&invalid_path));
     }
 
@@ -734,6 +736,31 @@ mod tests {
         let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_extract_declared_license_from_public_domain_name() {
+        let content = r#"
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>aopalliance</groupId>
+              <artifactId>aopalliance</artifactId>
+              <version>1.0</version>
+              <licenses>
+                <license>
+                  <name>Public Domain</name>
+                </license>
+              </licenses>
+            </project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("public-domain")
+        );
     }
 
     #[test]
