@@ -89,6 +89,8 @@ mod docker;
 mod docker_scan_test;
 #[cfg(test)]
 mod docker_test;
+#[cfg(test)]
+mod downstream_scan_test;
 mod freebsd;
 #[cfg(test)]
 mod freebsd_test;
