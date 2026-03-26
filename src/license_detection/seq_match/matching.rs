@@ -322,7 +322,7 @@ pub fn seq_match_with_candidates(
                         rule_relevance: candidate.rule.relevance,
                         rid,
                         rule_identifier: candidate.rule.identifier.clone(),
-                        rule_url: String::new(),
+                        rule_url: candidate.rule.rule_url().unwrap_or_default(),
                         matched_text: None,
                         referenced_filenames: candidate.rule.referenced_filenames.clone(),
                         rule_kind: candidate.rule.kind(),

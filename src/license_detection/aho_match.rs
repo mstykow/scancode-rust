@@ -179,7 +179,7 @@ pub fn aho_match_with_extra_matchables(
             rule_relevance: rule.relevance,
             rid,
             rule_identifier: rule.identifier.clone(),
-            rule_url: String::new(),
+            rule_url: rule.rule_url().unwrap_or_default(),
             matched_text: None,
             referenced_filenames: rule.referenced_filenames.clone(),
             rule_kind: rule.kind(),
