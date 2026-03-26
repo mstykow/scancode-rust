@@ -1,6 +1,6 @@
 # SwiftShowDependenciesParser: Full Dependency Graph Extraction
 
-> For the broader Swift ecosystem assembly and top-level package improvements added later,
+> For broader Swift ecosystem assembly and top-level package handling,
 > see [swift-parser.md](swift-parser.md).
 
 ## Summary

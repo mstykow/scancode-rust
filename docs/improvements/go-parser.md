@@ -5,7 +5,7 @@
 Rust now goes beyond the released Python ScanCode Go handling in several concrete ways:
 
 1. preserves fallback datasource IDs across Go parser error paths
-2. captures `replace` coverage in parser goldens instead of leaving directive support only unit-tested
+2. preserves `replace`, `retract`, and `toolchain` directive fidelity across real parser inputs
 3. adds a dedicated `go.mod graph` parser so direct vs transitive module relationships are modeled separately from `go.sum`
 4. categorizes `_test.go` and `//go:build test` files as non-production source for source-directory heuristics
 
@@ -17,7 +17,7 @@ The Python reference covers `go.mod` and `go.sum`, but module-graph data, direct
 
 ### Directive and fallback correctness
 
-- Existing Rust support for `replace`, `retract`, and `toolchain` is now backed by a real parser golden using the upstream `opencensus-service` fixture.
+- Rust preserves `replace`, `retract`, and `toolchain` directive semantics on real parser inputs such as the `opencensus-service` fixture.
 - Fallback `PackageData` for `go.mod`, `go.sum`, and `Godeps.json` now keep the correct `datasource_id`, which is important for assembly/accounting consistency.
 
 ### Module graph support

@@ -12,9 +12,7 @@ This adds Hackage package detection, project-level dependency visibility, and si
 
 ## Upstream / Reference Context
 
-The reference side did not provide packagedcode parsers for these Haskell surfaces when this work was implemented.
-
-At implementation time there was no packagedcode parser in the reference tree for these three surfaces, and only minimal ecosystem classification for `.cabal` files.
+The Python reference does not ship packagedcode parsers for these three Haskell surfaces and only provides minimal ecosystem classification for `.cabal` files.
 
 ## Rust Improvements
 

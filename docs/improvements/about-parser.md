@@ -23,7 +23,7 @@ Rust now goes beyond the current Python ScanCode ABOUT handling in four concrete
 ### PURL/type derivation from `download_url`
 
 - ABOUT files without an explicit PURL now infer package type and PURL from recognized download hosts.
-- Current fixture-backed inference includes:
+- Supported inference includes:
   - PyPI wheel URLs → `pkg:pypi/...`
   - GitHub raw/source URLs → `pkg:github/...`
 

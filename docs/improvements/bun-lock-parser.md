@@ -2,9 +2,9 @@
 
 ## Summary
 
-Rust now parses Bun's text-based `bun.lock` format, and it also adds a first static compatibility layer for legacy binary `bun.lockb` fixtures Bun still migrates.
+Rust now parses Bun's text-based `bun.lock` format, and it also adds static compatibility for Bun's legacy binary `bun.lockb` v2 fixtures.
 
-This adds Bun lockfile dependency visibility that the Python reference does not currently provide, while keeping the still-unverified current binary format and any deeper Bun-specific binary sections as explicit follow-up work.
+This adds Bun lockfile dependency visibility that the Python reference does not currently provide, while keeping newer binary-only Bun formats outside the supported scope described here.
 
 ## Reference limitation
 
@@ -85,11 +85,11 @@ This improvement now covers:
 - the current text-based `bun.lock`
 - legacy Bun binary lockfile **format v2** compatibility, using Bun's own committed migration fixtures as the oracle
 
-Remaining Bun binary follow-up work is intentionally narrower than before because:
+Current Bun binary compatibility boundaries are:
 
-- Bun's current binary serializer version is newer than the legacy v2 fixtures we can verify today
-- optional tagged binary sections and current-format parity still need source-coupled validation before they should be claimed as fully supported
-- the migration path from `bun.lockb` to `bun.lock` remains the official Bun direction of travel
+- Bun's current binary serializer version is newer than the legacy v2 fixtures verified here
+- optional tagged binary sections from newer binary formats are not claimed as supported
+- Bun's migration path from `bun.lockb` to `bun.lock` remains the official direction of travel
 
 ## Coverage
 

@@ -3,13 +3,13 @@
 ## Summary
 
 Rust now ships a bounded, static parser for `meson.build` files even though the Python ScanCode reference still has no production Meson parser.
-This first slice focuses on the highest-value metadata surface from Meson’s own docs and introspection behavior: literal `project()` metadata and top-level literal `dependency()` declarations.
+The supported surface focuses on the highest-value metadata from Meson’s own docs and introspection behavior: literal `project()` metadata and top-level literal `dependency()` declarations.
 
 ## Python Status
 
 - Python ScanCode does not currently ship a production Meson parser.
 - Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- This gives Rust direct packagedcode support for Meson project metadata that the Python reference does not currently provide.
 
 ## Rust Improvements
 

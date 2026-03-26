@@ -12,8 +12,7 @@ Python ScanCode currently has only an open attempt at `go.work` support. Provena
 - `use` workspace member paths,
 - local workspace member module identities by reading the referenced `go.mod` files,
 - `replace` directives with old/new module or local-path metadata,
-- sibling assembly between a root `go.mod` and `go.work` when both exist in the same directory,
-- parser goldens and assembly golden coverage for workspace scenarios.
+- sibling assembly between a root `go.mod` and `go.work` when both exist in the same directory.
 
 ## Reference limitation
 

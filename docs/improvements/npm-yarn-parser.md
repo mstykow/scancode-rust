@@ -2,7 +2,7 @@
 
 ## Summary
 
-The current npm and Yarn enhancement pass in Provenant improves several behaviors that are missing, incomplete, or buggy in the Python reference:
+Provenant improves several npm and Yarn behaviors that are missing, incomplete, or buggy in the Python reference:
 
 - `package.json` now preserves npm `overrides` metadata.
 - `package.json` now preserves platform and compatibility metadata such as `os`, `cpu`, `libc`, `deprecated`, and `hasBin`.
@@ -94,7 +94,6 @@ The assembly phase also sorts `datafile_paths`, `datasource_ids`, and `for_packa
 - npm lockfile root identity and dependency-spec extraction
 - Yarn lockfile dependency-scope inference and Berry resolution-detail preservation
 - npm/Yarn assembly behavior for sibling manifests, workspaces, deterministic ordering, and nested package ownership
-- Parser and assembly regression coverage for the affected behaviors
 
 ## Coverage
 
@@ -103,6 +102,4 @@ This enhancement set is covered by:
 - npm parser-focused unit tests
 - npm lockfile-focused unit tests
 - Yarn lockfile-focused unit tests
-- Yarn Berry protocol golden coverage
-- npm parser golden coverage
-- npm workspace, pnpm workspace, and nested package assembly golden coverage
+- focused npm and Yarn parser/assembly tests for the affected behaviors

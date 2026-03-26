@@ -3,13 +3,13 @@
 ## Summary
 
 Rust now ships static Pixi workspace support for `pixi.toml` and `pixi.lock` even though the Python ScanCode reference still has no production Pixi parser.
-This slice focuses on the highest-value official Pixi surfaces: workspace identity, direct Conda/PyPI dependencies, feature/environment metadata, and version-gated lockfile dependency state.
+The supported surface focuses on the highest-value official Pixi metadata: workspace identity, direct Conda/PyPI dependencies, feature/environment metadata, and version-gated lockfile dependency state.
 
 ## Python Status
 
 - Python ScanCode does not currently ship a Pixi packagedcode parser.
 - Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- This gives Rust direct packagedcode support for Pixi workspace metadata that the Python reference does not currently provide.
 
 ## Rust Improvements
 
@@ -40,7 +40,7 @@ This slice focuses on the highest-value official Pixi surfaces: workspace identi
 
 - Rust does **not** execute tasks, resolve feature/environment inheritance dynamically, run the Pixi solver, or fetch channels/indexes over the network.
 - Unsupported or newer lockfile versions fall back safely with datasource metadata preserved instead of being guessed.
-- This slice does not parse `pyproject.toml` Pixi embedding yet; it is intentionally focused on native `pixi.toml` plus `pixi.lock`.
+- This supported surface does not parse `pyproject.toml` Pixi embedding; it is intentionally focused on native `pixi.toml` plus `pixi.lock`.
 
 ## Coverage
 
