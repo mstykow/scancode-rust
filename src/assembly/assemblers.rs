@@ -570,15 +570,6 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     },
 ];
 
-/// Datasource IDs that are intentionally NOT assembled.
-///
-/// These are either:
-/// - Non-package metadata (readme, about, os_release)
-/// - Binary archives (require external extraction via ExtractCode before scanning)
-/// - Supplementary metadata files (not primary package definitions)
-///
-/// This list serves as documentation; it is not used at runtime.
-#[cfg(test)]
 pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,

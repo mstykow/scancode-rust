@@ -8,6 +8,8 @@ mod alpine;
 mod alpine_scan_test;
 mod arch;
 #[cfg(test)]
+mod arch_scan_test;
+#[cfg(test)]
 mod arch_test;
 mod autotools;
 #[cfg(test)]
@@ -18,6 +20,8 @@ mod bazel_module_test;
 #[cfg(test)]
 mod bazel_test;
 mod bower;
+#[cfg(test)]
+mod bower_scan_test;
 #[cfg(test)]
 mod bower_test;
 mod buck;
@@ -34,8 +38,12 @@ mod cargo_lock;
 #[cfg(test)]
 mod cargo_lock_test;
 #[cfg(test)]
+mod cargo_scan_test;
+#[cfg(test)]
 mod cargo_test;
 mod chef;
+#[cfg(test)]
+mod chef_scan_test;
 #[cfg(test)]
 mod chef_test;
 mod clojure;
@@ -43,17 +51,23 @@ mod clojure;
 mod clojure_test;
 mod composer;
 #[cfg(test)]
+mod composer_scan_test;
+#[cfg(test)]
 mod composer_test;
 mod conan;
 mod conan_data;
 #[cfg(test)]
 mod conan_data_test;
 #[cfg(test)]
+mod conan_scan_test;
+#[cfg(test)]
 mod conan_test;
 mod conda;
 mod conda_meta_json;
 #[cfg(test)]
 mod conda_meta_json_test;
+#[cfg(test)]
+mod conda_scan_test;
 #[cfg(test)]
 mod conda_test;
 mod cpan;
@@ -69,8 +83,12 @@ mod cpan_scan_test;
 mod cpan_test;
 mod cran;
 #[cfg(test)]
+mod cran_scan_test;
+#[cfg(test)]
 mod cran_test;
 mod dart;
+#[cfg(test)]
+mod dart_scan_test;
 #[cfg(test)]
 mod dart_test;
 mod debian;
@@ -83,20 +101,26 @@ mod deno_lock;
 #[cfg(test)]
 mod deno_lock_test;
 #[cfg(test)]
+mod deno_scan_test;
+#[cfg(test)]
 mod deno_test;
 mod docker;
 #[cfg(test)]
 mod docker_scan_test;
 #[cfg(test)]
 mod docker_test;
-#[cfg(test)]
-mod downstream_scan_test;
 mod freebsd;
+#[cfg(test)]
+mod freebsd_scan_test;
 #[cfg(test)]
 mod freebsd_test;
 mod gitmodules;
+#[cfg(test)]
+mod gitmodules_scan_test;
 mod go;
 mod go_mod_graph;
+#[cfg(test)]
+mod go_scan_test;
 #[cfg(test)]
 mod go_test;
 #[cfg(test)]
@@ -110,13 +134,21 @@ mod gradle_module;
 mod gradle_module_scan_test;
 #[cfg(test)]
 mod gradle_module_test;
+#[cfg(test)]
+mod gradle_scan_test;
 mod hackage;
+#[cfg(test)]
+mod hackage_scan_test;
 #[cfg(test)]
 mod hackage_test;
 mod haxe;
 #[cfg(test)]
+mod haxe_scan_test;
+#[cfg(test)]
 mod haxe_test;
 mod helm;
+#[cfg(test)]
+mod helm_scan_test;
 #[cfg(test)]
 mod helm_test;
 mod hex_lock;
@@ -124,6 +156,8 @@ mod hex_lock;
 mod hex_lock_test;
 mod license_normalization;
 mod maven;
+#[cfg(test)]
+mod maven_scan_test;
 #[cfg(test)]
 mod maven_test;
 mod meson;
@@ -138,11 +172,15 @@ mod misc;
 mod misc_test;
 mod nix;
 #[cfg(test)]
+mod nix_scan_test;
+#[cfg(test)]
 mod nix_test;
 mod npm;
 mod npm_lock;
 #[cfg(test)]
 mod npm_lock_test;
+#[cfg(test)]
+mod npm_scan_test;
 #[cfg(test)]
 mod npm_test;
 mod npm_workspace;
@@ -150,8 +188,12 @@ mod npm_workspace;
 mod npm_workspace_test;
 mod nuget;
 #[cfg(test)]
+mod nuget_scan_test;
+#[cfg(test)]
 mod nuget_test;
 mod opam;
+#[cfg(test)]
+mod opam_scan_test;
 mod os_release;
 #[cfg(test)]
 mod os_release_test;
@@ -165,6 +207,8 @@ mod pipfile_lock;
 #[cfg(test)]
 mod pipfile_lock_test;
 mod pixi;
+#[cfg(test)]
+mod pixi_scan_test;
 #[cfg(test)]
 mod pixi_test;
 mod pnpm_lock;
@@ -206,11 +250,15 @@ mod rpm_mariner_manifest;
 #[cfg(test)]
 mod rpm_mariner_manifest_test;
 mod rpm_parser;
+#[cfg(test)]
+mod rpm_scan_test;
 mod rpm_specfile;
 #[cfg(test)]
 mod rpm_specfile_test;
 mod rpm_yumdb;
 mod ruby;
+#[cfg(test)]
+mod ruby_scan_test;
 #[cfg(test)]
 mod ruby_test;
 mod sbt;
@@ -234,6 +282,8 @@ mod uv_lock;
 #[cfg(test)]
 mod uv_lock_test;
 mod vcpkg;
+#[cfg(test)]
+mod vcpkg_scan_test;
 #[cfg(test)]
 mod vcpkg_test;
 mod yarn_lock;
