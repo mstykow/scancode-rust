@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+      - "v*.*.*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,13 +19,14 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             archive_format: tar.gz
+            packages: pkg-config libsqlite3-dev
 
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             archive_format: tar.gz
-            use_cross: true
+            packages: pkg-config libsqlite3-dev
 
           # x86_64-apple-darwin removed: macos-15-large requires paid plan
           # Intel Mac users can use Rosetta 2 to run ARM builds
@@ -33,11 +34,13 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             archive_format: tar.gz
+            packages: ""
 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             archive_format: zip
             ext: .exe
+            packages: ""
 
     runs-on: ${{ matrix.os }}
 
@@ -48,27 +51,23 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.94.0
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606
         with:
-          targets: ${{ matrix.target }}
+          cache: false
+          rustflags: ""
+          target: ${{ matrix.target }}
+
+      - name: Install system packages
+        if: matrix.packages != ''
+        run: sudo apt-get update && sudo apt-get install --assume-yes ${{ matrix.packages }}
 
       - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
         with:
           key: ${{ matrix.target }}
 
-      - name: Install cross
-        if: matrix.use_cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
-
       - name: Build binary
-        run: |
-          if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
-          fi
-        shell: bash
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Create archive (Unix)
         if: matrix.archive_format == 'tar.gz'
@@ -87,7 +86,8 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
           7z a provenant-${{ matrix.target }}.zip provenant${{ matrix.ext }}
-          certutil -hashfile provenant-${{ matrix.target }}.zip SHA256 > provenant-${{ matrix.target }}.zip.sha256
+          $hash = (Get-FileHash "provenant-${{ matrix.target }}.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  provenant-${{ matrix.target }}.zip" | Out-File -FilePath "provenant-${{ matrix.target }}.zip.sha256" -Encoding ascii
         shell: pwsh
 
       - name: Upload build artifacts
@@ -102,7 +102,6 @@ jobs:
   create-release:
     name: Create Release
     needs: build
-    if: always() # Run even if some builds fail
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -114,9 +113,10 @@ jobs:
         run: ls -R artifacts
 
       - name: Create Release with all assets
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd
         with:
-          draft: false
+          allowUpdates: true
+          artifacts: artifacts/*/*.tar.gz,artifacts/*/*.zip,artifacts/*/*.sha256
+          artifactErrorsFailBuild: true
+          generateReleaseNotes: true
           prerelease: ${{ contains(github.ref, '-') }}
-          generate_release_notes: true
-          files: artifacts/*/*.{tar.gz,zip,sha256}

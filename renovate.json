@@ -12,6 +12,7 @@
     "Cargo.lock",
     "package.json",
     "package-lock.json",
+    "rust-toolchain.toml",
     ".nvmrc",
     "renovate.json",
     ".github/workflows/**"
@@ -31,17 +32,7 @@
     "minimumReleaseAge": null
   },
   "osvVulnerabilityAlerts": true,
-  "customManagers": [
-    {
-      "customType": "regex",
-      "managerFilePatterns": ["/.github/workflows/.+\\.ya?ml$/"],
-      "matchStrings": ["uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
-      "depNameTemplate": "rust",
-      "packageNameTemplate": "rust-lang/rust",
-      "datasourceTemplate": "github-tags",
-      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)$"
-    }
-  ],
+  "customManagers": [],
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],

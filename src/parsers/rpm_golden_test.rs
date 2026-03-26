@@ -47,6 +47,7 @@ mod golden_tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_golden_rpm_sqlite_db() {
         let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
@@ -60,6 +61,7 @@ mod golden_tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_golden_rpm_bdb_default() {
         let test_file = PathBuf::from("testdata/rpm/var/lib/rpm/Packages");
@@ -73,6 +75,7 @@ mod golden_tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_golden_rpm_ndb_default() {
         let test_file = PathBuf::from("testdata/rpm/usr/lib/sysimage/rpm/Packages.db");
