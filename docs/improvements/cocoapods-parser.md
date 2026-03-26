@@ -5,13 +5,12 @@
 Rust now goes beyond the current Python ScanCode CocoaPods handling in two concrete ways:
 
 1. refines dependency scope handling so runtime/development semantics are more honest across `.podspec`, `.podspec.json`, `Podfile`, and `Podfile.lock`
-2. adds an explicit `RxDataSources.podspec` regression proving the parser does not explode into duplicated package information
+2. avoids duplicate package explosion for `RxDataSources.podspec`
 
 ## Python Status
 
 - Current Python CocoaPods handling is split across `.podspec`, `.podspec.json`, `Podfile`, and `Podfile.lock` handlers.
 - Upstream still has unresolved scope-semantics questions and a history of duplicate-output bugs around `RxDataSources.podspec`.
-- Current upstream fixtures now show normal `RxDataSources` output, so the old explosive behavior is a bug to avoid reproducing, not a parity target.
 
 ## Rust Improvements
 
@@ -26,8 +25,8 @@ Rust now goes beyond the current Python ScanCode CocoaPods handling in two concr
 
 ### Duplicate-output protection
 
-- Rust now carries an explicit regression test for `RxDataSources.podspec` proving the parser emits exactly one package with a bounded, non-duplicated dependency set.
-- This matches the healthy current upstream fixture direction and guards against the old 940MB-style output blow-up.
+- Rust emits exactly one package with a bounded, non-duplicated dependency set for `RxDataSources.podspec`.
+- This avoids the historical output blow-up seen around duplicate CocoaPods package expansion.
 
 ## Coverage
 

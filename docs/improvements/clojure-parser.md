@@ -3,13 +3,13 @@
 ## Summary
 
 Rust now ships bounded static support for Clojure `deps.edn` and Leiningen `project.clj` even though the Python ScanCode reference still has no production Clojure package parser.
-This slice focuses on the most useful static surfaces from the official docs: direct dependency declarations in `deps.edn`, and literal `defproject` metadata plus dependency vectors in `project.clj`.
+The supported surface focuses on the most useful static data from the official docs: direct dependency declarations in `deps.edn`, and literal `defproject` metadata plus dependency vectors in `project.clj`.
 
 ## Python Status
 
 - Python ScanCode does not currently ship packagedcode support for `deps.edn` or `project.clj`.
 - Upstream interest exists, but the current upstream behavior is limited to summary and classification recognition for `project.clj` rather than package extraction.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- This gives Rust direct packagedcode support for Clojure project manifests that the Python reference does not currently provide.
 
 ## Rust Improvements
 
@@ -35,7 +35,7 @@ This slice focuses on the most useful static surfaces from the official docs: di
 
 - Rust does **not** run Leiningen, execute `project.clj`, or build an effective merged profile environment.
 - `deps.edn` is treated as dependency/config data, not as a source of invented package identity when the file does not declare one.
-- `deps.edn` and `project.clj` are intentionally treated as standalone unassembled manifests in this first slice.
+- `deps.edn` and `project.clj` are intentionally treated as standalone unassembled manifests in the supported static surface described here.
 
 ## Coverage
 

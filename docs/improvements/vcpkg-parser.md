@@ -4,19 +4,13 @@
 
 Rust now parses the primary modern vcpkg manifest surface, `vcpkg.json`, for both project manifests and port/library manifests.
 
-This delivers the highest-value part of vcpkg manifest-mode support immediately: direct dependency extraction, package identity for named manifests, and preservation of versioning/configuration metadata that affects dependency resolution.
+This delivers the core vcpkg manifest-mode behavior that matters most to scans: direct dependency extraction, package identity for named manifests, and preservation of versioning/configuration metadata that affects dependency resolution.
 
 ## Upstream / Reference Context
 
-The current local roadmap issue grouped three related files together:
+The Python reference has no modern `vcpkg.json` manifest parser and does not preserve manifest-mode dependency/configuration metadata.
 
-- `vcpkg.json`
-- `vcpkg-configuration.json`
-- `vcpkg-lock.json`
-
-But Microsoft’s documentation makes it clear that `vcpkg.json` is the required manifest and direct dependency surface, while configuration and registry lock metadata are supporting layers.
-
-That means the most valuable first step is the manifest itself.
+`vcpkg.json` is the required manifest and direct dependency surface, while configuration and registry lock metadata are supporting layers.
 
 ## Rust Improvements
 
@@ -70,7 +64,7 @@ When configuration is embedded in `vcpkg.json`, Rust preserves it directly.
 
 When embedded configuration is absent, Rust also opportunistically reads a sibling `vcpkg-configuration.json` and stores it under manifest `extra_data` as configuration metadata.
 
-This improves usefulness for real repositories today without yet claiming that standalone `vcpkg-configuration.json` is modeled as a separate first-class parser surface.
+This preserves useful real-world repository metadata without claiming standalone `vcpkg-configuration.json` provenance as its own parser surface.
 
 ## Scope Boundary
 
@@ -85,7 +79,7 @@ This improvement intentionally does **not** yet claim first-class support for:
 - standalone `vcpkg-configuration.json` provenance as its own parser/datasource
 - `vcpkg-lock.json` registry lock-state parsing
 
-Those are tracked separately as narrower follow-up work after the main manifest parser.
+Those supporting layers remain out of scope for this document.
 
 ## Primary Areas Affected
 
@@ -96,11 +90,11 @@ Those are tracked separately as narrower follow-up work after the main manifest 
 
 ## Coverage
 
-This improvement is covered by:
+Coverage includes:
 
 - unit tests for project manifests
 - unit tests for port/library manifests
 - unit tests for project manifests without package identity
 - unit tests for sibling configuration ingestion
-- parser golden coverage for project manifests
-- parser golden coverage for port/library manifests
+- parser goldens for project manifests
+- parser goldens for port/library manifests
