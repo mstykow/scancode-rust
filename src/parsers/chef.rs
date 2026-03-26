@@ -47,6 +47,7 @@ const FIELD_DEPENDENCIES: &str = "dependencies";
 const FIELD_DEPENDS: &str = "depends";
 
 struct ChefPackageFields {
+    datasource_id: DatasourceId,
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,
@@ -160,6 +161,7 @@ impl PackageParser for ChefMetadataJsonParser {
         }
 
         vec![build_package(ChefPackageFields {
+            datasource_id: DatasourceId::ChefCookbookMetadataJson,
             name,
             version,
             description,
@@ -317,6 +319,7 @@ impl PackageParser for ChefMetadataRbParser {
             .filter(|s| !s.is_empty());
 
         vec![build_package(ChefPackageFields {
+            datasource_id: DatasourceId::ChefCookbookMetadataRb,
             name,
             version,
             description,
@@ -332,6 +335,7 @@ impl PackageParser for ChefMetadataRbParser {
 
 fn build_package(fields: ChefPackageFields) -> PackageData {
     let ChefPackageFields {
+        datasource_id,
         name,
         version,
         description,
@@ -407,9 +411,19 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
             (None, None, None, None)
         };
 
+    let purl = match (name.as_deref(), version.as_deref()) {
+        (Some(name), Some(version)) => PackageUrl::new("chef", name)
+            .map(|mut p| {
+                let _ = p.with_version(version);
+                p.to_string()
+            })
+            .ok(),
+        _ => None,
+    };
+
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE),
-        datasource_id: Some(DatasourceId::ChefCookbookMetadataRb),
+        datasource_id: Some(datasource_id),
         name,
         version,
         description,
@@ -422,6 +436,7 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
         repository_download_url,
         repository_homepage_url,
         api_data_url,
+        purl,
         primary_language: Some("Ruby".to_string()),
         ..Default::default()
     }

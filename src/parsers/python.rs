@@ -1179,6 +1179,14 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
             package_data.version = Some(wheel_info.version.clone());
         }
 
+        package_data.qualifiers = Some(std::collections::HashMap::from([(
+            "extension".to_string(),
+            format!(
+                "{}-{}-{}",
+                wheel_info.python_tag, wheel_info.abi_tag, wheel_info.platform_tag
+            ),
+        )]));
+
         package_data.purl = build_wheel_purl(
             package_data.name.as_deref(),
             package_data.version.as_deref(),

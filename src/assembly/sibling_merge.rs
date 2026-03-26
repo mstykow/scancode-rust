@@ -70,7 +70,7 @@ pub fn assemble_siblings(
 
                 match &mut package {
                     None => {
-                        if pkg_data.purl.is_some()
+                        if (pkg_data.purl.is_some() || has_assemblable_identity(pkg_data))
                             && !should_skip_npm_lock_package_creation(
                                 pkg_data,
                                 saw_unpackageable_npm_manifest,
@@ -195,6 +195,10 @@ fn npm_package_identity_matches(package: &Package, pkg_data: &PackageData) -> bo
 
 fn normalized_identity_value(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn has_assemblable_identity(pkg_data: &PackageData) -> bool {
+    pkg_data.package_type.is_some() && normalized_identity_value(pkg_data.name.as_deref()).is_some()
 }
 
 fn should_skip_python_uv_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {

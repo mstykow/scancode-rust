@@ -32,6 +32,9 @@ use serde_json::Value;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, normalize_declared_license_key,
+};
 
 /// Conan conanfile.py recipe parser.
 ///
@@ -138,6 +141,19 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
     } else {
         None
     };
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        if license_list.len() == 1 {
+            if let Some(normalized) = normalize_declared_license_key(&license_list[0]) {
+                build_declared_license_data(
+                    normalized,
+                    DeclaredLicenseMatchMetadata::single_line(&license_list[0]),
+                )
+            } else {
+                (None, None, Vec::new())
+            }
+        } else {
+            (None, None, Vec::new())
+        };
 
     PackageData {
         name,
@@ -147,6 +163,9 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
         vcs_url,
         keywords,
         dependencies,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement: extracted_license,
         datasource_id: Some(DatasourceId::ConanConanFilePy),
         ..default_package_data()
