@@ -690,4 +690,275 @@ mod tests {
             DatasourceId::NugetPackagesConfig,
         );
     }
+
+    #[test]
+    fn test_deno_basic_scan_assembles_manifest_and_lockfile() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/deno-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("deno-sample"))
+            .expect("deno package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Deno));
+        assert_eq!(package.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:generic/%40provenant/deno-sample@1.0.0")
+        );
+        assert_dependency_present(&result.dependencies, "pkg:npm/chalk", "deno.json");
+        assert_dependency_present(&result.dependencies, "pkg:npm/chalk@5.6.2", "deno.lock");
+        assert_file_links_to_package(
+            &files,
+            "/deno.json",
+            &package.package_uid,
+            DatasourceId::DenoJson,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/deno.lock",
+            &package.package_uid,
+            DatasourceId::DenoLock,
+        );
+    }
+
+    #[test]
+    fn test_python_wheel_origin_scan_assembles_distribution_and_origin_metadata() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let cache_dir = temp_dir.path().join(".cache/pip/wheels/eb/60/37/cachehash");
+        fs::create_dir_all(&cache_dir).expect("create pip cache dir");
+        fs::copy(
+            Path::new(
+                "testdata/python/golden/pip_cache/wheels/construct/construct-2.10.68-py3-none-any.whl",
+            ),
+            cache_dir.join("construct-2.10.68-py3-none-any.whl"),
+        )
+        .expect("copy wheel fixture");
+        fs::copy(
+            Path::new("testdata/python/golden/pip_cache/wheels/construct/origin.json"),
+            cache_dir.join("origin.json"),
+        )
+        .expect("copy origin fixture");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("construct"))
+            .expect("construct package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Pypi));
+        assert_eq!(package.version.as_deref(), Some("2.10.68"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:pypi/construct@2.10.68?extension=py3-none-any")
+        );
+        assert_file_links_to_package(
+            &files,
+            "/construct-2.10.68-py3-none-any.whl",
+            &package.package_uid,
+            DatasourceId::PypiWheel,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/origin.json",
+            &package.package_uid,
+            DatasourceId::PypiPipOriginJson,
+        );
+    }
+
+    #[test]
+    fn test_dart_pubspec_scan_assembles_manifest_and_lockfile() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::copy(
+            Path::new("testdata/dart-golden/publish-pubspec/pubspec.yaml"),
+            temp_dir.path().join("pubspec.yaml"),
+        )
+        .expect("copy pubspec fixture");
+        fs::copy(
+            Path::new("testdata/dart-golden/stock-lock/pubspec.lock"),
+            temp_dir.path().join("pubspec.lock"),
+        )
+        .expect("copy pubspec.lock fixture");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("mock_name"))
+            .expect("dart package should be assembled");
+
+        assert_eq!(package.version.as_deref(), Some("1.1.0"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:dart/mock_name@1.1.0"));
+        assert_dependency_present(&result.dependencies, "pkg:pubspec/yaml", "pubspec.yaml");
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:pubspec/async@2.6.1",
+            "pubspec.lock",
+        );
+        assert_file_links_to_package(
+            &files,
+            "/pubspec.yaml",
+            &package.package_uid,
+            DatasourceId::PubspecYaml,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/pubspec.lock",
+            &package.package_uid,
+            DatasourceId::PubspecLock,
+        );
+    }
+
+    #[test]
+    fn test_conan_manifest_scan_assembles_recipe_and_conandata() {
+        let (files, result) =
+            scan_and_assemble(Path::new("testdata/conan/recipes/libzip/manifest"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| {
+                package.name.as_deref() == Some("libzip")
+                    && package.version.as_deref() == Some("1.10.1")
+            })
+            .expect("libzip conan package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Conan));
+        assert_eq!(
+            package.declared_license_expression_spdx.as_deref(),
+            Some("BSD-3-Clause")
+        );
+        assert_eq!(package.purl.as_deref(), Some("pkg:conan/libzip@1.10.1"));
+        assert_file_links_to_package(
+            &files,
+            "/conanfile.py",
+            &package.package_uid,
+            DatasourceId::ConanConanFilePy,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/conandata.yml",
+            &package.package_uid,
+            DatasourceId::ConanConanDataYml,
+        );
+    }
+
+    #[test]
+    fn test_conda_assembly_scan_keeps_conda_and_pypi_package_contracts() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/conda/assembly"));
+
+        let conda_package = result
+            .packages
+            .iter()
+            .find(|package| {
+                package.package_type == Some(PackageType::Conda)
+                    && package.name.as_deref() == Some("requests")
+            })
+            .expect("conda requests package should be assembled");
+        let pypi_package = result
+            .packages
+            .iter()
+            .find(|package| {
+                package.package_type == Some(PackageType::Pypi)
+                    && package.name.as_deref() == Some("requests")
+            })
+            .expect("embedded pypi requests package should be assembled");
+
+        assert_eq!(conda_package.version.as_deref(), Some("2.32.3"));
+        assert_eq!(
+            conda_package.purl.as_deref(),
+            Some("pkg:conda/requests@2.32.3")
+        );
+        assert_eq!(pypi_package.version.as_deref(), Some("2.32.3"));
+        assert_eq!(
+            pypi_package.purl.as_deref(),
+            Some("pkg:pypi/requests@2.32.3")
+        );
+        assert_dependency_present(&result.dependencies, "pkg:conda/zlib", "meta.yaml");
+        assert_file_links_to_package(
+            &files,
+            "/requests-2.32.3-py312h06a4308_1.json",
+            &conda_package.package_uid,
+            DatasourceId::CondaMetaJson,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/site-packages/requests-2.32.3.dist-info/METADATA",
+            &pypi_package.package_uid,
+            DatasourceId::PypiWheelMetadata,
+        );
+    }
+
+    #[test]
+    fn test_chef_basic_scan_assembles_metadata_json_and_rb() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/chef/basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("301"))
+            .expect("chef package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Chef));
+        assert_eq!(package.version.as_deref(), Some("0.1.0"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:chef/301@0.1.0"));
+        assert_dependency_present(&result.dependencies, "pkg:chef/nodejs", "metadata.rb");
+        assert_file_links_to_package(
+            &files,
+            "/metadata.json",
+            &package.package_uid,
+            DatasourceId::ChefCookbookMetadataJson,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/metadata.rb",
+            &package.package_uid,
+            DatasourceId::ChefCookbookMetadataRb,
+        );
+    }
+
+    #[test]
+    fn test_ruby_manifest_lock_scan_assembles_gemspec_and_lockfile() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::copy(
+            Path::new("testdata/ruby/basic.gemspec"),
+            temp_dir.path().join("example.gemspec"),
+        )
+        .expect("copy gemspec fixture");
+        fs::copy(
+            Path::new("testdata/ruby/Gemfile.lock"),
+            temp_dir.path().join("Gemfile.lock"),
+        )
+        .expect("copy Gemfile.lock fixture");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("example-gem"))
+            .expect("ruby manifest package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Gem));
+        assert_eq!(package.version.as_deref(), Some("1.2.3"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:gem/example-gem@1.2.3"));
+        assert_dependency_present(&result.dependencies, "pkg:gem/rails", "example.gemspec");
+        assert_dependency_present(&result.dependencies, "pkg:gem/rspec@3.12.0", "Gemfile.lock");
+        assert_file_links_to_package(
+            &files,
+            "/example.gemspec",
+            &package.package_uid,
+            DatasourceId::Gemspec,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/Gemfile.lock",
+            &package.package_uid,
+            DatasourceId::GemfileLock,
+        );
+    }
 }
