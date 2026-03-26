@@ -23,6 +23,25 @@ mod tests {
         );
     }
 
+    fn assert_file_links_to_package(
+        files: &[crate::models::FileInfo],
+        suffix: &str,
+        package_uid: &str,
+        datasource_id: DatasourceId,
+    ) {
+        let file = files
+            .iter()
+            .find(|file| file.path.ends_with(suffix))
+            .unwrap_or_else(|| panic!("{suffix} should be scanned"));
+
+        assert!(file.for_packages.iter().any(|uid| uid == package_uid));
+        assert!(
+            file.package_data
+                .iter()
+                .any(|pkg_data| { pkg_data.datasource_id == Some(datasource_id) })
+        );
+    }
+
     #[test]
     fn test_gitmodules_scan_keeps_manifest_unassembled_and_hoists_known_dependencies() {
         let (files, result) = scan_and_assemble(Path::new("testdata/gitmodules"));
@@ -373,6 +392,302 @@ mod tests {
                 .package_data
                 .iter()
                 .any(|pkg_data| { pkg_data.datasource_id == Some(DatasourceId::RpmYumdb) })
+        );
+    }
+
+    #[test]
+    fn test_cargo_basic_scan_assembles_manifest_and_lockfile() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/cargo-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-crate"))
+            .expect("cargo package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Cargo));
+        assert_eq!(package.version.as_deref(), Some("0.1.0"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:cargo/test-crate@0.1.0"));
+        assert_dependency_present(&result.dependencies, "pkg:cargo/serde", "Cargo.toml");
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:cargo/serde@1.0.195",
+            "Cargo.lock",
+        );
+        assert_file_links_to_package(
+            &files,
+            "/Cargo.toml",
+            &package.package_uid,
+            DatasourceId::CargoToml,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/Cargo.lock",
+            &package.package_uid,
+            DatasourceId::CargoLock,
+        );
+    }
+
+    #[test]
+    fn test_composer_basic_scan_assembles_manifest_and_lockfile() {
+        let (files, result) =
+            scan_and_assemble(Path::new("testdata/assembly-golden/composer-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| {
+                package.namespace.as_deref() == Some("test")
+                    && package.name.as_deref() == Some("package")
+            })
+            .expect("composer package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Composer));
+        assert_eq!(package.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:composer/test/package@1.0.0")
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:composer/phpunit/phpunit",
+            "composer.json",
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:composer/phpunit/phpunit@10.0.0",
+            "composer.lock",
+        );
+        assert_file_links_to_package(
+            &files,
+            "/composer.json",
+            &package.package_uid,
+            DatasourceId::PhpComposerJson,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/composer.lock",
+            &package.package_uid,
+            DatasourceId::PhpComposerLock,
+        );
+    }
+
+    #[test]
+    fn test_helm_basic_scan_assembles_chart_and_lockfile() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/helm-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("nginx"))
+            .expect("helm chart should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Helm));
+        assert_eq!(package.version.as_deref(), Some("22.1.1"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:helm/nginx@22.1.1"));
+        assert_dependency_present(&result.dependencies, "pkg:helm/common", "Chart.yaml");
+        assert_dependency_present(&result.dependencies, "pkg:helm/common@2.31.4", "Chart.lock");
+        assert_file_links_to_package(
+            &files,
+            "/Chart.yaml",
+            &package.package_uid,
+            DatasourceId::HelmChartYaml,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/Chart.lock",
+            &package.package_uid,
+            DatasourceId::HelmChartLock,
+        );
+    }
+
+    #[test]
+    fn test_ruby_extracted_scan_assembles_metadata_and_gemspec() {
+        let (files, result) =
+            scan_and_assemble(Path::new("testdata/assembly-golden/ruby-extracted-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("example-gem"))
+            .expect("ruby extracted gem should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Gem));
+        assert_eq!(package.version.as_deref(), Some("1.2.3"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:gem/example-gem@1.2.3"));
+        assert_dependency_present(&result.dependencies, "pkg:gem/rails", "metadata.gz-extract");
+        assert_dependency_present(&result.dependencies, "pkg:gem/rubocop", "example.gemspec");
+        assert_file_links_to_package(
+            &files,
+            "/metadata.gz-extract",
+            &package.package_uid,
+            DatasourceId::GemArchiveExtracted,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/example.gemspec",
+            &package.package_uid,
+            DatasourceId::Gemspec,
+        );
+    }
+
+    #[test]
+    fn test_go_basic_scan_assembles_module_and_sum() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/go-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-module"))
+            .expect("go module should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Golang));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:golang/example.com/test-module")
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:golang/github.com/gin-gonic/gin@v1.9.0",
+            "go.sum",
+        );
+        assert_file_links_to_package(&files, "/go.mod", &package.package_uid, DatasourceId::GoMod);
+        assert_file_links_to_package(&files, "/go.sum", &package.package_uid, DatasourceId::GoSum);
+    }
+
+    #[test]
+    fn test_bun_basic_scan_assembles_package_and_bun_lock() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/bun-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-package"))
+            .expect("bun package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Npm));
+        assert_eq!(package.version.as_deref(), Some("1.0.0"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:npm/test-package@1.0.0"));
+        assert_dependency_present(&result.dependencies, "pkg:npm/express", "package.json");
+        assert_dependency_present(&result.dependencies, "pkg:npm/express@4.18.0", "bun.lock");
+        assert_file_links_to_package(
+            &files,
+            "/package.json",
+            &package.package_uid,
+            DatasourceId::NpmPackageJson,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/bun.lock",
+            &package.package_uid,
+            DatasourceId::BunLock,
+        );
+    }
+
+    #[test]
+    fn test_hackage_basic_scan_assembles_multi_file_package() {
+        let (files, result) =
+            scan_and_assemble(Path::new("testdata/assembly-golden/hackage-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("aaa-example-hackage"))
+            .expect("hackage package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Hackage));
+        assert_eq!(package.version.as_deref(), Some("0.1.0.0"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:hackage/aaa-example-hackage@0.1.0.0")
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:hackage/base",
+            "aaa-example-hackage.cabal",
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:hackage/aeson@2.2.1.0",
+            "stack.yaml",
+        );
+        assert_file_links_to_package(
+            &files,
+            "/aaa-example-hackage.cabal",
+            &package.package_uid,
+            DatasourceId::HackageCabal,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/cabal.project",
+            &package.package_uid,
+            DatasourceId::HackageCabalProject,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/stack.yaml",
+            &package.package_uid,
+            DatasourceId::HackageStackYaml,
+        );
+    }
+
+    #[test]
+    fn test_pixi_basic_scan_assembles_manifest_and_lockfile() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/pixi-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("pixi-demo"))
+            .expect("pixi package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Pixi));
+        assert_eq!(package.version.as_deref(), Some("1.2.3"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:pixi/pixi-demo@1.2.3"));
+        assert_dependency_present(&result.dependencies, "pkg:conda/python", "pixi.toml");
+        assert_dependency_present(&result.dependencies, "pkg:conda/python@3.12.7", "pixi.lock");
+        assert_file_links_to_package(
+            &files,
+            "/pixi.toml",
+            &package.package_uid,
+            DatasourceId::PixiToml,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/pixi.lock",
+            &package.package_uid,
+            DatasourceId::PixiLock,
+        );
+    }
+
+    #[test]
+    fn test_nuget_basic_scan_assembles_csproj_and_packages_config() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/nuget-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("Contoso.Utility"))
+            .expect("nuget package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Nuget));
+        assert_eq!(package.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:nuget/Contoso.Utility@1.0.0")
+        );
+        assert_dependency_present(&result.dependencies, "pkg:nuget/NUnit", "packages.config");
+        assert_file_links_to_package(
+            &files,
+            "/Contoso.Utility.csproj",
+            &package.package_uid,
+            DatasourceId::NugetCsproj,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/packages.config",
+            &package.package_uid,
+            DatasourceId::NugetPackagesConfig,
         );
     }
 }
