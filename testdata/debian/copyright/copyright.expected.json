@@ -53,6 +53,7 @@
             "matched_length": 2,
             "match_coverage": 100.0,
             "rule_relevance": 100,
+            "rule_url": null,
             "matched_text": "License: LGPL-2.1"
           }
         ]
@@ -75,6 +76,7 @@
             "matched_length": 2,
             "match_coverage": 100.0,
             "rule_relevance": 100,
+            "rule_url": null,
             "matched_text": "License: LGPL-2.1"
           }
         ]
@@ -93,6 +95,7 @@
             "matched_length": 2,
             "match_coverage": 100.0,
             "rule_relevance": 100,
+            "rule_url": null,
             "matched_text": "License: LGPL-2.1"
           }
         ]
@@ -111,6 +114,7 @@
             "matched_length": 2,
             "match_coverage": 100.0,
             "rule_relevance": 100,
+            "rule_url": null,
             "matched_text": "License: LGPL-2.1"
           }
         ]
@@ -129,6 +133,7 @@
             "matched_length": 2,
             "match_coverage": 100.0,
             "rule_relevance": 100,
+            "rule_url": null,
             "matched_text": "License: LGPL-2.1"
           }
         ]
