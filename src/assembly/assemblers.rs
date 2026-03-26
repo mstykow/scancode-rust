@@ -570,6 +570,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     },
 ];
 
+// Datasource IDs intentionally excluded from package assembly.
+//
+// This list is runtime-significant: files with these datasource IDs may remain
+// unowned by any Package, while their dependencies are still eligible for
+// top-level hoisting. Tests also use it to enforce explicit assembly accounting.
 pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,
