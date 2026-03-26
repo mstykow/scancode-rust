@@ -170,6 +170,7 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
     }
 
     assemblers::run_post_assembly_passes(files, &mut packages, &mut dependencies);
+    hoist_unassembled_file_dependencies(files, &mut dependencies);
 
     for package in &mut packages {
         package.datafile_paths.sort();
@@ -233,6 +234,31 @@ fn apply_directory_merge_results(
             packages.push(package);
         }
         dependencies.extend(deps);
+    }
+}
+
+fn hoist_unassembled_file_dependencies(
+    files: &[FileInfo],
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    for file in files {
+        if !file.for_packages.is_empty() {
+            continue;
+        }
+
+        for pkg_data in &file.package_data {
+            let Some(datasource_id) = pkg_data.datasource_id else {
+                continue;
+            };
+
+            if !assemblers::UNASSEMBLED_DATASOURCE_IDS.contains(&datasource_id) {
+                continue;
+            }
+
+            dependencies.extend(pkg_data.dependencies.iter().map(|dep| {
+                TopLevelDependency::from_dependency(dep, file.path.clone(), datasource_id, None)
+            }));
+        }
     }
 }
 

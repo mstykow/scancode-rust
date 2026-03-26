@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use super::super::scan_pipeline_test_utils::scan_and_assemble;
+    use super::super::scan_pipeline_test_utils::{assert_file_links_to_package, scan_and_assemble};
+    use crate::models::{DatasourceId, PackageType};
 
     #[test]
     fn test_python_metadata_scan_assigns_referenced_site_packages_files() {
@@ -128,5 +129,49 @@ mod tests {
         assert!(setup_file.for_packages.contains(&package.package_uid));
         assert!(module_init.for_packages.contains(&package.package_uid));
         assert!(top_level.for_packages.contains(&package.package_uid));
+    }
+
+    #[test]
+    fn test_python_wheel_origin_scan_assembles_distribution_and_origin_metadata() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let cache_dir = temp_dir.path().join(".cache/pip/wheels/eb/60/37/cachehash");
+        std::fs::create_dir_all(&cache_dir).expect("create pip cache dir");
+        std::fs::copy(
+            "testdata/python/golden/pip_cache/wheels/construct/construct-2.10.68-py3-none-any.whl",
+            cache_dir.join("construct-2.10.68-py3-none-any.whl"),
+        )
+        .expect("copy wheel fixture");
+        std::fs::copy(
+            "testdata/python/golden/pip_cache/wheels/construct/origin.json",
+            cache_dir.join("origin.json"),
+        )
+        .expect("copy origin fixture");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("construct"))
+            .expect("construct package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Pypi));
+        assert_eq!(package.version.as_deref(), Some("2.10.68"));
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:pypi/construct@2.10.68?extension=py3-none-any")
+        );
+        assert_file_links_to_package(
+            &files,
+            "/construct-2.10.68-py3-none-any.whl",
+            &package.package_uid,
+            DatasourceId::PypiWheel,
+        );
+        assert_file_links_to_package(
+            &files,
+            "/origin.json",
+            &package.package_uid,
+            DatasourceId::PypiPipOriginJson,
+        );
     }
 }

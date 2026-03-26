@@ -50,4 +50,45 @@ mod tests {
             pkg_data.datasource_id == Some(DatasourceId::RpmInstalledDatabaseSqlite)
         }));
     }
+
+    #[test]
+    fn test_rpm_yumdb_scan_assembles_virtual_package_and_preserves_metadata() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/rpm/var/lib/yum/yumdb"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("bash"))
+            .expect("bash yumdb package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Rpm));
+        assert_eq!(package.version.as_deref(), Some("5.0-1.el8"));
+        assert!(package.is_virtual);
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:rpm/bash@5.0-1.el8?arch=x86_64")
+        );
+        let extra = package
+            .extra_data
+            .as_ref()
+            .expect("yumdb extra_data should exist");
+        assert_eq!(
+            extra.get("from_repo").and_then(|v| v.as_str()),
+            Some("baseos")
+        );
+        assert_eq!(extra.get("reason").and_then(|v| v.as_str()), Some("dep"));
+        assert_eq!(extra.get("releasever").and_then(|v| v.as_str()), Some("8"));
+
+        let from_repo = files
+            .iter()
+            .find(|file| file.path.ends_with("/from_repo"))
+            .expect("from_repo file should be scanned");
+        assert!(from_repo.for_packages.contains(&package.package_uid));
+        assert!(
+            from_repo
+                .package_data
+                .iter()
+                .any(|pkg_data| { pkg_data.datasource_id == Some(DatasourceId::RpmYumdb) })
+        );
+    }
 }

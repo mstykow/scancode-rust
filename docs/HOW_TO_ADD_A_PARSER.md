@@ -386,8 +386,7 @@ meaningful dependencies, or file/package linkage consumed by assembly and output
 
 **Recommended location**: keep these tests near the owning ecosystem under `src/parsers/` in a
 dedicated file such as `src/parsers/<ecosystem>_scan_test.rs`. For broad retroactive audits across
-multiple existing ecosystems, extending the shared `src/parsers/downstream_scan_test.rs` suite is
-also appropriate.
+multiple existing ecosystems, add parser-local scan files for each covered ecosystem.
 
 If your parser emits meaningful `PackageData.file_references`, treat one of these scan tests as
 effectively required. Parser unit tests can prove that references were extracted; only a
@@ -1022,7 +1021,7 @@ Before submitting your parser:
 - [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Datasource classified in `ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`
-- [ ] If parser emits meaningful downstream package/dependency data, final package visibility / `for_packages` / dependency hoisting is proven by a parser-adjacent `*_scan_test.rs` or the shared `src/parsers/downstream_scan_test.rs`
+- [ ] If parser emits meaningful downstream package/dependency data, final package visibility / `for_packages` / dependency hoisting is proven by a parser-adjacent `*_scan_test.rs`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
 
