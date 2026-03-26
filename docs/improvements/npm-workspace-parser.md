@@ -2,12 +2,12 @@
 
 ## Summary
 
-Our Rust implementation improves on the Python reference in two areas:
+Provenant improves on the Python reference in two durable ways:
 
 - ✨ **New Feature: pnpm-workspace.yaml metadata extraction** — Python recognizes the file but extracts no metadata (NonAssemblable handler)
 - ✨ **Improved Assembly: Workspace assembly with per-member packages** — Python has basic workspace assembly; Rust adds exclusion patterns, sibling-merge cleanup, and more robust member discovery
 
-## Part 1: Parser Improvements
+## Parser improvement: `pnpm-workspace.yaml` metadata extraction
 
 ### Problem in Python Reference
 
@@ -15,15 +15,15 @@ Python ScanCode has a `PnpmWorkspaceYamlHandler` in `packagedcode/npm.py`, but i
 
 The handler recognizes `pnpm-workspace.yaml` files but produces no package metadata, no workspace pattern extraction, and no structural information about the monorepo.
 
-### Our Solution
+### Rust behavior
 
-We implemented `NpmWorkspaceParser` which extracts workspace configuration data from `pnpm-workspace.yaml` files, including:
+Rust extracts workspace configuration data from `pnpm-workspace.yaml`, including:
 
 - Workspace package glob patterns (e.g., `packages/*`, `apps/*`)
 - Monorepo structure information
 - Negation patterns for excluded packages
 
-### Before/After Comparison
+### Output difference
 
 **Python Output** (stub — NonAssemblable):
 
@@ -48,7 +48,7 @@ We implemented `NpmWorkspaceParser` which extracts workspace configuration data 
 }
 ```
 
-### What Gets Extracted
+### Extracted data
 
 | Field                      | Source           | Description                                                 |
 | -------------------------- | ---------------- | ----------------------------------------------------------- |
@@ -66,9 +66,9 @@ The parser handles all pnpm workspace glob patterns:
 - `"*"` — Root-level wildcard
 - Empty or missing `packages` field — Graceful fallback
 
-## Part 2: Assembly Improvements
+## Assembly improvement: richer workspace handling
 
-### What Python Does
+### Python reference behavior
 
 The Python reference handles workspace assembly by:
 
@@ -78,9 +78,9 @@ The Python reference handles workspace assembly by:
 - Uses `walk_npm()` to assign resources, skipping `node_modules`
 - Resolves `workspace:*` version references
 
-### What Rust Improves
+### Rust improvement
 
-Rust achieves feature parity with that assembly behavior and adds several improvements:
+Rust preserves the same core workspace behavior while adding several user-visible improvements:
 
 | Feature                                  | Python | Rust | Improvement                                                |
 | ---------------------------------------- | ------ | ---- | ---------------------------------------------------------- |
@@ -95,13 +95,13 @@ Rust achieves feature parity with that assembly behavior and adds several improv
 | **Sibling-merge cleanup**                | ❌     | ✅   | 🆕 Removes duplicate packages from earlier assembly phases |
 | **Explicit dependency cleanup**          | ❌     | ✅   | 🆕 Cleans up root dependencies after hoisting to members   |
 
-### Bugs Fixed from Python
+### Concrete user-visible differences
 
-1. **No exclusion pattern support**: Python ignores `!pattern` entries in workspace globs; Rust filters them out during member discovery
-2. **Duplicate packages**: Python doesn't clean up packages created by sibling-merge before workspace assembly, leading to duplicates; Rust explicitly removes them
-3. **Version resolution timing**: Python resolves workspace versions during parsing; Rust defers to assembly phase where all member versions are known
-4. **Root package cleanup**: Python keeps private root packages in output; Rust removes them when all content is assigned to members
-5. **Member validation**: Python doesn't validate that discovered members actually have package.json files; Rust verifies before creating packages
+1. **Exclusion patterns**: Rust respects `!pattern` entries in workspace globs, so excluded packages do not leak into the workspace package set.
+2. **Duplicate-package cleanup**: Rust removes duplicate packages created by earlier sibling-merge phases before workspace assembly.
+3. **Workspace-version fidelity**: Rust resolves workspace versions only once all member versions are known, so `workspace:*`, `workspace:^`, and `workspace:~` references stay grounded in the actual workspace state.
+4. **Root-package cleanup**: Rust drops private root packages once all content is reassigned to workspace members, avoiding redundant root-only package entries.
+5. **Member validation**: Rust verifies that discovered members actually contain `package.json` files before creating package records.
 
 ## Impact
 

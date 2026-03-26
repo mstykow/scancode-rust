@@ -2,14 +2,14 @@
 
 ## Summary
 
-Rust now ships static Nix package support for `flake.nix`, `flake.lock`, and a bounded `default.nix` `mkDerivation` slice even though the Python ScanCode reference still has no production Nix packagedcode parser.
-This first slice focuses on the highest-value official and commonly used Nix repository surfaces: flake identity, pinned flake dependency state, and literal derivation metadata that can be recovered safely without evaluation.
+Rust now ships static Nix package support for `flake.nix`, `flake.lock`, and a bounded `default.nix` `mkDerivation` surface even though the Python ScanCode reference still has no production Nix packagedcode parser.
+The supported surface focuses on the highest-value official and commonly used Nix repository metadata: flake identity, pinned flake dependency state, and literal derivation metadata that can be recovered safely without evaluation.
 
 ## Python Status
 
 - Python ScanCode does not currently ship a production Nix packagedcode parser.
-- Upstream interest exists, including current Nix-manifest issue tracking, but there is no packagedcode implementation or test suite to port directly.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- Python ScanCode does not currently ship packagedcode support for these Nix surfaces beyond general file recognition.
+- This gives Rust direct packagedcode support for flake and bounded derivation metadata that the Python reference does not currently provide.
 
 ## Rust Improvements
 

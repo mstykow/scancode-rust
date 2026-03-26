@@ -2,13 +2,13 @@
 
 ## Summary
 
-The Alpine parser in Provenant now combines existing beyond-parity improvements with the current Alpine enhancement batch:
+Provenant's Alpine parser improves on the Python reference in six concrete ways:
 
 1. **🐛 Bug Fix**: SHA1 checksums correctly decoded (Python always returns `null`)
 2. **✨ New Feature**: Provider field extraction (Python explicitly ignores this field)
-3. **✨ New Feature**: Static APKBUILD recipe parsing with real local fixture coverage
+3. **✨ New Feature**: Static APKBUILD recipe parsing
 4. **🐛 Bug Fix**: Alpine commit metadata now produces `git+https://...` VCS URLs
-5. **🐛 Bug Fix / Proof**: Packages with no files are still detected and retained
+5. **🐛 Bug Fix**: Packages with no files are still detected and retained
 6. **🔍 Enhanced**: APKBUILD dependency families and non-APKBUILD license normalization now match Alpine package semantics more closely
 
 ## Improvement 1: SHA1 Checksum Decoding (Bug Fix)
@@ -145,9 +145,9 @@ Coverage verifies that provider metadata is preserved as structured package data
 
 ## Improvement 3: APKBUILD Recipe Parsing
 
-### Python Implementation (Current)
+### Python Reference Status
 
-Current Python ScanCode already has an APKBUILD parser on `develop`, but the local Rust planning docs had drifted and still described it as a missing/stub surface.
+The Python reference already parses `APKBUILD`, but Provenant extends that support with broader static dependency-family extraction and more consistent declared-license handling across Alpine inputs.
 
 ### Our Rust Implementation
 
@@ -169,7 +169,7 @@ Implemented coverage includes:
 
 ### Why This Matters
 
-This closes the most visible Alpine parser gap in Rust without violating the security-first parsing rule: we still do **not** execute shell or evaluate arbitrary shell functions.
+This keeps the parser inside the project's security-first boundary: it still does **not** execute shell or evaluate arbitrary shell functions.
 
 Rust now also emits APKBUILD dependency families as structured dependencies:
 
@@ -180,7 +180,7 @@ Rust now also emits APKBUILD dependency families as structured dependencies:
 
 ## Improvement 4: HTTPS VCS URL Generation
 
-Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust now matches that behavior for installed-db commit metadata.
+Python does not consistently preserve HTTPS commit-style Alpine VCS URLs from installed-db metadata, while Rust emits them directly.
 
 ### Before
 
@@ -191,9 +191,9 @@ Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust
 - `c:<commit>` now becomes:
   - `git+https://git.alpinelinux.org/aports/commit/?id={commit}`
 
-## Improvement 5: Fileless Package Detection Proof
+## Improvement 5: Fileless Package Retention
 
-The Alpine batch now explicitly proves that packages with no file references are still preserved as packages rather than being dropped.
+Rust preserves packages with no file references as packages rather than dropping them.
 
 This matters for packages like `libc-utils` and for APKBUILD “dummy package” patterns such as `linux-firmware`’s `none()` subpackage.
 
@@ -207,34 +207,9 @@ Rust now keeps Alpine package metadata more consistent across all supported Alpi
 
 This removes an odd asymmetry where only APKBUILD enjoyed normalized license metadata even though package archives and installed-db records carry the same package-declared license values.
 
-## Implementation Notes
-
-### Challenge: Case-Sensitive Field Parsing
-
-Alpine's installed database format uses:
-
-- `P:` for **package name** (capital P)
-- `p:` for **providers** (lowercase p)
-
-Python's RFC822 parser is case-insensitive, making it impossible to distinguish these fields correctly.
-
-**Our Solution**: Use raw text parsing with case-sensitive field extraction:
-
-```rust
-for line in content.lines() {
-    if line.starts_with("P:") {
-        // Package name (capital P)
-        name = Some(line[2..].trim().to_string());
-    } else if line.starts_with("p:") {
-        // Providers (lowercase p)
-        providers = extract_providers(line);
-    }
-}
-```
-
 ## Coverage
 
-Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, APKBUILD dependency families, raw matched-text preservation for `custom:multiple`, fileless package detection, HTTPS VCS URL synthesis, non-APKBUILD license normalization, and golden coverage for installed-db, `.apk`, and APKBUILD inputs.
+Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, APKBUILD dependency families, raw matched-text preservation for `custom:multiple`, fileless package retention, HTTPS VCS URL synthesis, and non-APKBUILD license normalization.
 
 ## References
 

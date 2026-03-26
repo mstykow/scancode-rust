@@ -3,13 +3,13 @@
 ## Summary
 
 Rust now ships a bounded, static parser for `build.sbt` files even though the Python ScanCode reference has no production SBT parser today.
-This first slice is intentionally narrow: it extracts only top-level literal metadata, literal license/homepage forms, and literal external library dependencies, and it skips anything that would require Scala or sbt evaluation.
+The supported surface is intentionally narrow: it extracts only top-level literal metadata, literal license/homepage forms, and literal external library dependencies, and it skips anything that would require Scala or sbt evaluation.
 
 ## Python Status
 
 - Python ScanCode does not currently ship a production SBT parser.
 - Upstream demand exists, but there is no reference implementation to port directly.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- This gives Rust direct packagedcode support for SBT build metadata that the Python reference does not currently provide.
 
 ## Rust Improvements
 
