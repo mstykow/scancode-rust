@@ -196,6 +196,10 @@ hoisting.
 In addition to the top-level integration suite, some parsers benefit from a small number of
 ecosystem-local scanner/assembly tests under `src/parsers/*_scan_test.rs`.
 
+For broad retroactive coverage work across many existing parsers, a shared audit suite such as
+`src/parsers/downstream_scan_test.rs` is also appropriate, as long as each test still protects a
+clear ecosystem-specific downstream contract.
+
 These are appropriate when behavior depends on scanner wiring or assembly/file-reference handling,
 for example:
 
@@ -209,6 +213,9 @@ for example:
 These are **not** a replacement for `tests/scanner_integration.rs`. The top-level integration suite
 should stay cross-parser and system-oriented, while ecosystem-local scan tests stay close to the
 owning parser behavior they protect.
+
+For parsers that emit meaningful downstream package/dependency data, this layer should be treated as
+the default expectation rather than an optional extra.
 
 **Example**:
 

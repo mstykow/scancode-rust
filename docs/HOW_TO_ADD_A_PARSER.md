@@ -338,7 +338,7 @@ mod tests {
 - [ ] Malformed input handled gracefully
 - [ ] Edge cases (empty, minimal, complex)
 - [ ] Golden fixtures added for representative parser outputs
-- [ ] Ecosystem-level scan/assembly fixture tests added when scanner wiring or assembly behavior is critical
+- [ ] At least one fixture-backed scan/assembly contract test added when the parser emits meaningful downstream package or dependency data
 
 ### Integration Test Verification
 
@@ -358,7 +358,7 @@ The `test_all_parsers_are_registered_and_exported` test will verify your parser 
 
 **If this test fails**, it means you forgot to add your parser to the `register_package_handlers!` macro in Step 4.2.
 
-### Ecosystem-Level Scan/Assembly Tests (Add When They Protect Real Behavior)
+### Ecosystem-Level Scan/Assembly Tests (Default for Downstream Package Contracts)
 
 Unit tests and parser golden tests are the baseline. Some ecosystems also benefit from a small
 number of **fixture-backed scanner/assembly tests** that exercise the higher-level flow:
@@ -369,7 +369,8 @@ number of **fixture-backed scanner/assembly tests** that exercise the higher-lev
 4. assembly behavior when relevant
 
 These tests are valuable when parser correctness depends on more than parsing a single file in
-isolation.
+isolation. In practice, this is the default for parsers that emit top-level package identity,
+meaningful dependencies, or file/package linkage consumed by assembly and output stages.
 
 **Good candidates**:
 
@@ -378,9 +379,15 @@ isolation.
 - ecosystems with multiple competing metadata surfaces where scanner/assembly ordering matters
 - archive or extracted layouts where normalized paths or file references affect final behavior
 - intentionally unassembled formats whose scanner behavior must stay stable
+- package/lockfile pairs whose final package visibility, dependency hoisting, or `for_packages`
+  linkage would not be proven by parser-only goldens
+- parsers whose downstream contract depends on package-shape fields such as `namespace`/`name`,
+  `purl`, declared-license fields, `datasource_id`, or assembled `datafile_paths`
 
 **Recommended location**: keep these tests near the owning ecosystem under `src/parsers/` in a
-dedicated file such as `src/parsers/<ecosystem>_scan_test.rs`.
+dedicated file such as `src/parsers/<ecosystem>_scan_test.rs`. For broad retroactive audits across
+multiple existing ecosystems, extending the shared `src/parsers/downstream_scan_test.rs` suite is
+also appropriate.
 
 If your parser emits meaningful `PackageData.file_references`, treat one of these scan tests as
 effectively required. Parser unit tests can prove that references were extracted; only a
@@ -394,8 +401,9 @@ This keeps them distinct from:
 - top-level scanner integration tests in `tests/scanner_integration.rs`, which should stay focused
   on cross-parser/system behavior rather than ecosystem-specific fixtures
 
-**Rule of thumb**: add this layer only when it protects scanner/assembly behavior that unit and
-golden parser tests would miss.
+**Rule of thumb**: if your parser emits package data that downstream assembly or output consumes,
+add at least one fixture-backed scan-and-assemble contract test. Unit tests and parser goldens do
+not prove final package visibility, `for_packages`, dependency hoisting, or file-link behavior.
 
 ## Step 4: Register the Parser
 
@@ -1014,7 +1022,7 @@ Before submitting your parser:
 - [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Datasource classified in `ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`
-- [ ] If parser emits meaningful `file_references`, final `for_packages` assignment is proven by a parser-adjacent `*_scan_test.rs`
+- [ ] If parser emits meaningful downstream package/dependency data, final package visibility / `for_packages` / dependency hoisting is proven by a parser-adjacent `*_scan_test.rs` or the shared `src/parsers/downstream_scan_test.rs`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
 
