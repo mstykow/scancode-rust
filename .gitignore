@@ -53,3 +53,8 @@ node_modules/
 # Keep transient SQLite journal files created while exercising test fixtures ignored.
 testdata/**/*.sqlite-shm
 testdata/**/*.sqlite-wal
+
+# Local scan cache artifacts should never be tracked anywhere in the repo.
+# Keep this after the testdata re-include so fixture-local caches stay ignored too.
+.provenant-cache/
+.provenant-cache/**
