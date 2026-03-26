@@ -44,6 +44,10 @@ impl PackageParser for RpmBdbDatabaseParser {
     const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
+        if cfg!(target_os = "windows") {
+            return false;
+        }
+
         let path_str = path.to_string_lossy();
         (path_str.ends_with("/Packages") || path_str.contains("/var/lib/rpm/Packages"))
             && !path_str.ends_with(".db")
@@ -67,6 +71,10 @@ impl PackageParser for RpmNdbDatabaseParser {
     const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
+        if cfg!(target_os = "windows") {
+            return false;
+        }
+
         let path_str = path.to_string_lossy();
         path_str.ends_with("/Packages.db") || path_str.contains("usr/lib/sysimage/rpm/Packages.db")
     }
@@ -89,6 +97,10 @@ impl PackageParser for RpmSqliteDatabaseParser {
     const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
+        if cfg!(target_os = "windows") {
+            return false;
+        }
+
         let path_str = path.to_string_lossy();
         path_str.ends_with("/rpmdb.sqlite") || path_str.contains("rpm/rpmdb.sqlite")
     }
@@ -113,6 +125,7 @@ fn parse_rpm_database(
     path: &Path,
     datasource_id: DatasourceId,
 ) -> Result<Vec<PackageData>, String> {
+    #[cfg(unix)]
     match rpmdb::read_packages(path.to_path_buf()) {
         Ok(packages) => Ok(packages
             .into_iter()
@@ -253,6 +266,15 @@ fn parse_rpm_database(
             .collect()),
         Err(e) => Err(format!("Failed to read RPM database: {:?}", e)),
     }
+
+    #[cfg(not(unix))]
+    {
+        let _ = (path, datasource_id);
+        Err(format!(
+            "RPM database parsing is only supported on Unix targets (current target: {})",
+            std::env::consts::OS
+        ))
+    }
 }
 
 fn build_evr_version(epoch: i32, version: &str, release: &str) -> Option<String> {
@@ -378,6 +400,7 @@ mod tests {
         assert_eq!(build_evr_version(0, "", ""), None);
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_parse_rpm_database_sqlite() {
         let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
@@ -392,6 +415,7 @@ mod tests {
         assert!(pkg.name.is_some());
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_parse_rpm_database_sqlite_preserves_release_in_version() {
         let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
@@ -419,6 +443,7 @@ mod tests {
     }
 }
 
+#[cfg(unix)]
 crate::register_parser!(
     "RPM installed package database",
     &[
