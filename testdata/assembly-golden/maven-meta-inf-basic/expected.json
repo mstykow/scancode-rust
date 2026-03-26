@@ -29,7 +29,29 @@
         "META-INF/maven/com.example/nested-lib/pom.xml"
       ],
       "datasource_ids": ["java_jar_manifest", "maven_pom", "maven_pom_properties"],
+      "declared_license_expression": "apache-2.0",
+      "declared_license_expression_spdx": "Apache-2.0",
       "description": "Nested Library\nNarrative from nested pom",
+      "license_detections": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "start_line": 1,
+              "end_line": 1,
+              "matcher": "parser-declared-license",
+              "score": 100.0,
+              "matched_length": 4,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "matched_text": "- license:\n    name: Apache-2.0\n"
+            }
+          ]
+        }
+      ],
       "extracted_license_statement": "- license:\n    name: Apache-2.0\n",
       "name": "nested-lib",
       "namespace": "com.example",
