@@ -198,6 +198,82 @@ fn test_engine_detect_spdx_identifier() {
 }
 
 #[test]
+fn test_engine_detects_boost_short_notice_with_url() {
+    let engine = get_engine();
+
+    let text = "Use, modification and distribution are subject to the Boost Software License, Version 1.0.\n(See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)";
+    let raw_matches = engine
+        .detect_matches_with_kind(text, false, false)
+        .expect("Raw detection should succeed");
+    let detections = engine
+        .detect_with_kind(text, false, false)
+        .expect("Detection should succeed");
+
+    assert!(
+        detections
+            .iter()
+            .any(|d| d.license_expression.as_deref() == Some("boost-1.0")),
+        "detections: {:?}, raw_matches: {:?}",
+        detections
+            .iter()
+            .map(|d| (
+                d.license_expression.as_deref().unwrap_or("none"),
+                d.matches
+                    .iter()
+                    .map(|m| (m.license_expression.as_str(), m.rule_identifier.as_str()))
+                    .collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>(),
+        raw_matches
+            .iter()
+            .map(|m| (
+                m.license_expression.as_str(),
+                m.rule_identifier.as_str(),
+                m.matcher
+            ))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_engine_detects_zlib_short_reference_notice() {
+    let engine = get_engine();
+
+    let text = "For conditions of distribution and use, see copyright notice in zlib.h";
+    let raw_matches = engine
+        .detect_matches_with_kind(text, false, false)
+        .expect("Raw detection should succeed");
+    let detections = engine
+        .detect_with_kind(text, false, false)
+        .expect("Detection should succeed");
+
+    assert!(
+        detections
+            .iter()
+            .any(|d| d.license_expression.as_deref() == Some("zlib")),
+        "detections: {:?}, raw_matches: {:?}",
+        detections
+            .iter()
+            .map(|d| (
+                d.license_expression.as_deref().unwrap_or("none"),
+                d.matches
+                    .iter()
+                    .map(|m| (m.license_expression.as_str(), m.rule_identifier.as_str()))
+                    .collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>(),
+        raw_matches
+            .iter()
+            .map(|m| (
+                m.license_expression.as_str(),
+                m.rule_identifier.as_str(),
+                m.matcher
+            ))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_engine_index_populated() {
     let engine = get_engine();
     let index = engine.index();

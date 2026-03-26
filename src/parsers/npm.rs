@@ -167,7 +167,7 @@ impl PackageParser for NpmParser {
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
             namespace,
-            name,
+            name: package_name,
             version,
             qualifiers: None,
             subpath: None,

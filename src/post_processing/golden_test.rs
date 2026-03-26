@@ -185,7 +185,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
     fn test_golden_tallies_full_fixture_matches_expected_output() {
         assert_tally_fixture_matches_expected(
             "testdata/summarycode-golden/tallies/full_tallies",
@@ -205,7 +204,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
     fn test_golden_tallies_with_details_fixture_matches_expected_output() {
         assert_tally_fixture_matches_expected(
             "testdata/summarycode-golden/tallies/full_tallies",
@@ -225,7 +223,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
     fn test_golden_tallies_key_files_fixture_matches_expected_output() {
         assert_tally_fixture_matches_expected(
             "testdata/summarycode-golden/tallies/full_tallies",
@@ -245,7 +242,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
     fn test_golden_tallies_by_facet_fixture_matches_expected_output() {
         let facet_defs = vec![
             "dev=*.java".to_string(),
@@ -290,7 +286,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "blocked on broader package parser parity outside post-processing"]
     fn test_golden_package_fixture_matches_expected_output() {
         assert_package_fixture_matches_expected(
             "testdata/summarycode-golden/tallies/packages",

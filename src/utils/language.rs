@@ -44,7 +44,9 @@ pub fn detect_language(path: &Path, content: &[u8]) -> String {
             "css" => return "CSS".to_string(),
             "c" => return "C".to_string(),
             "cpp" | "cc" | "cxx" => return "C++".to_string(),
-            "h" | "hpp" => return "C/C++ Header".to_string(),
+            "h" => return "C".to_string(),
+            "hpp" => return "C++".to_string(),
+            "s" => return "GAS".to_string(),
             "java" => return "Java".to_string(),
             "go" => return "Go".to_string(),
             "rb" => return "Ruby".to_string(),
@@ -132,5 +134,15 @@ mod tests {
             detect_language(Path::new("containerfile.core"), b"FROM scratch\n"),
             "Dockerfile"
         );
+    }
+
+    #[test]
+    fn detect_language_maps_c_headers_to_c() {
+        assert_eq!(detect_language(Path::new("zlib.h"), b"/* header */\n"), "C");
+    }
+
+    #[test]
+    fn detect_language_maps_uppercase_s_to_gas() {
+        assert_eq!(detect_language(Path::new("gvmat64.S"), b"; asm\n"), "GAS");
     }
 }

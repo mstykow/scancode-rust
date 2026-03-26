@@ -275,6 +275,23 @@ fn compute_tallies_normalizes_jboss_style_copyright_and_holder_values() {
 }
 
 #[test]
+fn compute_tallies_strips_leading_years_from_copyright_tallies() {
+    let mut source = file("project/src/zlib.h");
+    source.copyrights = vec![Copyright {
+        copyright: "Copyright (c) 1995-2013 Jean-loup Gailly and Mark Adler".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let tallies = compute_tallies(&[source]).expect("tallies exist");
+
+    assert_eq!(
+        tallies.copyrights[0].value.as_deref(),
+        Some("Copyright (c) Jean-loup Gailly and Mark Adler")
+    );
+}
+
+#[test]
 fn compute_tallies_filters_lowercase_author_noise() {
     let mut source = file("project/src/lib.java");
     source.authors = vec![Author {
@@ -324,11 +341,22 @@ fn compute_detailed_tallies_assigns_file_and_directory_rollups() {
         .iter()
         .find(|file| file.path == "project/empty")
         .unwrap();
+    let readme = files
+        .iter()
+        .find(|file| file.path == "project/README.md")
+        .unwrap();
     assert_eq!(
         src.tallies.as_ref().unwrap().programming_language[0]
             .value
             .as_deref(),
         Some("Rust")
+    );
+    assert_eq!(
+        readme.tallies.as_ref().unwrap().programming_language,
+        vec![TallyEntry {
+            value: Some("Markdown".to_string()),
+            count: 1
+        }]
     );
     assert!(
         root.tallies

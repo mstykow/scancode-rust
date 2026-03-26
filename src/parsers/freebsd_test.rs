@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use super::PackageParser;
 use super::freebsd::{
-    FreebsdCompactManifestParser, build_license_statement, parse_freebsd_manifest,
+    FreebsdCompactManifestParser, build_freebsd_license_data, build_freebsd_purl,
+    build_license_statement, parse_freebsd_manifest,
 };
 use crate::models::DatasourceId;
 
@@ -315,6 +316,38 @@ fn test_basic_file() {
 
     assert!(pkg.code_view_url.is_some());
     assert!(pkg.download_url.is_some());
+    assert_eq!(pkg.declared_license_expression.as_deref(), Some("gpl-2.0"));
+    assert_eq!(
+        pkg.purl.as_deref(),
+        Some("pkg:freebsd/dmidecode@2.12?arch=freebsd:10:x86:64&origin=sysutils/dmidecode")
+    );
+}
+
+#[test]
+fn test_build_freebsd_purl_with_qualifiers() {
+    let purl = build_freebsd_purl(
+        "dmidecode",
+        Some("2.12"),
+        Some("freebsd:10:x86:64"),
+        Some("sysutils/dmidecode"),
+    );
+
+    assert_eq!(
+        purl.as_deref(),
+        Some("pkg:freebsd/dmidecode@2.12?arch=freebsd:10:x86:64&origin=sysutils/dmidecode")
+    );
+}
+
+#[test]
+fn test_build_freebsd_license_data_single_license() {
+    let licenses = vec!["GPLv2".to_string()];
+    let (declared, declared_spdx, detections) =
+        build_freebsd_license_data(Some(&licenses), Some("single"), Some("GPLv2"));
+
+    assert_eq!(declared.as_deref(), Some("gpl-2.0"));
+    assert_eq!(declared_spdx.as_deref(), Some("GPL-2.0-only"));
+    assert_eq!(detections.len(), 1);
+    assert_eq!(detections[0].license_expression, "gpl-2.0");
 }
 
 #[test]

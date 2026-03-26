@@ -32,6 +32,10 @@ use std::io::BufReader;
 use std::path::Path;
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    combine_normalized_licenses, empty_declared_license_data, normalize_declared_license_key,
+};
 
 #[derive(Clone, Default)]
 struct MavenDependencyData {
@@ -1865,13 +1869,24 @@ impl PackageParser for MavenParser {
         }
 
         package_data.extracted_license_statement = build_license_statement(&licenses);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            build_maven_declared_license_data(
+                &licenses,
+                package_data.extracted_license_statement.as_deref(),
+            );
+        package_data.declared_license_expression = declared_license_expression;
+        package_data.declared_license_expression_spdx = declared_license_expression_spdx;
+        package_data.license_detections = license_detections;
 
         vec![package_data]
     }
 
     fn is_match(path: &Path) -> bool {
         if let Some(filename) = path.file_name().and_then(|name| name.to_str()) {
-            filename == "pom.xml" || filename == "pom.properties" || filename == "MANIFEST.MF"
+            filename.eq_ignore_ascii_case("pom.xml")
+                || filename.eq_ignore_ascii_case("pom.properties")
+                || filename.eq_ignore_ascii_case("MANIFEST.MF")
+                || filename.to_ascii_lowercase().ends_with(".pom")
         } else {
             false
         }
@@ -1905,6 +1920,44 @@ fn build_maven_url(
     };
 
     Some(url)
+}
+
+fn build_maven_declared_license_data(
+    licenses: &[MavenLicenseEntry],
+    matched_text: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let normalized: Vec<_> = licenses
+        .iter()
+        .filter_map(|license| license.name.as_deref())
+        .filter_map(normalize_maven_license_name)
+        .collect();
+
+    if normalized.is_empty() {
+        return empty_declared_license_data();
+    }
+
+    let Some(combined) = combine_normalized_licenses(normalized, " OR ") else {
+        return empty_declared_license_data();
+    };
+
+    build_declared_license_data(
+        combined,
+        DeclaredLicenseMatchMetadata::single_line(matched_text.unwrap_or_default()),
+    )
+}
+
+fn normalize_maven_license_name(name: &str) -> Option<NormalizedDeclaredLicense> {
+    match name.trim() {
+        "Public Domain" | "public domain" => Some(NormalizedDeclaredLicense::new(
+            "public-domain",
+            "LicenseRef-provenant-public-domain",
+        )),
+        other => normalize_declared_license_key(other),
+    }
 }
 
 /// Parse pom.properties file (Java properties format)

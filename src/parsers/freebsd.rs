@@ -22,12 +22,17 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use log::warn;
+use packageurl::PackageUrl;
 use serde::Deserialize;
 
 use crate::models::{DatasourceId, PackageData, PackageType, Party};
 use crate::parsers::utils::read_file_to_string;
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    combine_normalized_licenses, empty_declared_license_data, normalize_declared_license_key,
+};
 
 const PACKAGE_TYPE: PackageType = PackageType::Freebsd;
 
@@ -122,6 +127,12 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
     // Build extracted_license_statement from licenses and licenselogic
     let extracted_license_statement =
         build_license_statement(&manifest.licenses, &manifest.licenselogic);
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        build_freebsd_license_data(
+            manifest.licenses.as_deref(),
+            manifest.licenselogic.as_deref(),
+            extracted_license_statement.as_deref(),
+        );
 
     // Build code_view_url from origin
     let code_view_url = manifest
@@ -141,6 +152,15 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
         None
     };
 
+    let purl = name.as_ref().and_then(|pkg_name| {
+        build_freebsd_purl(
+            pkg_name,
+            version.as_deref(),
+            manifest.arch.as_deref(),
+            manifest.origin.as_deref(),
+        )
+    });
+
     PackageData {
         datasource_id: Some(DatasourceId::FreebsdCompactManifest),
         package_type: Some(PACKAGE_TYPE),
@@ -155,10 +175,86 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
         } else {
             Some(qualifiers)
         },
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         code_view_url,
         download_url,
+        purl,
         ..Default::default()
+    }
+}
+
+pub(crate) fn build_freebsd_purl(
+    name: &str,
+    version: Option<&str>,
+    arch: Option<&str>,
+    origin: Option<&str>,
+) -> Option<String> {
+    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), name).ok()?;
+
+    if let Some(version) = version {
+        purl.with_version(version).ok()?;
+    }
+
+    if let Some(arch) = arch {
+        purl.add_qualifier("arch", arch).ok()?;
+    }
+
+    if let Some(origin) = origin {
+        purl.add_qualifier("origin", origin).ok()?;
+    }
+
+    Some(purl.to_string())
+}
+
+pub(crate) fn build_freebsd_license_data(
+    licenses: Option<&[String]>,
+    licenselogic: Option<&str>,
+    matched_text: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let Some(licenses) = licenses else {
+        return empty_declared_license_data();
+    };
+
+    let normalized: Vec<_> = licenses
+        .iter()
+        .filter_map(|license| normalize_freebsd_license_name(license))
+        .collect();
+
+    if normalized.is_empty() {
+        return empty_declared_license_data();
+    }
+
+    let combined = match licenselogic.unwrap_or("and") {
+        "single" => normalized.into_iter().next(),
+        "or" | "dual" => combine_normalized_licenses(normalized, " OR "),
+        _ => combine_normalized_licenses(normalized, " AND "),
+    };
+
+    let Some(combined) = combined else {
+        return empty_declared_license_data();
+    };
+
+    build_declared_license_data(
+        combined,
+        DeclaredLicenseMatchMetadata::single_line(matched_text.unwrap_or_default()),
+    )
+}
+
+fn normalize_freebsd_license_name(license: &str) -> Option<NormalizedDeclaredLicense> {
+    match license.trim() {
+        "GPLv2" => Some(NormalizedDeclaredLicense::new("gpl-2.0", "GPL-2.0-only")),
+        "GPLv3" => Some(NormalizedDeclaredLicense::new("gpl-3.0", "GPL-3.0-only")),
+        "BSD3CLAUSE" => Some(NormalizedDeclaredLicense::new("bsd-new", "BSD-3-Clause")),
+        "PSFL" => Some(NormalizedDeclaredLicense::new("psf-2.0", "PSF-2.0")),
+        "RUBY" => Some(NormalizedDeclaredLicense::new("ruby", "Ruby")),
+        other => normalize_declared_license_key(other),
     }
 }
 
