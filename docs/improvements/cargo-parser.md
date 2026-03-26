@@ -5,7 +5,7 @@
 Rust now goes beyond the released Python ScanCode Cargo handling in several concrete ways:
 
 1. assigns ordinary crate files to their Cargo package instead of limiting ownership to `Cargo.toml` and `Cargo.lock`
-2. proves workspace member file ownership for non-manifest files such as `LICENSE` and `README.md`
+2. assigns workspace member ownership for non-manifest files such as `LICENSE` and `README.md`
 3. closes parser parity gaps around lowercase Cargo filenames and missing manifest fields like `readme` and `publish`
 4. links manifest-declared files such as `readme` and `license-file` through explicit Cargo `file_references`
 5. preserves per-dependency Cargo.lock provenance such as `source` and checksums
@@ -23,8 +23,7 @@ The Python reference covers the main Cargo surfaces, but package-wide file owner
 
 ### Workspace member ownership
 
-- Cargo workspace member files like `crates/cli/LICENSE` and `crates/core/README.md` are now explicitly covered in assembly regression fixtures.
-- This proves the member package assignment logic works for real non-manifest member files, not only `Cargo.toml`.
+- Cargo workspace member files like `crates/cli/LICENSE` and `crates/core/README.md` now stay attached to their member packages, not just to `Cargo.toml`.
 
 ### Parser parity fixes
 
@@ -45,7 +44,7 @@ The Python reference covers the main Cargo surfaces, but package-wide file owner
 
 - Cargo.lock dependency entries now preserve per-package `source` and `checksum` values in dependency `extra_data`.
 - Annotated lockfile dependency strings such as `serde 1.0.228 (registry+...)` now normalize correctly to the pinned package version while still retaining provenance.
-- Assembly goldens now prove that the hoisted Cargo.lock dependencies keep this provenance when manifest and lockfile data are merged.
+- Hoisted Cargo.lock dependencies keep this provenance when manifest and lockfile data are merged.
 
 ## Why this matters
 

@@ -129,7 +129,6 @@ Rust now resolves dependency scope, optional flags, classifier, and type after p
 - **Parity with Maven semantics**: dependency management, relocations, classifiers, and modern POM versions are now represented explicitly
 - **Better SBOM fidelity**: richer descriptions, source packages, structured licenses, and normalized dependency flags improve downstream package analysis
 - **Less lossy output**: key Maven metadata is preserved instead of being flattened or discarded
-- **Stronger regression coverage**: unit, parser-golden, and assembly-golden tests now lock in these behaviors
 
 ## References
 

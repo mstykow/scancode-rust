@@ -34,7 +34,7 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
 
 - Composer package-root resource assignment now associates ordinary files under a Composer package root with that package.
 - Nested Composer packages no longer lose file ownership to a parent package just because they live under the parent directory tree.
-- The new nested assembly fixture proves:
+- In nested Composer repositories:
   - root package files remain on the root package
   - nested package files like `packages/plugin/README.md` stay with the nested package
 

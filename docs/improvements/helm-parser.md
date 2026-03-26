@@ -3,13 +3,13 @@
 ## Summary
 
 Rust now ships static Helm chart support for `Chart.yaml` and `Chart.lock` even though the Python ScanCode reference still has no production Helm parser.
-This slice focuses on the high-value official metadata surface from Helm itself: chart identity, maintainers, declared chart dependencies, and pinned lockfile dependency state.
+The supported surface focuses on the high-value official metadata from Helm itself: chart identity, maintainers, declared chart dependencies, and pinned lockfile dependency state.
 
 ## Python Status
 
 - Python ScanCode does not currently ship a Helm packagedcode parser.
 - Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
-- That makes this parser a net-new Rust improvement rather than parity work.
+- This gives Rust direct packagedcode support for Helm chart metadata that the Python reference does not currently provide.
 
 ## Rust Improvements
 
@@ -34,7 +34,7 @@ This slice focuses on the high-value official metadata surface from Helm itself:
 ## Guardrails
 
 - Rust does **not** evaluate templates, parse `values.yaml`, fetch remote chart repositories, inspect packaged chart archives, or resolve charts from OCI registries.
-- Legacy `apiVersion: v1` charts still have their core chart metadata parsed from `Chart.yaml`, but this slice does not implement `requirements.yaml` / `requirements.lock`.
+- Legacy `apiVersion: v1` charts still have their core chart metadata parsed from `Chart.yaml`, but this supported surface does not implement `requirements.yaml` / `requirements.lock`.
 - Malformed dependency entries are skipped instead of causing the whole chart parse to fail.
 
 ## Coverage

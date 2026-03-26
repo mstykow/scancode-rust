@@ -5,7 +5,7 @@
 Rust now goes beyond the current Python ScanCode Ruby handling in several concrete ways:
 
 1. resolves gemspec constants from required local Ruby files instead of leaving all external constants unresolved
-2. preserves Bundler `Gemfile` and `Gemfile.lock` source metadata at parser level and proves it with parser goldens
+2. preserves Bundler `Gemfile` and `Gemfile.lock` source metadata at parser level
 3. merges extracted gem metadata layouts without duplicate package/dependency emission and assigns nested extracted files to the assembled gem package
 4. tags nested Ruby legal/readme/manifest files as `key_file`, promotes package metadata from them, and computes a top-level `license_clarity_score`
 
@@ -51,7 +51,7 @@ The Python reference already handles some Bundler and gemspec data, but constant
 
 ### False-dependency protection
 
-- Gemspec parser coverage now explicitly proves that description text mentioning `add_dependency`-like strings does not create fake dependencies.
+- Gemspec parsing ignores description text that merely mentions `add_dependency`-like strings, so prose does not create fake dependencies.
 
 ### Extracted gem assembly
 

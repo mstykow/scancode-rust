@@ -191,22 +191,19 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
   - copyright: `(c) 2004-2009 pudn.com`
   - holder: `pudn.com`
 - Drop `upload_log.asp?e=...` link-only false positives as metadata noise, not copyright statements.
-- Keep deterministic regression coverage so both fixtures produce the same result.
-- Keep the local Rust-owned golden fixtures aligned with that canonical output.
 
 **Impact**: Higher semantic quality, deterministic behavior, and simpler maintenance than fixture-name-dependent parity hacks.
 
 ## Coverage
 
-Coverage includes unit-level detector behavior, golden regression coverage for the major copyright, holder, and author outputs, and deterministic local fixture maintenance for intentional divergences.
+Coverage includes unit-level detector behavior and golden regression coverage for the major copyright, holder, and author outputs.
 
 ## What Users Should Expect
 
 - **Default behavior**: Results are designed to closely match Python ScanCode for common copyright patterns.
 - **Intentional differences**: Some outputs are intentionally improved (for example Unicode name preservation and bug-fix correctness changes).
 - **Determinism guarantee**: Identical input bytes produce identical output; fixture names do not influence detection.
-- **Edge-case differences**: Remaining differences are either intentional divergences or optional quality-tuning opportunities, and these are documented in the repository's copyright-planning docs.
+- **Edge-case differences**: Some outputs still differ intentionally where Rust chooses a more accurate or more deterministic result.
 - **Media metadata bonus**: Supported images can surface copyright clues from EXIF/XMP metadata even though Python's text-analysis parity baseline does not scan generic media metadata.
-- **Golden source of truth**: Repository fixtures are Rust-owned expectations, while Python fixtures remain a comparison baseline.
 
 The sections above describe the stable behavior changes: bug fixes, Unicode preservation, deterministic output, parallel-safe execution, optional runtime limits, and explicit documented divergences where Rust intentionally differs from the Python baseline.
