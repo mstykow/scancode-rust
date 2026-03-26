@@ -200,6 +200,98 @@ mod tests {
     }
 
     #[test]
+    fn test_freebsd_scan_assembles_package_identity_and_declared_license() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/freebsd/basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("dmidecode"))
+            .expect("dmidecode package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Freebsd));
+        assert_eq!(package.version.as_deref(), Some("2.12"));
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("gpl-2.0")
+        );
+        assert_eq!(
+            package.purl.as_deref(),
+            Some("pkg:freebsd/dmidecode@2.12?arch=freebsd:10:x86:64&origin=sysutils/dmidecode")
+        );
+
+        let manifest = files
+            .iter()
+            .find(|file| file.path.ends_with("/+COMPACT_MANIFEST"))
+            .expect("+COMPACT_MANIFEST should be scanned");
+        assert!(manifest.for_packages.contains(&package.package_uid));
+        assert!(manifest.package_data.iter().any(|pkg_data| {
+            pkg_data.datasource_id == Some(DatasourceId::FreebsdCompactManifest)
+        }));
+    }
+
+    #[test]
+    fn test_maven_repository_pom_scan_assembles_package_from_repo_style_filename() {
+        let (files, result) = scan_and_assemble(Path::new(
+            "testdata/summarycode-golden/tallies/packages/scan/aopalliance",
+        ));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("aopalliance"))
+            .expect("aopalliance package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Maven));
+        assert_eq!(package.namespace.as_deref(), Some("aopalliance"));
+        assert_eq!(package.version.as_deref(), Some("1.0"));
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("public-domain")
+        );
+
+        let pom = files
+            .iter()
+            .find(|file| file.path.ends_with("/aopalliance-1.0.pom"))
+            .expect("repository pom should be scanned");
+        assert!(pom.for_packages.contains(&package.package_uid));
+        assert!(
+            pom.package_data
+                .iter()
+                .any(|pkg_data| { pkg_data.datasource_id == Some(DatasourceId::MavenPom) })
+        );
+    }
+
+    #[test]
+    fn test_npm_scoped_package_scan_preserves_namespace_and_leaf_name() {
+        let (files, result) = scan_and_assemble(Path::new(
+            "testdata/summarycode-golden/tallies/packages/scan/scoped1",
+        ));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.namespace.as_deref() == Some("@ionic"))
+            .expect("scoped npm package should be assembled");
+
+        assert_eq!(package.package_type, Some(PackageType::Npm));
+        assert_eq!(package.name.as_deref(), Some("app-scripts"));
+        assert_eq!(package.version.as_deref(), Some("3.0.1-201710301651"));
+
+        let manifest = files
+            .iter()
+            .find(|file| file.path.ends_with("/package.json"))
+            .expect("package.json should be scanned");
+        assert!(manifest.for_packages.contains(&package.package_uid));
+        assert!(
+            manifest
+                .package_data
+                .iter()
+                .any(|pkg_data| { pkg_data.datasource_id == Some(DatasourceId::NpmPackageJson) })
+        );
+    }
+
+    #[test]
     fn test_rpm_specfile_scan_assembles_package_and_dependencies() {
         let temp_dir = tempfile::TempDir::new().expect("create temp dir");
         fs::copy(
