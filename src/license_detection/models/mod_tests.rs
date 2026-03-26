@@ -3,6 +3,7 @@ mod tests {
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::dictionary::tid;
     use crate::license_detection::models::{License, LicenseMatch, MatcherKind, Rule, RuleKind};
+    use crate::models::Match as OutputMatch;
     use std::collections::HashMap;
 
     fn create_test_index() -> LicenseIndex {
@@ -32,7 +33,7 @@ mod tests {
 
     fn create_rule() -> Rule {
         Rule {
-            identifier: "mit.LICENSE".to_string(),
+            identifier: "mit_123.RULE".to_string(),
             license_expression: "mit".to_string(),
             text: "MIT License".to_string(),
             tokens: vec![],
@@ -204,13 +205,58 @@ mod tests {
     fn test_rule_creation_with_all_fields() {
         let rule = create_rule();
 
-        assert_eq!(rule.identifier, "mit.LICENSE");
+        assert_eq!(rule.identifier, "mit_123.RULE");
         assert_eq!(rule.license_expression, "mit");
         assert!(rule.is_license_notice());
         assert!(!rule.is_license_text());
         assert!(!rule.is_license_reference());
         assert!(!rule.is_license_tag());
         assert_eq!(rule.relevance, 90);
+        assert_eq!(
+            rule.rule_url(),
+            Some(
+                "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_123.RULE"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_rule_url_uses_license_expression_for_license_rules() {
+        let mut rule = create_rule();
+        rule.identifier = "mit.LICENSE".to_string();
+        rule.is_from_license = true;
+
+        assert_eq!(
+            rule.rule_url(),
+            Some(
+                "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_rule_url_uses_rules_directory_when_not_from_license() {
+        let mut rule = create_rule();
+        rule.identifier = "mit.LICENSE".to_string();
+        rule.is_from_license = false;
+
+        assert_eq!(
+            rule.rule_url(),
+            Some(
+                "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit.LICENSE"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_rule_url_is_absent_for_empty_identifier() {
+        let mut rule = create_rule();
+        rule.identifier.clear();
+
+        assert_eq!(rule.rule_url(), None);
     }
 
     #[test]
@@ -522,6 +568,30 @@ mod tests {
         let deserialized: LicenseMatch = serde_json::from_str(&json).unwrap();
 
         assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_output_match_serializes_null_rule_url() {
+        let output_match = OutputMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(3),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("spdx-license-identifier-mit-deadbeef".to_string()),
+            rule_url: None,
+            matched_text: Some("MIT".to_string()),
+        };
+
+        let json = serde_json::to_value(&output_match).unwrap();
+
+        assert!(json.get("rule_url").is_some());
+        assert!(json["rule_url"].is_null());
     }
 
     #[test]
