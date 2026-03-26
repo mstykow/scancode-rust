@@ -1883,10 +1883,10 @@ impl PackageParser for MavenParser {
 
     fn is_match(path: &Path) -> bool {
         if let Some(filename) = path.file_name().and_then(|name| name.to_str()) {
-            filename.eq_ignore_ascii_case("pom.xml")
-                || filename.eq_ignore_ascii_case("pom.properties")
-                || filename.eq_ignore_ascii_case("MANIFEST.MF")
-                || filename.to_ascii_lowercase().ends_with(".pom")
+            filename == "pom.xml"
+                || filename == "pom.properties"
+                || filename == "MANIFEST.MF"
+                || filename.ends_with(".pom")
         } else {
             false
         }
