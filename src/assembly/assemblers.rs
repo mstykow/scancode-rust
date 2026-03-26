@@ -468,6 +468,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["haxelib.json"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::Gitmodules],
+        sibling_file_patterns: &[".gitmodules"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // OCaml/opam ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::OpamFile],
@@ -578,7 +583,6 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,
     DatasourceId::EtcOsRelease,
-    DatasourceId::Gitmodules,
     // Binary archives (require external extraction via ExtractCode before scanning)
     DatasourceId::AlpineApkArchive,
     DatasourceId::AndroidAarLibrary,

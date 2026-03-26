@@ -28,6 +28,11 @@ use regex::Regex;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::PackageParser;
 
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data_from_pair,
+    normalize_spdx_declared_license,
+};
+
 /// Parser for OCaml OPAM package manifest files.
 ///
 /// Handles the OPAM file format used by the OCaml package manager.
@@ -94,6 +99,8 @@ fn parse_opam(text: &str) -> PackageData {
 
     let (repository_homepage_url, api_data_url, purl) =
         build_opam_urls(&opam_data.name, &opam_data.version);
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_opam_declared_license(opam_data.license.as_deref());
 
     PackageData {
         package_type: Some(OpamParser::PACKAGE_TYPE),
@@ -119,9 +126,9 @@ fn parse_opam(text: &str) -> PackageData {
         vcs_url: opam_data.dev_repo,
         copyright: None,
         holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         other_license_expression: None,
         other_license_expression_spdx: None,
         other_license_detections: Vec::new(),
@@ -138,6 +145,37 @@ fn parse_opam(text: &str) -> PackageData {
         api_data_url,
         datasource_id: Some(DatasourceId::OpamFile),
         purl,
+    }
+}
+
+fn normalize_opam_declared_license(
+    statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let Some(statement) = statement.map(str::trim).filter(|value| !value.is_empty()) else {
+        return super::license_normalization::empty_declared_license_data();
+    };
+
+    match statement {
+        "GPL-2.0-only" => build_declared_license_data_from_pair(
+            "gpl-2.0",
+            "GPL-2.0-only",
+            DeclaredLicenseMatchMetadata::single_line(statement),
+        ),
+        "GPL-3.0-only" => build_declared_license_data_from_pair(
+            "gpl-3.0",
+            "GPL-3.0-only",
+            DeclaredLicenseMatchMetadata::single_line(statement),
+        ),
+        "LGPL-3.0-only with OCaml-LGPL-linking-exception" => build_declared_license_data_from_pair(
+            "lgpl-3.0 WITH ocaml-lgpl-linking-exception",
+            "LGPL-3.0-only WITH OCaml-LGPL-linking-exception",
+            DeclaredLicenseMatchMetadata::single_line(statement),
+        ),
+        _ => normalize_spdx_declared_license(Some(statement)),
     }
 }
 
@@ -616,6 +654,27 @@ mod tests {
         assert_eq!(parties[0].role, Some("author".to_string()));
         assert_eq!(parties[1].email, Some("maintainer@example.com".to_string()));
         assert_eq!(parties[1].role, Some("maintainer".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_opam_declared_license_preserves_scancode_style_expression() {
+        let (declared, declared_spdx, detections) = normalize_opam_declared_license(Some(
+            "LGPL-3.0-only with OCaml-LGPL-linking-exception",
+        ));
+
+        assert_eq!(
+            declared.as_deref(),
+            Some("lgpl-3.0 WITH ocaml-lgpl-linking-exception")
+        );
+        assert_eq!(
+            declared_spdx.as_deref(),
+            Some("LGPL-3.0-only WITH OCaml-LGPL-linking-exception")
+        );
+        assert_eq!(detections.len(), 1);
+        assert_eq!(
+            detections[0].license_expression,
+            "lgpl-3.0 WITH ocaml-lgpl-linking-exception"
+        );
     }
 }
 
