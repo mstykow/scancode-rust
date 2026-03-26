@@ -67,13 +67,7 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
 
     let log_category = analyze_detection(&group.matches, false);
 
-    let matches_for_expression = if log_category == DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH {
-        filter_license_intros(&group.matches)
-    } else if log_category == DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE {
-        filter_license_intros_and_references(&group.matches)
-    } else {
-        group.matches.clone()
-    };
+    let matches_for_expression = select_matches_for_expression(&group.matches, log_category);
 
     detection.matches = group.matches.clone();
 
@@ -165,13 +159,7 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
 
     let log_category = analyze_detection(&group.matches, false);
 
-    let matches_for_expression = if log_category == DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH {
-        filter_license_intros(&group.matches)
-    } else if log_category == DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE {
-        filter_license_intros_and_references(&group.matches)
-    } else {
-        group.matches.clone()
-    };
+    let matches_for_expression = select_matches_for_expression(&group.matches, log_category);
 
     // Store RAW matches in detection.matches (matching Python behavior)
     // Python's LicenseDetection.from_matches() stores original unfiltered matches
@@ -200,6 +188,25 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
     }
 
     detection
+}
+
+fn select_matches_for_expression(
+    matches: &[crate::license_detection::models::LicenseMatch],
+    log_category: &str,
+) -> Vec<crate::license_detection::models::LicenseMatch> {
+    let filtered = if log_category == DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH {
+        filter_license_intros(matches)
+    } else if log_category == DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE {
+        filter_license_intros_and_references(matches)
+    } else {
+        matches.to_vec()
+    };
+
+    if filtered.is_empty() {
+        matches.to_vec()
+    } else {
+        filtered
+    }
 }
 
 /// Filter detections by minimum score threshold.
@@ -960,5 +967,21 @@ mod tests {
         let group = DetectionGroup::new(vec![m]);
         let detection = create_detection_from_group(&group);
         assert_eq!(detection.matches.len(), 1);
+    }
+
+    #[test]
+    fn test_create_detection_from_group_keeps_known_local_file_reference_expression() {
+        let mut m = create_test_match(1, 1, "1-hash", "zlib_5.RULE");
+        m.license_expression = "zlib".to_string();
+        m.license_expression_spdx = Some("Zlib".to_string());
+        m.match_coverage = 100.0;
+        m.score = 100.0;
+        m.rule_relevance = 100;
+        m.referenced_filenames = Some(vec!["zlib.h".to_string()]);
+
+        let group = DetectionGroup::new(vec![m]);
+        let detection = create_detection_from_group(&group);
+
+        assert_eq!(detection.license_expression.as_deref(), Some("zlib"));
     }
 }

@@ -33,7 +33,8 @@ mod tests {
         let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Npm));
-        assert_eq!(package_data.name, Some("@example/test-package".to_string()));
+        assert_eq!(package_data.name, Some("test-package".to_string()));
+        assert_eq!(package_data.namespace, Some("@example".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
             package_data.homepage_url,
@@ -94,7 +95,8 @@ mod tests {
         let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Npm));
-        assert_eq!(package_data.name, Some("@example/test-package".to_string()));
+        assert_eq!(package_data.name, Some("test-package".to_string()));
+        assert_eq!(package_data.namespace, Some("@example".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
             package_data.homepage_url,
@@ -210,7 +212,7 @@ mod tests {
         let (_temp_file, package_path) = create_temp_package_json(content);
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        assert_eq!(package_data.name, Some("@org/test-package".to_string()));
+        assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.namespace, Some("@org".to_string()));
 
         // Check purl contains the expected components rather than exact match
