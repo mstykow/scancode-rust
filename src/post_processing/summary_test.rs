@@ -910,6 +910,89 @@ fn compute_score_mode_uses_single_joined_expression_without_ambiguity() {
 }
 
 #[test]
+fn get_primary_license_keeps_with_expression_ambiguous_against_base_license() {
+    let expressions = vec![
+        "gpl-2.0 WITH classpath-exception-2.0".to_string(),
+        "gpl-2.0".to_string(),
+    ];
+
+    assert_eq!(get_primary_license(&expressions), None);
+}
+
+#[test]
+fn compute_score_mode_does_not_treat_with_expression_as_covering_base_license() {
+    let mut manifest = file("with_exception_ambiguity/Cargo.toml");
+    manifest.is_manifest = true;
+    manifest.is_key_file = true;
+    manifest.is_top_level = true;
+    manifest.license_expression = Some("gpl-2.0 WITH classpath-exception-2.0".to_string());
+    manifest.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "gpl-2.0 WITH classpath-exception-2.0".to_string(),
+        license_expression_spdx: "GPL-2.0-only WITH Classpath-exception-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "gpl-2.0 WITH classpath-exception-2.0".to_string(),
+            license_expression_spdx: "GPL-2.0-only WITH Classpath-exception-2.0".to_string(),
+            from_file: Some("with_exception_ambiguity/Cargo.toml".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(5),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+    manifest.copyrights = vec![Copyright {
+        copyright: "Copyright Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut gpl = file("with_exception_ambiguity/LICENSE-GPL");
+    gpl.is_legal = true;
+    gpl.is_key_file = true;
+    gpl.is_top_level = true;
+    gpl.license_expression = Some("gpl-2.0".to_string());
+    gpl.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "gpl-2.0".to_string(),
+        license_expression_spdx: "GPL-2.0-only".to_string(),
+        matches: vec![Match {
+            license_expression: "gpl-2.0".to_string(),
+            license_expression_spdx: "GPL-2.0-only".to_string(),
+            from_file: Some("with_exception_ambiguity/LICENSE-GPL".to_string()),
+            start_line: 1,
+            end_line: 176,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(1410),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let files = vec![manifest, gpl];
+    let indexes = build_output_indexes(&files, None, false);
+    let summary = compute_summary_with_options(&files, &[], &indexes, false, true)
+        .expect("score-only summary exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0")
+    );
+    let score = summary.license_clarity_score.expect("clarity exists");
+    assert_eq!(score.score, 90);
+    assert!(score.ambiguous_compound_licensing);
+}
+
+#[test]
 fn compute_score_mode_scores_nested_manifest_key_file_without_copyright() {
     let mut pom = file("jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml");
     pom.is_manifest = true;

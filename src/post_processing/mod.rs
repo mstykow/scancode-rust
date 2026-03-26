@@ -8,7 +8,8 @@ use glob::Pattern;
 
 use crate::assembly;
 use crate::license_detection::expression::{
-    combine_expressions_and, expression_to_string, parse_expression, simplify_expression,
+    LicenseExpression, combine_expressions_and, expression_to_string, parse_expression,
+    simplify_expression,
 };
 use crate::models::{
     DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
@@ -1084,11 +1085,10 @@ fn get_primary_license(declared_license_expressions: &[String]) -> Option<String
 
     if unique_joined_expressions.len() == 1 {
         let joined_expression = unique_joined_expressions[0].clone();
-        let joined_upper = joined_expression.to_ascii_uppercase();
         let all_other_expressions_accounted_for = unique_declared_license_expressions
             .iter()
             .filter(|expression| *expression != &joined_expression)
-            .all(|expression| joined_upper.contains(expression.to_ascii_uppercase().as_str()));
+            .all(|expression| summary_expression_covers(&joined_expression, expression));
 
         if all_other_expressions_accounted_for {
             return Some(joined_expression);
@@ -1100,6 +1100,132 @@ fn get_primary_license(declared_license_expressions: &[String]) -> Option<String
     }
 
     None
+}
+
+fn summary_expression_covers(container: &str, contained: &str) -> bool {
+    let Ok(parsed_container) = parse_expression(container) else {
+        return false;
+    };
+    let Ok(parsed_contained) = parse_expression(contained) else {
+        return false;
+    };
+
+    let simplified_container = simplify_expression(&parsed_container);
+    let simplified_contained = simplify_expression(&parsed_contained);
+
+    summary_expression_covers_ast(&simplified_container, &simplified_contained)
+}
+
+fn summary_expression_covers_ast(
+    container: &LicenseExpression,
+    contained: &LicenseExpression,
+) -> bool {
+    if summary_expressions_equal(container, contained) {
+        return true;
+    }
+
+    match (container, contained) {
+        (LicenseExpression::And { .. }, LicenseExpression::And { .. }) => {
+            let container_args = summary_flat_and_args(container);
+            let contained_args = summary_flat_and_args(contained);
+            contained_args.iter().all(|contained_arg| {
+                container_args
+                    .iter()
+                    .any(|container_arg| summary_expressions_equal(container_arg, contained_arg))
+            })
+        }
+        (LicenseExpression::Or { .. }, LicenseExpression::Or { .. }) => {
+            let container_args = summary_flat_or_args(container);
+            let contained_args = summary_flat_or_args(contained);
+            contained_args.iter().all(|contained_arg| {
+                container_args
+                    .iter()
+                    .any(|container_arg| summary_expressions_equal(container_arg, contained_arg))
+            })
+        }
+        (LicenseExpression::And { .. }, _) => summary_flat_and_args(container)
+            .iter()
+            .any(|container_arg| summary_expressions_equal(container_arg, contained)),
+        (LicenseExpression::Or { .. }, _) => summary_flat_or_args(container)
+            .iter()
+            .any(|container_arg| summary_expressions_equal(container_arg, contained)),
+        _ => false,
+    }
+}
+
+fn summary_expressions_equal(a: &LicenseExpression, b: &LicenseExpression) -> bool {
+    match (a, b) {
+        (LicenseExpression::License(left), LicenseExpression::License(right)) => left == right,
+        (LicenseExpression::LicenseRef(left), LicenseExpression::LicenseRef(right)) => {
+            left == right
+        }
+        (
+            LicenseExpression::With {
+                left: left_license,
+                right: left_exception,
+            },
+            LicenseExpression::With {
+                left: right_license,
+                right: right_exception,
+            },
+        ) => {
+            summary_expressions_equal(left_license, right_license)
+                && summary_expressions_equal(left_exception, right_exception)
+        }
+        (LicenseExpression::And { .. }, LicenseExpression::And { .. }) => {
+            let left_args = summary_flat_and_args(a);
+            let right_args = summary_flat_and_args(b);
+            left_args.len() == right_args.len()
+                && right_args.iter().all(|right_arg| {
+                    left_args
+                        .iter()
+                        .any(|left_arg| summary_expressions_equal(left_arg, right_arg))
+                })
+        }
+        (LicenseExpression::Or { .. }, LicenseExpression::Or { .. }) => {
+            let left_args = summary_flat_or_args(a);
+            let right_args = summary_flat_or_args(b);
+            left_args.len() == right_args.len()
+                && right_args.iter().all(|right_arg| {
+                    left_args
+                        .iter()
+                        .any(|left_arg| summary_expressions_equal(left_arg, right_arg))
+                })
+        }
+        _ => false,
+    }
+}
+
+fn summary_flat_and_args(expr: &LicenseExpression) -> Vec<LicenseExpression> {
+    let mut args = Vec::new();
+    collect_summary_flat_and_args(expr, &mut args);
+    args
+}
+
+fn collect_summary_flat_and_args(expr: &LicenseExpression, args: &mut Vec<LicenseExpression>) {
+    match expr {
+        LicenseExpression::And { left, right } => {
+            collect_summary_flat_and_args(left, args);
+            collect_summary_flat_and_args(right, args);
+        }
+        _ => args.push(expr.clone()),
+    }
+}
+
+fn summary_flat_or_args(expr: &LicenseExpression) -> Vec<LicenseExpression> {
+    let mut args = Vec::new();
+    collect_summary_flat_or_args(expr, &mut args);
+    args
+}
+
+fn collect_summary_flat_or_args(expr: &LicenseExpression, args: &mut Vec<LicenseExpression>) {
+    match expr {
+        LicenseExpression::Or { left, right } => {
+            collect_summary_flat_or_args(left, args);
+            collect_summary_flat_or_args(right, args);
+        }
+        _ => args.push(expr.clone()),
+    }
 }
 
 fn group_license_expressions(expressions: &[String]) -> (Vec<String>, Vec<String>) {
