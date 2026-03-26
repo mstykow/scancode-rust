@@ -151,6 +151,11 @@ fn test_golden_debian_control() {
 - Handles optional license detection fields gracefully
 - Provides clear diff messages on mismatch
 
+Parser goldens are intentionally narrower than scan/assembly or output tests. They validate
+`PackageData` extraction, but by themselves they will not catch downstream contract drift such as
+package visibility after assembly, `for_packages` assignment, `datafile_paths`, or dependency
+hoisting.
+
 ---
 
 ### Layer 3: Integration Tests
@@ -197,6 +202,9 @@ for example:
 - installed metadata linking files back to the assembled package
 - archive/extracted layouts where normalized paths matter
 - intentionally unassembled formats whose scanner behavior must stay stable
+- package-input fields whose downstream consumers depend on the assembled/output contract (for
+  example `purl`, `namespace`/`name`, declared-license fields, dependency hoisting, and
+  `datafile_paths`)
 
 These are **not** a replacement for `tests/scanner_integration.rs`. The top-level integration suite
 should stay cross-parser and system-oriented, while ecosystem-local scan tests stay close to the
