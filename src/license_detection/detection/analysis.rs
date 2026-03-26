@@ -4,6 +4,7 @@ use super::types::LicenseDetection;
 use super::*;
 use crate::license_detection::expression::combine_expressions_and;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
+use crate::utils::spdx::combine_license_expressions;
 
 /// Coverage value below which detections are not perfect.
 /// Any value < 100 means detection is imperfect.
@@ -411,7 +412,7 @@ pub fn determine_license_expression(matches: &[LicenseMatch]) -> Result<String, 
         .map(|m| m.license_expression.as_str())
         .collect();
 
-    combine_expressions_and(&expressions, false)
+    combine_expressions_and(&expressions, true)
         .map_err(|e| format!("Failed to combine expressions: {}", e))
 }
 
@@ -433,8 +434,8 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
     let expressions = expressions
         .ok_or_else(|| "Missing SPDX expressions for one or more matches".to_string())?;
 
-    combine_expressions_and(&expressions, false)
-        .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
+    combine_license_expressions(expressions.into_iter().map(str::to_string))
+        .ok_or_else(|| "Failed to combine SPDX expressions".to_string())
 }
 
 /// Determine SPDX expression from ScanCode license keys.
@@ -1112,6 +1113,39 @@ mod tests {
     }
 
     #[test]
+    fn test_determine_license_expression_simplifies_absorbed_compound() {
+        let m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+        let mut m2 = create_test_match_full(
+            "mit",
+            "1-hash",
+            11,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "apache.LICENSE",
+        );
+        m2.license_expression = "mit OR apache-2.0".to_string();
+
+        let result = determine_license_expression(&[m1, m2]);
+
+        assert_eq!(result.as_deref(), Ok("mit"));
+    }
+
+    #[test]
     fn test_determine_license_expression_empty() {
         let matches: Vec<LicenseMatch> = vec![];
         let result = determine_license_expression(&matches);
@@ -1256,7 +1290,7 @@ mod tests {
         let matches = vec![create_test_match(95.0, "mit.LICENSE")];
         let result = determine_spdx_expression(&matches);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "mit");
+        assert_eq!(result.unwrap(), "MIT");
     }
 
     #[test]
@@ -1289,6 +1323,41 @@ mod tests {
         let matches = vec![m1, m2];
         let result = determine_spdx_expression(&matches);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_determine_spdx_expression_simplifies_absorbed_compound() {
+        let mut m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+        m1.license_expression_spdx = Some("MIT".to_string());
+
+        let mut m2 = create_test_match_full(
+            "mit",
+            "1-hash",
+            11,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "apache.LICENSE",
+        );
+        m2.license_expression_spdx = Some("MIT OR Apache-2.0".to_string());
+
+        let result = determine_spdx_expression(&[m1, m2]);
+
+        assert_eq!(result.as_deref(), Ok("MIT"));
     }
 
     #[test]

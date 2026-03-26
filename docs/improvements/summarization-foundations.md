@@ -110,7 +110,7 @@ The summary pipeline no longer emits every available post-processing section unc
 
 The current branch also closes several active upstream fixture gaps:
 
-- joined license expressions can become the primary declared license without being treated as ambiguous when they subsume the single-license files beneath them
+- boolean-equivalent license expressions are now simplified before summary/tally comparison, so redundant forms such as `Apache-2.0 AND (Apache-2.0 OR MIT)` collapse to their simplest equivalent
 - score-only mode no longer borrows package-declared origin data that belongs to full summary mode
 - summary holder selection now keeps null `other_holders` buckets while still removing the declared holders themselves
 - summary now emits an empty declared-holder string when no holder can be established

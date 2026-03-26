@@ -1,21 +1,21 @@
 {
   "summary": {
-    "declared_license_expression": "apache-2.0 AND (apache-2.0 OR mit)",
+    "declared_license_expression": "mit AND apache-2.0",
     "license_clarity_score": {
-      "score": 100,
+      "score": 90,
       "declared_license": true,
       "identification_precision": true,
       "has_license_text": true,
       "declared_copyrights": true,
       "conflicting_license_categories": false,
-      "ambiguous_compound_licensing": false
+      "ambiguous_compound_licensing": true
     },
     "declared_holder": "Example Corp., Demo Corp.",
     "primary_language": "Python",
     "other_license_expressions": [
       {
         "value": "apache-2.0",
-        "count": 1
+        "count": 4
       },
       {
         "value": "mit",

@@ -3,9 +3,12 @@ use std::sync::LazyLock;
 use log::warn;
 
 use crate::license_detection::LicenseDetectionEngine;
-use crate::license_detection::expression::{LicenseExpression, parse_expression};
+use crate::license_detection::expression::{
+    LicenseExpression, parse_expression, simplify_expression,
+};
 use crate::license_detection::index::LicenseIndex;
 use crate::models::{LicenseDetection, Match};
+use crate::utils::spdx::{ExpressionRelation, combine_license_expressions_with_relation};
 
 pub(crate) const PARSER_DECLARED_MATCHER: &str = "parser-declared-license";
 
@@ -92,6 +95,8 @@ pub(crate) fn normalize_spdx_expression(statement: &str) -> Option<NormalizedDec
     let engine = PARSER_LICENSE_ENGINE.as_ref()?;
     let expression = parse_expression(statement).ok()?;
     let (declared_ast, declared_spdx_ast) = normalize_expression_ast(&expression, engine.index())?;
+    let declared_ast = simplify_expression(&declared_ast);
+    let declared_spdx_ast = simplify_expression(&declared_spdx_ast);
 
     Some(NormalizedDeclaredLicense::new(
         render_canonical_expression(&declared_ast),
@@ -121,16 +126,40 @@ pub(crate) fn combine_normalized_licenses(
         return licenses.into_iter().next();
     }
 
-    let declared_expression = licenses
-        .iter()
-        .map(|license| license.declared_license_expression.clone())
-        .collect::<Vec<_>>()
-        .join(separator);
-    let declared_spdx_expression = licenses
-        .iter()
-        .map(|license| license.declared_license_expression_spdx.clone())
-        .collect::<Vec<_>>()
-        .join(separator);
+    let relation = match separator {
+        " AND " => ExpressionRelation::And,
+        " OR " => ExpressionRelation::Or,
+        _ => {
+            let declared_expression = licenses
+                .iter()
+                .map(|license| license.declared_license_expression.clone())
+                .collect::<Vec<_>>()
+                .join(separator);
+            let declared_spdx_expression = licenses
+                .iter()
+                .map(|license| license.declared_license_expression_spdx.clone())
+                .collect::<Vec<_>>()
+                .join(separator);
+
+            return Some(NormalizedDeclaredLicense::new(
+                declared_expression,
+                declared_spdx_expression,
+            ));
+        }
+    };
+
+    let declared_expression = combine_license_expressions_with_relation(
+        licenses
+            .iter()
+            .map(|license| license.declared_license_expression.clone()),
+        relation,
+    )?;
+    let declared_spdx_expression = combine_license_expressions_with_relation(
+        licenses
+            .iter()
+            .map(|license| license.declared_license_expression_spdx.clone()),
+        relation,
+    )?;
 
     Some(NormalizedDeclaredLicense::new(
         declared_expression,
@@ -406,6 +435,16 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_spdx_declared_license_simplifies_absorbed_expression() {
+        let (declared, declared_spdx, detections) =
+            normalize_spdx_declared_license(Some("MIT AND (MIT OR Apache-2.0)"));
+
+        assert_eq!(declared.as_deref(), Some("mit"));
+        assert_eq!(declared_spdx.as_deref(), Some("MIT"));
+        assert_eq!(detections.len(), 1);
+    }
+
+    #[test]
     fn test_normalize_declared_license_key_scancode() {
         let normalized = normalize_declared_license_key("mit").expect("normalized key");
 
@@ -429,6 +468,21 @@ mod tests {
             combined.declared_license_expression_spdx,
             "MIT OR Apache-2.0"
         );
+    }
+
+    #[test]
+    fn test_combine_normalized_licenses_simplifies_absorbed_and_expression() {
+        let combined = combine_normalized_licenses(
+            vec![
+                NormalizedDeclaredLicense::new("mit", "MIT"),
+                NormalizedDeclaredLicense::new("mit OR apache-2.0", "MIT OR Apache-2.0"),
+            ],
+            " AND ",
+        )
+        .expect("combined expression");
+
+        assert_eq!(combined.declared_license_expression, "mit");
+        assert_eq!(combined.declared_license_expression_spdx, "MIT");
     }
 
     #[test]

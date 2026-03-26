@@ -185,6 +185,7 @@ Provenant should match the useful behavior surface without inheriting those stru
   - `--tallies-with-details`
   - `--generated`
 - ✅ Active summary/score parity improvements for:
+  - boolean simplification of equivalent declared and detected license expressions before summary/tally scoring (for example collapsing `A AND (A OR B)` to `A`)
   - joined-expression primary-license resolution without false ambiguity
   - score-only mode using key-file resource evidence instead of package-only origin data
   - package-datafile holder fallback ahead of global key-file holder fallback

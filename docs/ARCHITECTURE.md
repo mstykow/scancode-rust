@@ -540,7 +540,7 @@ The following sections describe major architectural components in detail.
 **License Detection**:
 
 - License text matching using fingerprinting algorithms
-- SPDX license expression generation
+- SPDX license expression generation with boolean simplification of equivalent expressions
 - Confidence scoring and multi-license handling
 - Integration with existing SPDX license data
 
