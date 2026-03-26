@@ -76,6 +76,7 @@ On every release attempt, the script:
 The repository is configured so `cargo release`:
 
 - Creates the release commit as `chore: release vX.Y.Z`
+- Regenerates `xtask/Cargo.lock` after bumping the crate version and before creating the release commit
 - Creates a GPG-signed tag `vX.Y.Z`
 - Publishes the crate to crates.io
 - Pushes the commit and tag to GitHub

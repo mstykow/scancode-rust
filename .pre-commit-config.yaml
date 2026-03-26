@@ -15,6 +15,13 @@ repos:
         types: [rust]
         pass_filenames: false
 
+      - id: check-xtask-lockfile-sync
+        name: Check xtask lockfile sync
+        entry: ./scripts/check_xtask_lockfile_sync.sh
+        language: system
+        pass_filenames: false
+        files: ^(Cargo.toml|xtask/Cargo\.toml|release\.sh)$
+
       - id: generate-supported-formats
         name: Generate docs/SUPPORTED_FORMATS.md
         entry: bash -c 'cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
