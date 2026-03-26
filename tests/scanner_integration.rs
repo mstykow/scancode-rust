@@ -32,6 +32,13 @@ fn hidden_progress() -> Arc<ScanProgress> {
     Arc::new(ScanProgress::new(ProgressMode::Quiet))
 }
 
+fn package_scan_options() -> TextDetectionOptions {
+    TextDetectionOptions {
+        detect_packages: true,
+        ..TextDetectionOptions::default()
+    }
+}
+
 fn scan<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
@@ -263,8 +270,9 @@ fn png_crc32(bytes: &[u8]) -> u32 {
 fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
     let patterns: Vec<Pattern> = vec![];
+    let options = package_scan_options();
 
-    let result = scan(test_dir, 50, &patterns, None, false, None);
+    let result = scan(test_dir, 50, &patterns, None, false, Some(&options));
 
     // Should find 3 files with package data (npm, python, cargo)
     let package_files: Vec<_> = result
@@ -300,8 +308,9 @@ fn test_scanner_discovers_all_registered_parsers() {
 fn test_full_output_format_structure() {
     let test_dir = "testdata/integration/multi-parser";
     let patterns: Vec<Pattern> = vec![];
+    let options = package_scan_options();
 
-    let result = scan(test_dir, 50, &patterns, None, false, None);
+    let result = scan(test_dir, 50, &patterns, None, false, Some(&options));
 
     // Verify basic structure
     assert!(!result.files.is_empty(), "Should have files in result");

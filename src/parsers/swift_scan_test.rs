@@ -163,7 +163,10 @@ mod tests {
             progress,
             None,
             false,
-            &TextDetectionOptions::default(),
+            &TextDetectionOptions {
+                detect_packages: true,
+                ..TextDetectionOptions::default()
+            },
         );
 
         let mut files = result.files;
