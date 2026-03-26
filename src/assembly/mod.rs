@@ -251,7 +251,7 @@ fn hoist_unassembled_file_dependencies(
                 continue;
             };
 
-            if !assemblers::UNASSEMBLED_DATASOURCE_IDS.contains(&datasource_id) {
+            if !should_hoist_unassembled_dependencies(datasource_id) {
                 continue;
             }
 
@@ -260,6 +260,17 @@ fn hoist_unassembled_file_dependencies(
             }));
         }
     }
+}
+
+fn should_hoist_unassembled_dependencies(datasource_id: DatasourceId) -> bool {
+    if !assemblers::UNASSEMBLED_DATASOURCE_IDS.contains(&datasource_id) {
+        return false;
+    }
+
+    !matches!(
+        datasource_id,
+        DatasourceId::NugetDirectoryBuildProps | DatasourceId::NugetDirectoryPackagesProps
+    )
 }
 
 fn stable_package_sort_key(package: &Package) -> (Option<&str>, Option<&str>, Option<&str>, &str) {
