@@ -4,13 +4,14 @@ use std::collections::HashSet;
 
 use super::{LicenseExpression, ParseError};
 
-/// Simplify a license expression by deduplicating license keys.
+/// Simplify a license expression by deduplicating and reducing boolean clauses.
 ///
 /// # Arguments
 /// * `expr` - The expression to simplify
 ///
 /// # Returns
-/// Simplified expression with duplicate licenses removed, preserving order.
+/// Simplified expression with duplicate and subsumed licenses removed,
+/// preserving order.
 pub fn simplify_expression(expr: &LicenseExpression) -> LicenseExpression {
     match expr {
         LicenseExpression::License(key) => LicenseExpression::License(key.clone()),
@@ -23,15 +24,73 @@ pub fn simplify_expression(expr: &LicenseExpression) -> LicenseExpression {
             let mut unique = Vec::new();
             let mut seen = HashSet::new();
             collect_unique_and(expr, &mut unique, &mut seen);
+            prune_subsumed_operands(&mut unique, true);
             build_expression_from_list(&unique, true)
         }
         LicenseExpression::Or { .. } => {
             let mut unique = Vec::new();
             let mut seen = HashSet::new();
             collect_unique_or(expr, &mut unique, &mut seen);
+            prune_subsumed_operands(&mut unique, false);
             build_expression_from_list(&unique, false)
         }
     }
+}
+
+fn prune_subsumed_operands(operands: &mut Vec<LicenseExpression>, outer_is_and: bool) {
+    let inner_is_and = !outer_is_and;
+    let pruned: Vec<LicenseExpression> = operands
+        .iter()
+        .enumerate()
+        .filter(|(candidate_idx, candidate)| {
+            !operands.iter().enumerate().any(|(other_idx, other)| {
+                candidate_idx != &other_idx && operand_subsumes(other, candidate, inner_is_and)
+            })
+        })
+        .map(|(_, operand)| operand.clone())
+        .collect();
+
+    *operands = pruned;
+}
+
+fn operand_subsumes(
+    other: &LicenseExpression,
+    candidate: &LicenseExpression,
+    inner_is_and: bool,
+) -> bool {
+    let other_args = get_flat_args(other);
+    let candidate_args = get_flat_args(candidate);
+
+    if other_args.len() >= candidate_args.len() {
+        return false;
+    }
+
+    let relevant_operator = matches!(other, LicenseExpression::And { .. })
+        || matches!(other, LicenseExpression::Or { .. })
+        || matches!(candidate, LicenseExpression::And { .. })
+        || matches!(candidate, LicenseExpression::Or { .. });
+
+    if !relevant_operator {
+        return false;
+    }
+
+    let operator_matches = if inner_is_and {
+        matches!(candidate, LicenseExpression::And { .. })
+            || matches!(other, LicenseExpression::And { .. })
+    } else {
+        matches!(candidate, LicenseExpression::Or { .. })
+            || matches!(other, LicenseExpression::Or { .. })
+    };
+
+    if !operator_matches {
+        return false;
+    }
+
+    other_args.iter().all(|other_arg| {
+        candidate_args
+            .iter()
+            .any(|arg| expressions_equal(arg, other_arg))
+    })
 }
 
 fn collect_unique_and(
@@ -509,6 +568,44 @@ mod tests {
         let expr = super::super::parse::parse_expression("mit AND mit AND apache-2.0").unwrap();
         let simplified = simplify_expression(&expr);
         assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
+    }
+
+    #[test]
+    fn test_simplify_and_absorption() {
+        let expr = super::super::parse::parse_expression("mit AND (mit OR apache-2.0)").unwrap();
+        let simplified = simplify_expression(&expr);
+
+        assert_eq!(expression_to_string(&simplified), "mit");
+    }
+
+    #[test]
+    fn test_simplify_or_absorption() {
+        let expr = super::super::parse::parse_expression("mit OR (mit AND apache-2.0)").unwrap();
+        let simplified = simplify_expression(&expr);
+
+        assert_eq!(expression_to_string(&simplified), "mit");
+    }
+
+    #[test]
+    fn test_simplify_or_subsumption() {
+        let expr = super::super::parse::parse_expression(
+            "(mit AND apache-2.0) OR (mit AND apache-2.0 AND bsd-new)",
+        )
+        .unwrap();
+        let simplified = simplify_expression(&expr);
+
+        assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
+    }
+
+    #[test]
+    fn test_simplify_and_subsumption() {
+        let expr = super::super::parse::parse_expression(
+            "(mit OR apache-2.0) AND (mit OR apache-2.0 OR bsd-new)",
+        )
+        .unwrap();
+        let simplified = simplify_expression(&expr);
+
+        assert_eq!(expression_to_string(&simplified), "mit OR apache-2.0");
     }
 
     #[test]

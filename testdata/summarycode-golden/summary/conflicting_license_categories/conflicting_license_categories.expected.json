@@ -1,6 +1,6 @@
 {
   "summary": {
-    "declared_license_expression": "apache-2.0 AND mit",
+    "declared_license_expression": "mit AND apache-2.0",
     "license_clarity_score": {
       "score": 70,
       "declared_license": true,
@@ -14,15 +14,11 @@
     "primary_language": "Python",
     "other_license_expressions": [
       {
-        "value": null,
-        "count": 1
-      },
-      {
         "value": "apache-2.0",
-        "count": 1
+        "count": 2
       },
       {
-        "value": "apache-2.0 AND (apache-2.0 OR mit)",
+        "value": null,
         "count": 1
       },
       {

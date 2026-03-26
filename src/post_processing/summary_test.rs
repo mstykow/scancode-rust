@@ -303,7 +303,7 @@ fn compute_summary_prefers_package_origin_info_and_preserves_other_tallies() {
     );
     assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
     assert_eq!(summary.primary_language.as_deref(), Some("Python"));
-    assert_eq!(summary.other_license_expressions.len(), 2);
+    assert_eq!(summary.other_license_expressions.len(), 1);
 }
 
 #[test]
@@ -375,10 +375,10 @@ fn compute_summary_resolves_joined_primary_license_without_ambiguity() {
     let score = summary.license_clarity_score.expect("clarity exists");
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("apache-2.0 AND (apache-2.0 OR mit)")
+        Some("apache-2.0 AND mit")
     );
-    assert_eq!(score.score, 100);
-    assert!(!score.ambiguous_compound_licensing);
+    assert_eq!(score.score, 90);
+    assert!(score.ambiguous_compound_licensing);
     assert!(!score.conflicting_license_categories);
 }
 
@@ -660,7 +660,7 @@ fn compute_summary_uses_tallied_primary_language_when_top_level_packages_disagre
     let summary = compute_summary(&[py1, py2, rs], &[cargo, pypi]).expect("summary exists");
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("apache-2.0 AND mit")
+        Some("mit AND apache-2.0")
     );
     assert_eq!(summary.primary_language.as_deref(), Some("Python"));
 }

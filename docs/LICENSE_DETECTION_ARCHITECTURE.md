@@ -250,8 +250,8 @@ INPUT: File text content
           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 6. DETECTION CREATION                                               │
-│     • Combine expressions from matches                              │
-│     • Convert to SPDX identifiers                                   │
+│     • Combine and simplify equivalent expressions from matches       │
+│     • Convert to SPDX identifiers while preserving SPDX casing       │
 │     • Classify detection quality                                    │
 └─────────────────────────────────────────────────────────────────────┘
           │
