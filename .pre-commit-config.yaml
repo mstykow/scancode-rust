@@ -2,10 +2,12 @@ repos:
   - repo: local
     hooks:
       - id: fmt
-        name: Format Rust code and stage changes
-        entry: bash -c 'cargo fmt -- "$@" && git add -- "$@"' --
+        name: Check Rust formatting
+        entry: cargo fmt
         language: system
+        args: ["--all", "--", "--check"]
         types: [rust]
+        pass_filenames: false
 
       - id: clippy
         name: Run clippy
@@ -24,7 +26,7 @@ repos:
 
       - id: generate-supported-formats
         name: Generate docs/SUPPORTED_FORMATS.md
-        entry: bash -c 'cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
+        entry: cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats
         language: system
         pass_filenames: false
         files: ^src/parsers/.*\.rs$
@@ -32,14 +34,14 @@ repos:
 
       - id: markdown-lint
         name: Lint markdown files with auto-fix
-        entry: bash -c 'npm exec -- markdownlint-cli2 --fix --no-globs "$@" && git add -- "$@"' --
+        entry: bash -c 'npm exec -- markdownlint-cli2 --fix --no-globs "$@"' --
         language: system
         types: [markdown]
         require_serial: true
 
       - id: prettier
         name: Format YAML, JSON, and Markdown with Prettier
-        entry: bash -c 'npm exec -- prettier --write "$@" && git add -- "$@"' --
+        entry: bash -c 'npm exec -- prettier --write "$@"' --
         language: system
         files: \.(yml|yaml|json|md)$
         require_serial: true

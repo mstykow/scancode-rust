@@ -301,7 +301,7 @@ mod tests {
 
 **Pre-commit hooks** (install with `pre-commit install`):
 
-- `cargo fmt --all` - Format code and stage changes
+- `cargo fmt --all` - Format code before committing
 - `cargo clippy --all-targets --all-features -- -D warnings` - Lint with warnings as errors
 - `cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
 - `npm run lint:md:fix` - Lint and auto-fix Markdown
