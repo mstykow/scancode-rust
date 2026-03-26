@@ -570,6 +570,11 @@ fn convert_detection_to_model(
         .matches
         .into_iter()
         .map(|m| {
+            let rule_url = if m.rule_url.is_empty() {
+                None
+            } else {
+                Some(m.rule_url)
+            };
             let matched_text = if include_text {
                 m.matched_text.or_else(|| {
                     Some(crate::license_detection::query::matched_text_from_text(
@@ -593,7 +598,7 @@ fn convert_detection_to_model(
                 match_coverage: Some(m.match_coverage as f64),
                 rule_relevance: Some(m.rule_relevance as usize),
                 rule_identifier: Some(m.rule_identifier),
-                rule_url: Some(m.rule_url),
+                rule_url,
                 matched_text,
             }
         })
@@ -695,9 +700,81 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::is_go_non_production_source;
+    use super::{convert_detection_to_model, is_go_non_production_source};
+    use crate::license_detection::LicenseDetection as InternalLicenseDetection;
+    use crate::license_detection::models::{LicenseMatch, MatcherKind, RuleKind};
     use std::fs;
     use tempfile::tempdir;
+
+    fn make_internal_match(rule_url: &str) -> LicenseMatch {
+        LicenseMatch {
+            rid: 0,
+            license_expression: "mit".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            start_token: 0,
+            end_token: 1,
+            matcher: MatcherKind::Hash,
+            score: 1.0,
+            matched_length: 3,
+            rule_length: 3,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "mit.LICENSE".to_string(),
+            rule_url: rule_url.to_string(),
+            matched_text: Some("MIT".to_string()),
+            referenced_filenames: None,
+            rule_kind: RuleKind::Text,
+            is_from_license: true,
+            matched_token_positions: None,
+            hilen: 3,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
+            hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
+        }
+    }
+
+    fn make_detection(rule_url: &str) -> InternalLicenseDetection {
+        InternalLicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: Some("MIT".to_string()),
+            matches: vec![make_internal_match(rule_url)],
+            detection_log: vec![],
+            identifier: Some("mit-test".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_convert_detection_to_model_preserves_rule_url() {
+        let detection = make_detection(
+            "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE",
+        );
+
+        let converted =
+            convert_detection_to_model(detection, false, "").expect("detection should convert");
+
+        assert_eq!(
+            converted.matches[0].rule_url.as_deref(),
+            Some(
+                "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE"
+            )
+        );
+    }
+
+    #[test]
+    fn test_convert_detection_to_model_emits_null_for_empty_rule_url() {
+        let detection = make_detection("");
+
+        let converted =
+            convert_detection_to_model(detection, false, "").expect("detection should convert");
+
+        assert_eq!(converted.matches[0].rule_url, None);
+    }
 
     #[test]
     fn test_is_go_non_production_source_for_test_filename() {

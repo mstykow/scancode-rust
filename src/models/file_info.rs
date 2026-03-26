@@ -362,7 +362,6 @@ pub struct Match {
     pub rule_relevance: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_identifier: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text: Option<String>,

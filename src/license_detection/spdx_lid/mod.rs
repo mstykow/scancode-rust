@@ -285,34 +285,37 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
             let start_line = query.line_for_pos(*start_token).unwrap_or(1);
             let end_line = query.line_for_pos(*end_token).unwrap_or(start_line);
 
-            let (rid, rule_relevance, rule_identifier, rule_length, referenced_filenames) = index
-                .rid_by_spdx_key
-                .get(&license_expression)
-                .map(|&rid| {
-                    let rule = &index.rules_by_rid[rid];
-                    (
-                        rid,
-                        rule.relevance,
-                        rule.identifier.clone(),
-                        rule.tokens.len(),
-                        rule.referenced_filenames.clone(),
-                    )
-                })
-                .unwrap_or_else(|| {
-                    let unknown_rid = index.unknown_spdx_rid.unwrap_or(0);
-                    if unknown_rid < index.rules_by_rid.len() {
-                        let rule = &index.rules_by_rid[unknown_rid];
+            let (rid, rule_relevance, rule_identifier, rule_url, rule_length, referenced_filenames) =
+                index
+                    .rid_by_spdx_key
+                    .get(&license_expression)
+                    .map(|&rid| {
+                        let rule = &index.rules_by_rid[rid];
                         (
-                            unknown_rid,
+                            rid,
                             rule.relevance,
                             rule.identifier.clone(),
+                            rule.rule_url().unwrap_or_default(),
                             rule.tokens.len(),
                             rule.referenced_filenames.clone(),
                         )
-                    } else {
-                        (0, 100_u8, String::new(), 0_usize, None)
-                    }
-                });
+                    })
+                    .unwrap_or_else(|| {
+                        let unknown_rid = index.unknown_spdx_rid.unwrap_or(0);
+                        if unknown_rid < index.rules_by_rid.len() {
+                            let rule = &index.rules_by_rid[unknown_rid];
+                            (
+                                unknown_rid,
+                                rule.relevance,
+                                rule.identifier.clone(),
+                                rule.rule_url().unwrap_or_default(),
+                                rule.tokens.len(),
+                                rule.referenced_filenames.clone(),
+                            )
+                        } else {
+                            (0, 100_u8, String::new(), String::new(), 0_usize, None)
+                        }
+                    });
 
             let score = rule_relevance as f32 / 100.0;
 
@@ -332,7 +335,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 rule_relevance,
                 rid,
                 rule_identifier,
-                rule_url: String::new(),
+                rule_url,
                 matched_text: None,
                 referenced_filenames,
                 rule_kind: crate::license_detection::models::RuleKind::Tag,

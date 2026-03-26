@@ -7,6 +7,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::license_detection::index::dictionary::TokenId;
 
+const SCANCODE_LICENSE_URL_BASE: &str =
+    "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses";
+const SCANCODE_RULE_URL_BASE: &str =
+    "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules";
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
 )]
@@ -226,6 +231,20 @@ impl Ord for Rule {
 }
 
 impl Rule {
+    pub fn rule_url(&self) -> Option<String> {
+        if self.is_from_license {
+            return (!self.license_expression.is_empty()).then(|| {
+                format!(
+                    "{SCANCODE_LICENSE_URL_BASE}/{}.LICENSE",
+                    self.license_expression
+                )
+            });
+        }
+
+        (!self.identifier.is_empty())
+            .then(|| format!("{SCANCODE_RULE_URL_BASE}/{}", self.identifier))
+    }
+
     pub const fn kind(&self) -> RuleKind {
         self.rule_kind
     }
