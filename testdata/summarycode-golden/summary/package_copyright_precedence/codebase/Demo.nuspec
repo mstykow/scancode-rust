@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>Demo</id>
+    <version>1.0.0</version>
+    <authors>Demo Author</authors>
+    <description>Demo package.</description>
+    <copyright>Copyright Example Corp.</copyright>
+  </metadata>
+</package>

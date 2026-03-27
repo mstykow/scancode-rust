@@ -69,6 +69,10 @@ mod tests {
                 "testdata/summarycode-golden/summary/embedded_packages/bunkerweb",
                 "testdata/summarycode-golden/summary/embedded_packages/bunkerweb.expected.json",
             ),
+            (
+                "testdata/summarycode-golden/summary/package_copyright_precedence",
+                "testdata/summarycode-golden/summary/package_copyright_precedence/package_copyright_precedence.expected.json",
+            ),
         ];
 
         for (fixture_dir, expected_file) in fixtures {
