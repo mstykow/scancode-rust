@@ -35,6 +35,15 @@ mod tests {
         );
         assert_eq!(package_data.datasource_id, Some(DatasourceId::BowerJson));
         assert!(package_data.is_private);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
     }
 
     #[test]
@@ -127,6 +136,9 @@ mod tests {
             package_data.extracted_license_statement,
             Some("MIT AND Apache 2.0 AND BSD-3-Clause".to_string())
         );
+        assert!(package_data.declared_license_expression.is_none());
+        assert!(package_data.declared_license_expression_spdx.is_none());
+        assert!(package_data.license_detections.is_empty());
     }
 
     #[test]

@@ -53,6 +53,15 @@ WriteMakefile(
         assert_eq!(pkg.version.as_deref(), Some("1.23"));
         assert_eq!(pkg.description.as_deref(), Some("An example CPAN module"));
         assert_eq!(pkg.extracted_license_statement.as_deref(), Some("perl_5"));
+        assert_eq!(
+            pkg.declared_license_expression.as_deref(),
+            Some("gpl-1.0-plus OR artistic-perl-1.0")
+        );
+        assert_eq!(
+            pkg.declared_license_expression_spdx.as_deref(),
+            Some("GPL-1.0-or-later OR Artistic-1.0-Perl")
+        );
+        assert_eq!(pkg.license_detections.len(), 1);
         assert_eq!(pkg.primary_language.as_deref(), Some("Perl"));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::CpanMakefile));
         assert_eq!(pkg.purl.as_deref(), Some("pkg:cpan/Acme-Example@1.23"));
@@ -132,6 +141,15 @@ WriteMakefile(
             pkg.extracted_license_statement.as_deref(),
             Some("artistic_2")
         );
+        assert_eq!(
+            pkg.declared_license_expression.as_deref(),
+            Some("artistic-2.0")
+        );
+        assert_eq!(
+            pkg.declared_license_expression_spdx.as_deref(),
+            Some("Artistic-2.0")
+        );
+        assert_eq!(pkg.license_detections.len(), 1);
 
         // Check multiple authors
         assert_eq!(pkg.parties.len(), 2);

@@ -32,6 +32,11 @@ use serde_yaml::Value as YamlValue;
 use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    combine_normalized_licenses, empty_declared_license_data, normalize_declared_license_key,
+    normalize_spdx_expression,
+};
 
 const FIELD_NAME: &str = "name";
 const FIELD_VERSION: &str = "version";
@@ -81,6 +86,11 @@ impl PackageParser for CpanMetaJsonParser {
             .map(String::from);
 
         let extracted_license_statement = extract_license_from_json(&json);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_cpan_declared_license(
+                json.get(FIELD_LICENSE),
+                extracted_license_statement.as_deref(),
+            );
         let parties = extract_parties_from_json(&json);
         let dependencies = extract_dependencies_from_json(&json);
         let (homepage_url, vcs_url, code_view_url, bug_tracking_url) =
@@ -91,6 +101,9 @@ impl PackageParser for CpanMetaJsonParser {
             name,
             version,
             description,
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             extracted_license_statement,
             parties,
             dependencies,
@@ -140,6 +153,11 @@ impl PackageParser for CpanMetaYmlParser {
             .map(String::from);
 
         let extracted_license_statement = extract_license_from_yaml(&yaml);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_cpan_declared_license(
+                yaml.get(YamlValue::String(FIELD_LICENSE.to_string())),
+                extracted_license_statement.as_deref(),
+            );
         let parties = extract_parties_from_yaml(&yaml);
         let dependencies = extract_dependencies_from_yaml(&yaml);
         let (homepage_url, vcs_url, bug_tracking_url) = extract_resources_from_yaml(&yaml);
@@ -149,6 +167,9 @@ impl PackageParser for CpanMetaYmlParser {
             name,
             version,
             description,
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             extracted_license_statement,
             parties,
             dependencies,
@@ -291,6 +312,88 @@ fn extract_license_from_yaml(yaml: &serde_yaml::Mapping) -> Option<String> {
             }
             _ => None,
         })
+}
+
+fn normalize_cpan_declared_license(
+    raw_license: Option<&impl LicenseValueAdapter>,
+    extracted_license_statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let Some(raw_license) = raw_license else {
+        return empty_declared_license_data();
+    };
+    let normalized = raw_license
+        .license_values()
+        .into_iter()
+        .map(|value| normalize_cpan_license_value(&value))
+        .collect::<Option<Vec<_>>>();
+
+    if let Some(normalized) = normalized
+        && let Some(combined) = combine_normalized_licenses(normalized, " AND ")
+    {
+        return build_declared_license_data(
+            combined,
+            DeclaredLicenseMatchMetadata::single_line(
+                extracted_license_statement.unwrap_or_default(),
+            ),
+        );
+    }
+
+    empty_declared_license_data()
+}
+
+trait LicenseValueAdapter {
+    fn license_values(&self) -> Vec<String>;
+}
+
+impl LicenseValueAdapter for JsonValue {
+    fn license_values(&self) -> Vec<String> {
+        match self {
+            JsonValue::String(value) => vec![value.trim().to_string()],
+            JsonValue::Array(values) => values
+                .iter()
+                .filter_map(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+impl LicenseValueAdapter for YamlValue {
+    fn license_values(&self) -> Vec<String> {
+        match self {
+            YamlValue::String(value) => vec![value.trim().to_string()],
+            YamlValue::Sequence(values) => values
+                .iter()
+                .filter_map(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+fn normalize_cpan_license_value(value: &str) -> Option<NormalizedDeclaredLicense> {
+    match value.trim() {
+        "perl_5" | "Perl_5" => Some(NormalizedDeclaredLicense::new(
+            "gpl-1.0-plus OR artistic-perl-1.0",
+            "GPL-1.0-or-later OR Artistic-1.0-Perl",
+        )),
+        "artistic_2" => Some(NormalizedDeclaredLicense::new(
+            "artistic-2.0",
+            "Artistic-2.0",
+        )),
+        "apache_2_0" => Some(NormalizedDeclaredLicense::new("apache-2.0", "Apache-2.0")),
+        other => normalize_spdx_expression(other).or_else(|| normalize_declared_license_key(other)),
+    }
 }
 
 fn extract_parties_from_json(json: &serde_json::Map<String, JsonValue>) -> Vec<Party> {

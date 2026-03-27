@@ -27,6 +27,10 @@ use std::fs;
 use std::path::Path;
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, combine_normalized_licenses,
+    empty_declared_license_data, normalize_declared_license_key, normalize_spdx_declared_license,
+};
 
 const FIELD_NAME: &str = "name";
 const FIELD_VERSION: &str = "version";
@@ -83,6 +87,8 @@ impl PackageParser for BowerJsonParser {
             .map(String::from);
 
         let extracted_license_statement = extract_license_statement(&json);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_bower_declared_license(&json, extracted_license_statement.as_deref());
         let keywords = extract_keywords(&json);
         let parties = extract_parties(&json);
         let homepage_url = json
@@ -119,9 +125,9 @@ impl PackageParser for BowerJsonParser {
             vcs_url,
             copyright: None,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
-            license_detections: Vec::new(),
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
@@ -183,6 +189,40 @@ fn extract_license_statement(json: &Value) -> Option<String> {
             }
             _ => None,
         })
+}
+
+fn normalize_bower_declared_license(
+    json: &Value,
+    extracted_license_statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    match json.get(FIELD_LICENSE) {
+        Some(Value::Array(licenses)) => {
+            let normalized = licenses
+                .iter()
+                .filter_map(|value| value.as_str().map(str::trim))
+                .filter(|value| !value.is_empty())
+                .map(normalize_declared_license_key)
+                .collect::<Option<Vec<_>>>();
+
+            if let Some(normalized) = normalized
+                && let Some(combined) = combine_normalized_licenses(normalized, " AND ")
+            {
+                return build_declared_license_data(
+                    combined,
+                    DeclaredLicenseMatchMetadata::single_line(
+                        extracted_license_statement.unwrap_or_default(),
+                    ),
+                );
+            }
+
+            empty_declared_license_data()
+        }
+        _ => normalize_spdx_declared_license(extracted_license_statement),
+    }
 }
 
 /// Extracts keywords from the keywords field.

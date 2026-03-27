@@ -3,7 +3,7 @@ use chrono::Utc;
 use super::test_utils::{dir, file};
 use super::*;
 use crate::assembly;
-use crate::models::{Copyright, Holder, Match, Package, Tallies};
+use crate::models::{Copyright, Holder, Match, Package, PackageData, PackageType, Tallies};
 use crate::scan_result_shaping::normalize_paths;
 use serde_json::json;
 
@@ -314,6 +314,62 @@ fn create_output_preserves_file_level_license_clues_in_json_shape() {
         "unknown-license-reference"
     );
     assert_eq!(notice["license_clues"][0]["matcher"], "2-aho");
+}
+
+#[test]
+fn create_output_preserves_empty_package_data_license_and_dependency_arrays() {
+    let start = Utc::now();
+    let end = start;
+    let mut manifest = file("project/package.json");
+    manifest.package_data = vec![PackageData {
+        package_type: Some(PackageType::Npm),
+        name: Some("demo".to_string()),
+        version: Some("1.0.0".to_string()),
+        ..PackageData::default()
+    }];
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), manifest],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_classify: false,
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    let value = serde_json::to_value(&output).expect("output should serialize");
+    let package_data = value["files"]
+        .as_array()
+        .expect("files array")
+        .iter()
+        .find(|entry| entry["path"] == json!("project/package.json"))
+        .and_then(|entry| entry["package_data"].as_array())
+        .and_then(|package_data| package_data.first())
+        .expect("package data entry present");
+
+    assert_eq!(package_data["license_detections"], json!([]));
+    assert_eq!(package_data["dependencies"], json!([]));
 }
 
 #[test]

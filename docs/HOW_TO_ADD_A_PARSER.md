@@ -263,6 +263,23 @@ crate::register_parser!(
 
 Parser-side declared-license normalization is allowed only for **trustworthy declared metadata** (for example, SPDX-expression-compatible manifest fields) and should use the shared parser license-normalization helper rather than one-off parser logic.
 
+### Declared-license and dependency contract
+
+- If the format exposes a **trustworthy declared-license surface**, populate:
+  - `extracted_license_statement`
+  - `declared_license_expression`
+  - `declared_license_expression_spdx`
+  - parser-side `license_detections`
+  - using the shared helper in `src/parsers/license_normalization.rs`
+- If the license surface is ambiguous or weak, keep the parser **raw-only by design**:
+  - preserve `extracted_license_statement`
+  - leave declared-license fields empty
+  - do **not** emit partial or guessed declared expressions
+- Populate `dependencies` whenever the source format actually encodes dependency data.
+  Empty is correct only when the format has no dependency surface or the concrete file truly does not declare any dependencies.
+- Parser-side `license_detections` represent **declared metadata normalization**, not discovered file-content matches.
+- Treat parser tests and parser goldens as interface-contract checks: if a parser emits meaningful declared-license or dependency data, add assertions/fixtures that prove those fields are populated correctly.
+
 ## Step 3: Add Comprehensive Tests
 
 ### Create Test File

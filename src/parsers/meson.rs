@@ -9,6 +9,7 @@ use serde_json::Value as JsonValue;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 pub struct MesonParser;
 
@@ -147,6 +148,13 @@ fn apply_project_call(
         .unwrap_or_default();
     if !licenses.is_empty() {
         package.extracted_license_statement = Some(licenses.join("\n"));
+        if licenses.len() == 1 {
+            let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+                normalize_spdx_declared_license(licenses.first().map(String::as_str));
+            package.declared_license_expression = declared_license_expression;
+            package.declared_license_expression_spdx = declared_license_expression_spdx;
+            package.license_detections = license_detections;
+        }
     }
 
     let license_files = call

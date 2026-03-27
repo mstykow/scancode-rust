@@ -23,9 +23,21 @@
     "vcs_url": "https://github.com/jitsi/docker-jitsi-meet",
     "copyright": null,
     "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
+    "declared_license_expression": "apache-2.0",
+    "declared_license_expression_spdx": "Apache-2.0",
+    "license_detections": [
+      {
+        "license_expression": "apache-2.0",
+        "license_expression_spdx": "Apache-2.0",
+        "matches": [
+          {
+            "license_expression": "apache-2.0",
+            "license_expression_spdx": "Apache-2.0",
+            "score": 100.0
+          }
+        ]
+      }
+    ],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

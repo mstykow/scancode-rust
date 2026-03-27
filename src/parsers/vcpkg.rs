@@ -132,11 +132,39 @@ fn extract_maintainers(json: &Value) -> Vec<Party> {
 }
 
 fn extract_dependencies(json: &Value) -> Vec<Dependency> {
-    let Some(deps) = json.get("dependencies").and_then(Value::as_array) else {
-        return Vec::new();
-    };
+    let mut dependencies: Vec<Dependency> = json
+        .get("dependencies")
+        .and_then(Value::as_array)
+        .map(|deps| deps.iter().filter_map(parse_dependency_entry).collect())
+        .unwrap_or_default();
 
-    deps.iter().filter_map(parse_dependency_entry).collect()
+    if let Some(features) = json.get("features").and_then(Value::as_object) {
+        for (feature_name, feature_value) in features {
+            let Some(feature_dependencies) =
+                feature_value.get("dependencies").and_then(Value::as_array)
+            else {
+                continue;
+            };
+
+            for dependency in feature_dependencies
+                .iter()
+                .filter_map(parse_dependency_entry)
+                .map(|mut dependency| {
+                    let mut extra_data = dependency.extra_data.take().unwrap_or_default();
+                    extra_data.insert(
+                        "feature".to_string(),
+                        Value::String(feature_name.to_string()),
+                    );
+                    dependency.extra_data = Some(extra_data);
+                    dependency
+                })
+            {
+                dependencies.push(dependency);
+            }
+        }
+    }
+
+    dependencies
 }
 
 fn parse_dependency_entry(value: &Value) -> Option<Dependency> {

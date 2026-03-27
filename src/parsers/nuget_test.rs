@@ -305,6 +305,15 @@ mod tests {
             package_data.extracted_license_statement.as_deref(),
             Some("MIT")
         );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(extra["license_type"], "expression");
     }
 
@@ -1433,6 +1442,15 @@ mod tests {
             package_data.extracted_license_statement.as_deref(),
             Some("MIT")
         );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(
             package_data.vcs_url.as_deref(),
             Some("git+https://github.com/example/contoso")

@@ -27,6 +27,8 @@ use serde_json::Value;
 use crate::models::PackageData;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
+use super::python::extract_requires_dist_dependencies;
 
 const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
@@ -63,6 +65,7 @@ struct PackageMetadata {
     license: Option<String>,
     description: Option<String>,
     keywords: Option<String>,
+    requires_dist: Option<Vec<String>>,
 }
 
 impl PackageParser for PipInspectDeplockParser {
@@ -144,17 +147,28 @@ pub(crate) fn parse_pip_inspect_deplock(content: &str) -> PackageData {
         .as_ref()
         .map(|k| vec![k.clone()])
         .unwrap_or_default();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(metadata.license.as_deref());
+    let dependencies = metadata
+        .requires_dist
+        .as_ref()
+        .map(|requires_dist| extract_requires_dist_dependencies(requires_dist))
+        .unwrap_or_default();
 
     PackageData {
         package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         name: metadata.name.clone(),
         version: metadata.version.clone(),
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement: metadata.license.clone(),
         description: metadata.description.clone(),
         keywords,
         is_virtual: true,
         extra_data: extra_data_opt,
+        dependencies,
         datasource_id: Some(DatasourceId::PypiInspectDeplock),
         ..Default::default()
     }

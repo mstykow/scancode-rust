@@ -25,6 +25,10 @@ use serde_json::json;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    empty_declared_license_data, normalize_declared_license_key, normalize_spdx_expression,
+};
 
 static RE_WRITEMAKEFILE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"WriteMakefile1?\s*\(").unwrap());
@@ -104,6 +108,19 @@ pub(crate) fn parse_makefile_pl_with_base(content: &str, base_dir: Option<&Path>
         .map(|d| d.to_string())
         .or_else(|| resolved_metadata.abstract_text.clone());
     let extracted_license_statement = fields.get("LICENSE").map(|l| l.to_string());
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        extracted_license_statement
+            .as_deref()
+            .and_then(normalize_cpan_makefile_license)
+            .map(|normalized| {
+                build_declared_license_data(
+                    normalized,
+                    DeclaredLicenseMatchMetadata::single_line(
+                        extracted_license_statement.as_deref().unwrap_or_default(),
+                    ),
+                )
+            })
+            .unwrap_or_else(empty_declared_license_data);
 
     let parties = parse_author(&fields);
     let dependencies = parse_dependencies(&fields);
@@ -136,6 +153,9 @@ pub(crate) fn parse_makefile_pl_with_base(content: &str, base_dir: Option<&Path>
         name,
         version,
         description,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         parties,
         dependencies,
@@ -163,6 +183,21 @@ fn default_package_data() -> PackageData {
         primary_language: Some("Perl".to_string()),
         datasource_id: Some(DatasourceId::CpanMakefile),
         ..Default::default()
+    }
+}
+
+fn normalize_cpan_makefile_license(value: &str) -> Option<NormalizedDeclaredLicense> {
+    match value.trim() {
+        "perl_5" | "Perl_5" => Some(NormalizedDeclaredLicense::new(
+            "gpl-1.0-plus OR artistic-perl-1.0",
+            "GPL-1.0-or-later OR Artistic-1.0-Perl",
+        )),
+        "artistic_2" => Some(NormalizedDeclaredLicense::new(
+            "artistic-2.0",
+            "Artistic-2.0",
+        )),
+        "apache_2_0" => Some(NormalizedDeclaredLicense::new("apache-2.0", "Apache-2.0")),
+        other => normalize_spdx_expression(other).or_else(|| normalize_declared_license_key(other)),
     }
 }
 
