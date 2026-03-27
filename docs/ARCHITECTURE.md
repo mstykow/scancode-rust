@@ -706,7 +706,7 @@ Centralized `ScanProgress` struct manages mode-aware progress output via `indica
 
 Verbosity behavior is implemented in `src/progress.rs` and wired through `src/main.rs`: quiet suppresses stderr output, default shows progress/summary, verbose shows per-file stderr output with detailed per-file errors.
 
-Logging integration uses `indicatif-log-bridge` so parser `warn!()` messages print above active progress output without corruption. Runtime wiring lives in `src/progress.rs`, with scan updates in `src/scanner/process.rs`.
+Logging integration uses `indicatif-log-bridge` for startup and global warnings, while parser and other file-scoped scan failures are attached to `FileInfo.scan_errors` in `src/scanner/process.rs`. That keeps serialized output, CI logs, and the quiet/default/verbose progress modes aligned: default mode shows concise failing paths, verbose mode shows the underlying per-file error details.
 
 Module location: `src/progress.rs`
 

@@ -178,7 +178,7 @@ The progress/reporting path is now implemented around a centralized manager:
 | Multi-phase progress       | ✅     | Discovery/SPDX/assembly/output phase indicators + scan progress bar                                                          |
 | Throughput + summary stats | ✅     | Files/sec, bytes/sec, initial/final counts with sizes, package assembly counts, phase timings                                |
 | Real-time error display    | ✅     | Inline stderr reporting during scan, plus end-of-scan error section                                                          |
-| Logging integration        | ✅     | `warn!()` messages are compatible with active progress rendering                                                             |
+| Logging integration        | ✅     | Startup/global warnings use the logger bridge, while file-scoped parser/runtime failures flow through `scan_errors`          |
 | Non-TTY degradation        | ✅     | No progress redraw artifacts when stderr is redirected                                                                       |
 
 ### Dependencies
@@ -229,9 +229,9 @@ pub verbose: bool,
 
 #### D4: Use `indicatif-log-bridge` for Log Integration
 
-**Decision**: Wire `log` crate through `indicatif-log-bridge` so `warn!()` messages from parsers print above the progress bar cleanly.
+**Decision**: Wire `log` crate through `indicatif-log-bridge` for startup/global warnings, and route parser/file-scoped scan failures into `scan_errors` so progress modes can render them consistently.
 
-**Rationale**: Parser code already uses `log::warn!()` for errors. Without the bridge, these messages can interfere with progress rendering. `indicatif-log-bridge` integrates a logger with `MultiProgress` and uses suspended draws during log writes for clean output.
+**Rationale**: Global warnings still need clean stderr rendering, but parser read/parse failures should also survive into serialized scan output. Keeping per-file failures in `scan_errors` lets default mode stay concise, verbose mode stay forensic, and CI logs match the JSON error surface.
 
 **New dependency**: `indicatif-log-bridge`
 
