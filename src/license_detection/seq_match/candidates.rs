@@ -70,28 +70,28 @@ impl Ord for ScoresVector {
 ///
 /// Corresponds to the tuple structure used in Python: (scores_vectors, rid, rule, high_set_intersection)
 #[derive(Debug, Clone, PartialEq)]
-pub struct Candidate {
+pub struct Candidate<'a> {
     /// Rounded score vector for display/grouping
     pub score_vec_rounded: ScoresVector,
     /// Full score vector for sorting
     pub score_vec_full: ScoresVector,
     /// Rule ID
     pub rid: usize,
-    /// Reference to the rule
-    pub rule: Rule,
+    /// Reference to the rule (borrowed from LicenseIndex)
+    pub rule: &'a Rule,
     /// Set of high-value (legalese) tokens in the intersection
     pub high_set_intersection: HashSet<TokenId>,
 }
 
-impl PartialOrd for Candidate {
+impl PartialOrd for Candidate<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Eq for Candidate {}
+impl Eq for Candidate<'_> {}
 
-impl Ord for Candidate {
+impl Ord for Candidate<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Python sorts the tuple ((svr, svf), rid, rule, ...) with reverse=True
         // So it compares (svr, svf) tuple first, which means:
@@ -211,7 +211,7 @@ struct DupeGroupKey {
 /// precision (e.g., 6.9 and 6.7 are different, but 7 and 7 would be same).
 ///
 /// Corresponds to Python: `filter_dupes()` in match_set.py (line 461-498)
-pub(super) fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
+pub(super) fn filter_dupes(candidates: Vec<Candidate<'_>>) -> Vec<Candidate<'_>> {
     let mut groups: HashMap<DupeGroupKey, Vec<Candidate>> = HashMap::new();
 
     for candidate in candidates {
@@ -269,12 +269,12 @@ pub fn multisets_intersector(
 /// After selecting candidates using sets, this refines the ranking using multisets.
 ///
 /// Corresponds to Python: `compute_candidates()` step 2 in match_set.py (line 311-350)
-pub fn compute_candidates_with_msets(
-    index: &LicenseIndex,
+pub fn compute_candidates_with_msets<'a>(
+    index: &'a LicenseIndex,
     query_run: &QueryRun,
     high_resemblance: bool,
     top_n: usize,
-) -> Vec<Candidate> {
+) -> Vec<Candidate<'a>> {
     let query_tokens = query_run.matchable_tokens();
     if query_tokens.is_empty() {
         return Vec::new();
@@ -314,8 +314,13 @@ pub fn compute_candidates_with_msets(
         return Vec::new();
     }
 
-    let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<TokenId>)> =
-        Vec::new();
+    let mut step1_candidates: Vec<(
+        ScoresVector,
+        ScoresVector,
+        usize,
+        &'a Rule,
+        HashSet<TokenId>,
+    )> = Vec::new();
 
     for rid in candidate_rids {
         let Some(rule) = index.rules_by_rid.get(rid) else {
@@ -382,7 +387,7 @@ pub fn compute_candidates_with_msets(
             continue;
         }
 
-        step1_candidates.push((svr, svf, rid, rule.clone(), high_set_intersection));
+        step1_candidates.push((svr, svf, rid, rule, high_set_intersection));
     }
 
     if step1_candidates.is_empty() {
@@ -393,7 +398,7 @@ pub fn compute_candidates_with_msets(
 
     step1_candidates.truncate(top_n * 10);
 
-    let mut sortable_candidates: Vec<Candidate> = Vec::new();
+    let mut sortable_candidates: Vec<Candidate<'a>> = Vec::new();
 
     for (_svr, _svf, rid, rule, high_set_intersection) in step1_candidates {
         let Some(rule_mset) = index.msets_by_rid.get(&rid) else {
@@ -503,6 +508,84 @@ mod tests {
 
     #[test]
     fn test_candidate_ordering() {
+        let rule1 = Rule {
+            identifier: "test1".to_string(),
+            license_expression: "mit".to_string(),
+            text: String::new(),
+            tokens: vec![],
+            rule_kind: crate::license_detection::models::RuleKind::Text,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            has_stored_minimum_coverage: false,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let rule2 = Rule {
+            identifier: "test2".to_string(),
+            license_expression: "apache".to_string(),
+            text: String::new(),
+            tokens: vec![],
+            rule_kind: crate::license_detection::models::RuleKind::Text,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            has_stored_minimum_coverage: false,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
         let candidate1 = Candidate {
             score_vec_rounded: ScoresVector {
                 is_highly_resemblant: true,
@@ -519,44 +602,7 @@ mod tests {
                 rid: 0,
             },
             rid: 0,
-            rule: Rule {
-                identifier: "test1".to_string(),
-                license_expression: "mit".to_string(),
-                text: String::new(),
-                tokens: vec![],
-                rule_kind: crate::license_detection::models::RuleKind::Text,
-                is_false_positive: false,
-                is_required_phrase: false,
-                is_from_license: false,
-                relevance: 100,
-                minimum_coverage: None,
-                has_stored_minimum_coverage: false,
-                is_continuous: true,
-                referenced_filenames: None,
-                ignorable_urls: None,
-                ignorable_emails: None,
-                ignorable_copyrights: None,
-                ignorable_holders: None,
-                ignorable_authors: None,
-                language: None,
-                notes: None,
-                length_unique: 0,
-                high_length_unique: 0,
-                high_length: 0,
-                min_matched_length: 0,
-                min_high_matched_length: 0,
-                min_matched_length_unique: 0,
-                min_high_matched_length_unique: 0,
-                is_small: false,
-                is_tiny: false,
-                starts_with_license: false,
-                ends_with_license: false,
-                is_deprecated: false,
-                spdx_license_key: None,
-                other_spdx_license_keys: vec![],
-                required_phrase_spans: vec![],
-                stopwords_by_pos: std::collections::HashMap::new(),
-            },
+            rule: &rule1,
             high_set_intersection: HashSet::new(),
         };
 
@@ -576,44 +622,7 @@ mod tests {
                 rid: 1,
             },
             rid: 1,
-            rule: Rule {
-                identifier: "test2".to_string(),
-                license_expression: "apache".to_string(),
-                text: String::new(),
-                tokens: vec![],
-                rule_kind: crate::license_detection::models::RuleKind::Text,
-                is_false_positive: false,
-                is_required_phrase: false,
-                is_from_license: false,
-                relevance: 100,
-                minimum_coverage: None,
-                has_stored_minimum_coverage: false,
-                is_continuous: true,
-                referenced_filenames: None,
-                ignorable_urls: None,
-                ignorable_emails: None,
-                ignorable_copyrights: None,
-                ignorable_holders: None,
-                ignorable_authors: None,
-                language: None,
-                notes: None,
-                length_unique: 0,
-                high_length_unique: 0,
-                high_length: 0,
-                min_matched_length: 0,
-                min_high_matched_length: 0,
-                min_matched_length_unique: 0,
-                min_high_matched_length_unique: 0,
-                is_small: false,
-                is_tiny: false,
-                starts_with_license: false,
-                ends_with_license: false,
-                is_deprecated: false,
-                spdx_license_key: None,
-                other_spdx_license_keys: vec![],
-                required_phrase_spans: vec![],
-                stopwords_by_pos: std::collections::HashMap::new(),
-            },
+            rule: &rule2,
             high_set_intersection: HashSet::new(),
         };
 
@@ -688,7 +697,7 @@ mod tests {
                 rid: 1,
             },
             rid: 1,
-            rule: rule1,
+            rule: &rule1,
             high_set_intersection: HashSet::new(),
         };
 
@@ -708,7 +717,7 @@ mod tests {
                 rid: 2,
             },
             rid: 2,
-            rule: rule2,
+            rule: &rule2,
             high_set_intersection: HashSet::new(),
         };
 
@@ -787,7 +796,7 @@ mod tests {
                 rid: 1,
             },
             rid: 1,
-            rule: rule1,
+            rule: &rule1,
             high_set_intersection: HashSet::new(),
         };
 
@@ -807,7 +816,7 @@ mod tests {
                 rid: 2,
             },
             rid: 2,
-            rule: rule2,
+            rule: &rule2,
             high_set_intersection: HashSet::new(),
         };
 
@@ -917,7 +926,7 @@ mod tests {
                 rid: 1,
             },
             rid: 1,
-            rule: rule_sa,
+            rule: &rule_sa,
             high_set_intersection: HashSet::new(),
         };
 
@@ -937,7 +946,7 @@ mod tests {
                 rid: 2,
             },
             rid: 2,
-            rule: rule_nc_sa,
+            rule: &rule_nc_sa,
             high_set_intersection: HashSet::new(),
         };
 
@@ -950,11 +959,33 @@ mod tests {
             "Different license expressions should create different groups"
         );
 
-        let mut same_group_candidates = vec![filtered[0].clone(), filtered[1].clone()];
-        for candidate in &mut same_group_candidates {
-            candidate.rule.license_expression = "same".to_string();
-            candidate.rule.tokens = vec![tid(0); 100];
-        }
+        let mut rule_same1 = Rule {
+            license_expression: "same".to_string(),
+            tokens: vec![tid(0); 100],
+            ..rule_sa.clone()
+        };
+        let mut rule_same2 = Rule {
+            license_expression: "same".to_string(),
+            tokens: vec![tid(0); 100],
+            ..rule_nc_sa.clone()
+        };
+
+        let same_group_candidates = vec![
+            Candidate {
+                score_vec_rounded: filtered[0].score_vec_rounded.clone(),
+                score_vec_full: filtered[0].score_vec_full.clone(),
+                rid: filtered[0].rid,
+                rule: &mut rule_same1,
+                high_set_intersection: HashSet::new(),
+            },
+            Candidate {
+                score_vec_rounded: filtered[1].score_vec_rounded.clone(),
+                score_vec_full: filtered[1].score_vec_full.clone(),
+                rid: filtered[1].rid,
+                rule: &mut rule_same2,
+                high_set_intersection: HashSet::new(),
+            },
+        ];
 
         let deduped = filter_dupes(same_group_candidates);
         assert_eq!(deduped.len(), 1);
@@ -1002,6 +1033,11 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
         };
 
+        let rule_z = Rule {
+            identifier: "z.RULE".to_string(),
+            ..rule_a.clone()
+        };
+
         let candidate_low_rid = Candidate {
             score_vec_rounded: ScoresVector {
                 is_highly_resemblant: true,
@@ -1018,10 +1054,7 @@ mod tests {
                 rid: 1,
             },
             rid: 1,
-            rule: Rule {
-                identifier: "z.RULE".to_string(),
-                ..rule_a.clone()
-            },
+            rule: &rule_z,
             high_set_intersection: HashSet::new(),
         };
 
@@ -1035,10 +1068,7 @@ mod tests {
                 ..candidate_low_rid.score_vec_full.clone()
             },
             rid: 2,
-            rule: Rule {
-                identifier: "a.RULE".to_string(),
-                ..rule_a
-            },
+            rule: &rule_a,
             high_set_intersection: HashSet::new(),
         };
 
