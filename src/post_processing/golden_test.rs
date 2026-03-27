@@ -4,7 +4,7 @@ mod tests {
 
     use serde_json::Value;
 
-    use super::super::mark_generated_files;
+    use super::super::materialize_generated_flags;
     use super::super::test_utils::{
         FixtureOutputOptions, assert_classify_fixture_matches_expected,
         assert_facet_fixture_matches_expected, assert_package_fixture_matches_expected,
@@ -143,7 +143,10 @@ mod tests {
             progress,
             None,
             false,
-            &TextDetectionOptions::default(),
+            &TextDetectionOptions {
+                detect_generated: true,
+                ..TextDetectionOptions::default()
+            },
         )
         .files;
 
@@ -154,8 +157,7 @@ mod tests {
                 .to_str()
                 .expect("fixture path should be UTF-8"),
         );
-        mark_generated_files(&mut files, Some(generated_root));
-
+        materialize_generated_flags(&mut files);
         let actual = serde_json::json!({
             "files": files
                 .into_iter()

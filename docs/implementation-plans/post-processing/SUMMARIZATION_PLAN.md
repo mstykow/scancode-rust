@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, package-copyright holder precedence, package-datafile summary eligibility, and active summary/score/generated/classify/tally parity are implemented; performance hardening remains open here
+> **Status**: ✅ Complete — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, package-copyright holder precedence, package-datafile summary eligibility, active summary/score/generated/classify/tally parity, and Phase 11 performance hardening are implemented
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -217,15 +217,12 @@ Implemented Rust behavior is already materially leaner than Python:
 - ✅ top-level tallies aggregate counts directly in `HashMap<Option<String>, usize>` rather than re-expanding counted values
 - ✅ detailed tallies are bottom-up over already-present file/directory nodes
 - ✅ package metadata promotion no longer mutates declared-license provenance from key-file evidence
-
-The remaining hot spots are localized and should stay explicit in this plan:
-
-- ⚠️ `assign_facets()` now precomputes rule match scope and uses a fixed facet mask instead of per-file string sort/dedup churn, but it still scales with `O(files × facet_rules)` as rule count grows
-- ⚠️ generated-file fallback rereads still exist for paths that arrive without scanner-populated `is_generated` values (for example preloaded/legacy inputs), so that path should remain narrow and intentional
+- ✅ `assign_facets()` now precomputes rule match scope and uses a fixed facet mask instead of per-file string sort/dedup churn
+- ✅ generated-file flags are now owned by scan-time detection on normal scans, and production post-processing no longer rereads file contents to recover missing `is_generated` values
 
 ### Missing
 
-- ❌ No remaining functional summary-parity gaps are currently tracked here; the remaining open work in this plan is Phase 11 performance hardening
+- ✅ No remaining functional or tracked performance gaps remain in this plan
 
 ### Already handled elsewhere
 
@@ -252,19 +249,19 @@ The remaining hot spots are localized and should stay explicit in this plan:
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. ✅ Complete: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, package-copyright holder precedence, empty declared-holder parity, tallied-language fallback when packages disagree, package-datafile eligibility for declared-license summary origin, the main ambiguity/holder fixtures, and localized regression coverage including `package_copyright_precedence`.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. ✅ Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage with localized fixture coverage.
-12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns. Implemented so far: facet rules now precompute path-vs-broad matching scope and `assign_facets()` uses a fixed facet mask/materialization pass instead of cloning, sorting, and deduping matched facet strings per file.
+12. **Phase 11**: Performance hardening. ✅ Complete: facet rules now precompute path-vs-broad matching scope, `assign_facets()` uses a fixed facet mask/materialization pass instead of cloning/sorting/deduping matched facet strings per file, and production output now relies on scanner-populated generated flags instead of post-processing file rereads.
 
 ## Success Criteria
 
-- [ ] Generates accurate codebase tallies for licenses, copyrights, holders, authors, and languages where upstream does
-- [ ] Produces `--summary` output compatible with the ScanCode reference for covered scenarios
-- [ ] Calculates license clarity score matching Python semantics
-- [ ] Classifies key files and broader file categories compatibly with ScanCode
-- [ ] Supports facet-driven and key-file-driven tally variants
-- [ ] Detects generated code with documented heuristic behavior
-- [ ] Exposes the corresponding CLI options with parity-compatible semantics
-- [ ] Preserves the current in-place/count-based architecture and avoids Python-style repeated-walk/recount/copy regressions
-- [ ] Golden and integration tests pass
+- [x] Generates accurate codebase tallies for licenses, copyrights, holders, authors, and languages where upstream does
+- [x] Produces `--summary` output compatible with the ScanCode reference for covered scenarios
+- [x] Calculates license clarity score matching Python semantics
+- [x] Classifies key files and broader file categories compatibly with ScanCode
+- [x] Supports facet-driven and key-file-driven tally variants
+- [x] Detects generated code with documented heuristic behavior
+- [x] Exposes the corresponding CLI options with parity-compatible semantics
+- [x] Preserves the current in-place/count-based architecture and avoids Python-style repeated-walk/recount/copy regressions
+- [x] Golden and integration tests pass
 
 ## Related Documents
 

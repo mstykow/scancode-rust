@@ -16,6 +16,7 @@ use crate::models::{
     OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::scanner;
+#[cfg(test)]
 use crate::utils::generated::generated_code_hints;
 use crate::utils::spdx::combine_license_expressions;
 
@@ -46,7 +47,6 @@ pub(crate) struct CreateOutputOptions<'a> {
     pub(crate) include_tallies_with_details: bool,
     pub(crate) include_tallies_by_facet: bool,
     pub(crate) include_generated: bool,
-    pub(crate) scanned_root: Option<&'a Path>,
 }
 
 pub(crate) struct CreateOutputContext<'a> {
@@ -136,7 +136,7 @@ pub(crate) fn create_output(
         .then(|| build_classification_context(&files, &packages));
 
     if context.options.include_generated {
-        mark_generated_files(&mut files, context.options.scanned_root);
+        materialize_generated_flags(&mut files);
     } else {
         clear_generated_flags(&mut files);
     }
@@ -885,6 +885,20 @@ fn compute_summary_with_options(
     })
 }
 
+fn materialize_generated_flags(files: &mut [FileInfo]) {
+    for file in files.iter_mut() {
+        if file.file_type != FileType::File {
+            file.is_generated = Some(false);
+            continue;
+        }
+
+        if file.is_generated.is_none() {
+            file.is_generated = Some(false);
+        }
+    }
+}
+
+#[cfg(test)]
 fn mark_generated_files(files: &mut [FileInfo], scanned_root: Option<&Path>) {
     for file in files.iter_mut() {
         if file.file_type != FileType::File {
@@ -911,22 +925,33 @@ fn clear_resource_tallies(files: &mut [FileInfo]) {
     }
 }
 
+#[cfg(test)]
 fn generated_file_hint_exists(path: &str, scanned_root: Option<&Path>) -> Result<bool> {
     let path = resolve_generated_scan_path(path, scanned_root)?;
     Ok(!generated_code_hints(&path)?.is_empty())
 }
 
+#[cfg(test)]
 fn resolve_generated_scan_path(path: &str, scanned_root: Option<&Path>) -> Result<PathBuf> {
-    let relative_path = PathBuf::from(path);
-    let candidates = [
-        scanned_root.map(|root| root.join(&relative_path)),
-        Some(relative_path.clone()),
-    ];
+    let candidate = PathBuf::from(path);
 
-    for candidate in candidates.into_iter().flatten() {
-        if candidate.is_file() {
-            return Ok(candidate);
-        }
+    if candidate.is_absolute() {
+        return candidate
+            .is_file()
+            .then_some(candidate)
+            .ok_or_else(|| anyhow!("Generated detection path not found: {}", path));
+    }
+
+    let Some(scanned_root) = scanned_root else {
+        return Err(anyhow!(
+            "Generated detection fallback requires an absolute path or scanned root: {}",
+            path
+        ));
+    };
+
+    let anchored = scanned_root.join(&candidate);
+    if anchored.is_file() {
+        return Ok(anchored);
     }
 
     Err(anyhow!("Generated detection path not found: {}", path))
