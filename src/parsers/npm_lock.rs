@@ -20,8 +20,8 @@
 //! - Direct dependencies determined by top-level `dependencies` and `devDependencies`
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
+use crate::parser_warn as warn;
 use crate::parsers::utils::{npm_purl, parse_sri};
-use log::warn;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;

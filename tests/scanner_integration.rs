@@ -368,7 +368,15 @@ fn test_scanner_handles_empty_directory() {
 
     let patterns: Vec<Pattern> = vec![];
 
-    let result = scan(test_path, 50, &patterns, None, false, None);
+    let package_options = package_scan_options();
+    let result = scan(
+        test_path,
+        50,
+        &patterns,
+        None,
+        false,
+        Some(&package_options),
+    );
 
     // Should have no files (only the directory entry might be present)
     let file_count = result
@@ -393,7 +401,15 @@ fn test_scanner_handles_parse_errors_gracefully() {
     let patterns: Vec<Pattern> = vec![];
 
     // Scan should complete without crashing
-    let result = scan(test_path, 50, &patterns, None, false, None);
+    let package_options = package_scan_options();
+    let result = scan(
+        test_path,
+        50,
+        &patterns,
+        None,
+        false,
+        Some(&package_options),
+    );
 
     // Should find the file
     let json_file = result
@@ -403,10 +419,8 @@ fn test_scanner_handles_parse_errors_gracefully() {
         .expect("Should find package.json file");
 
     assert!(
-        json_file.package_data.is_empty()
-            || json_file.package_data[0].name.is_none()
-            || !json_file.scan_errors.is_empty(),
-        "Malformed file should have empty/invalid package data or scan errors"
+        !json_file.scan_errors.is_empty(),
+        "Malformed file should surface parser failures in scan_errors"
     );
 }
 

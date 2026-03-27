@@ -24,8 +24,8 @@
 use std::fs;
 use std::path::Path;
 
+use crate::parser_warn as warn;
 use lazy_static::lazy_static;
-use log::warn;
 use md5::{Digest, Md5};
 use packageurl::PackageUrl;
 use regex::Regex;

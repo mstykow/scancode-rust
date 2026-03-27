@@ -17,7 +17,7 @@
 //! - All fields are extracted with graceful error handling
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

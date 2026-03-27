@@ -22,8 +22,8 @@
 //! - Direct dependencies: all in pom.xml are direct
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
+use crate::parser_warn as warn;
 use crate::parsers::utils::read_file_to_string;
-use log::warn;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::{HashMap, HashSet};

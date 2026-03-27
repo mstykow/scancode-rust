@@ -562,11 +562,7 @@ pub fn load_loaded_rules_from_directory(dir: &Path) -> Result<Vec<LoadedRule>> {
             match parse_rule_to_loaded(&path) {
                 Ok(rule) => rules.push(rule),
                 Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse rule file {}: {}",
-                        path.display(),
-                        e
-                    );
+                    warn!("Failed to parse rule file {}: {}", path.display(), e);
                 }
             }
         }
@@ -601,11 +597,7 @@ pub fn load_loaded_licenses_from_directory(dir: &Path) -> Result<Vec<LoadedLicen
             match parse_license_to_loaded(&path) {
                 Ok(license) => licenses.push(license),
                 Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse license file {}: {}",
-                        path.display(),
-                        e
-                    );
+                    warn!("Failed to parse license file {}: {}", path.display(), e);
                 }
             }
         }

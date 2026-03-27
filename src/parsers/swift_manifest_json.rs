@@ -36,7 +36,7 @@ use std::io::Write as _;
 use std::path::Path;
 use std::process::Command;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 

@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use rpm::{IndexTag, Package, PackageMetadata, RPM_MAGIC};
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};

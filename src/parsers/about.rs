@@ -22,7 +22,7 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
 use crate::models::{DatasourceId, FileReference, PackageData, PackageType, Party};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_yaml::Value;
 use std::fs;

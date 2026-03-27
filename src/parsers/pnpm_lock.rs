@@ -48,7 +48,7 @@ impl PackageParser for PnpmLockParser {
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
-                log::warn!("Failed to read pnpm lockfile at {:?}: {}", path, e);
+                crate::parser_warn!("Failed to read pnpm lockfile at {:?}: {}", path, e);
                 return vec![default_package_data()];
             }
         };
@@ -56,7 +56,7 @@ impl PackageParser for PnpmLockParser {
         let lock_data: Value = match serde_yaml::from_str(&content) {
             Ok(data) => data,
             Err(e) => {
-                log::warn!("Failed to parse pnpm lockfile at {:?}: {}", path, e);
+                crate::parser_warn!("Failed to parse pnpm lockfile at {:?}: {}", path, e);
                 return vec![default_package_data()];
             }
         };

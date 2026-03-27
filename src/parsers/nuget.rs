@@ -27,7 +27,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use quick_xml::Reader;
 use quick_xml::events::Event;

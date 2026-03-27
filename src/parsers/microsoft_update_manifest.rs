@@ -13,7 +13,7 @@ use crate::models::{DatasourceId, PackageType};
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 

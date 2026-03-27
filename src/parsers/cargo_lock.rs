@@ -19,7 +19,7 @@
 //! - Uses TOML parsing for structured data extraction
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::json;
 use std::collections::HashMap;

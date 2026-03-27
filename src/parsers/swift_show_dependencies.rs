@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};

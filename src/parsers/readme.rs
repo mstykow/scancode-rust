@@ -23,8 +23,8 @@
 
 use crate::models::PackageData;
 use crate::models::{DatasourceId, PackageType};
+use crate::parser_warn as warn;
 use crate::parsers::utils::read_file_to_string;
-use log::warn;
 use std::path::Path;
 
 use super::PackageParser;

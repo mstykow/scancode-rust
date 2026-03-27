@@ -295,9 +295,59 @@ mod yarn_lock_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod golden_test;
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use crate::models::{PackageData, PackageType};
+
+thread_local! {
+    static PARSER_DIAGNOSTIC_STACK: RefCell<Vec<Vec<String>>> = const { RefCell::new(Vec::new()) };
+}
+
+#[derive(Debug, Default)]
+pub struct ParsePackagesResult {
+    pub packages: Vec<PackageData>,
+    pub scan_errors: Vec<String>,
+}
+
+pub(crate) fn capture_parser_diagnostics<F>(extract: F) -> ParsePackagesResult
+where
+    F: FnOnce() -> Vec<PackageData>,
+{
+    PARSER_DIAGNOSTIC_STACK.with(|stack| {
+        stack.borrow_mut().push(Vec::new());
+    });
+
+    let packages = extract();
+    let scan_errors =
+        PARSER_DIAGNOSTIC_STACK.with(|stack| stack.borrow_mut().pop().unwrap_or_default());
+
+    ParsePackagesResult {
+        packages,
+        scan_errors,
+    }
+}
+
+pub(crate) fn record_parser_diagnostic(message: String) -> bool {
+    PARSER_DIAGNOSTIC_STACK.with(|stack| {
+        let mut stack = stack.borrow_mut();
+        let Some(active) = stack.last_mut() else {
+            return false;
+        };
+        active.push(message);
+        true
+    })
+}
+
+#[macro_export]
+macro_rules! parser_warn {
+    ($($arg:tt)*) => {{
+        let message = format!($($arg)*);
+        if !$crate::parsers::record_parser_diagnostic(message.clone()) {
+            log::warn!("{message}");
+        }
+    }};
+}
 
 /// Package parser trait for extracting metadata from package manifest files.
 ///
@@ -315,8 +365,11 @@ use crate::models::{PackageData, PackageType};
 /// # Error Handling
 ///
 /// Parsers should handle errors gracefully by returning default/empty `PackageData`
-/// and logging warnings rather than panicking. This allows the scan to continue
-/// processing other files even when individual files fail to parse.
+/// and logging warnings with [`crate::parser_warn!`] rather than panicking. Scanner
+/// dispatch captures those warnings and attaches them to `FileInfo.scan_errors` so
+/// CI output and serialized scan results stay aligned.
+/// This allows the scan to continue processing other files even when individual
+/// files fail to parse.
 ///
 /// # Example
 ///
@@ -335,8 +388,6 @@ use crate::models::{PackageData, PackageType};
 ///     }
 ///
 ///     fn extract_packages(path: &Path) -> Vec<PackageData> {
-///         // Parse file and return metadata
-///         // On error, log warning and return default
 ///         vec![PackageData::default()]
 ///     }
 /// }
@@ -478,22 +529,22 @@ macro_rules! register_package_handlers {
         parsers: [$($parser:ty),* $(,)?],
         recognizers: [$($recognizer:ty),* $(,)?] $(,)?
     ) => {
-        pub fn try_parse_file(path: &Path) -> Option<Vec<PackageData>> {
+        pub fn try_parse_file(path: &Path) -> Option<ParsePackagesResult> {
             $(
                 if <$parser>::is_match(path) {
-                    return Some(<$parser>::extract_packages(path));
+                    return Some(capture_parser_diagnostics(|| <$parser>::extract_packages(path)));
                 }
             )*
             $(
                 if <$recognizer>::is_match(path) {
-                    return Some(<$recognizer>::extract_packages(path));
+                    return Some(capture_parser_diagnostics(|| <$recognizer>::extract_packages(path)));
                 }
             )*
             None
         }
 
         // Used by the parser-golden maintenance tool in `xtask`.
-        // Scanner runtime dispatch goes through `try_parse_file()` instead.
+        // Scanner runtime dispatch goes through `try_parse_file()`.
         #[allow(dead_code)]
         pub fn parse_by_type_name(type_name: &str, path: &Path) -> Option<PackageData> {
             match type_name {

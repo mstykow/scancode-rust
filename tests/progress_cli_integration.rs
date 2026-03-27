@@ -1,36 +1,18 @@
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 
 use tempfile::TempDir;
 
-fn binary_path() -> String {
-    if let Ok(path) = std::env::var("CARGO_BIN_EXE_provenant") {
-        return path;
-    }
-
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("target");
-
-    let binary_name = if cfg!(windows) {
-        "provenant.exe"
-    } else {
-        "provenant"
-    };
-
-    for profile in ["release", "debug"] {
-        let mut profile_path = path.clone();
-        profile_path.push(profile);
-        profile_path.push(binary_name);
-        if profile_path.exists() {
-            return profile_path.to_string_lossy().to_string();
-        }
-    }
-
-    panic!(
-        "Could not find provenant binary in target/release or target/debug. \
-         Run `cargo build` or `cargo build --release` first."
-    );
+fn provenant_command() -> Command {
+    let mut command = Command::new("cargo");
+    command.current_dir(env!("CARGO_MANIFEST_DIR")).args([
+        "run",
+        "--quiet",
+        "--bin",
+        "provenant",
+        "--",
+    ]);
+    command
 }
 
 fn create_scan_fixture() -> (TempDir, String) {
@@ -41,12 +23,21 @@ fn create_scan_fixture() -> (TempDir, String) {
     (temp, scan_dir.to_string_lossy().to_string())
 }
 
+fn create_malformed_package_fixture() -> (TempDir, String) {
+    let temp = TempDir::new().expect("failed to create temp dir");
+    let scan_dir = temp.path().join("scan");
+    fs::create_dir_all(&scan_dir).expect("failed to create scan dir");
+    fs::write(scan_dir.join("package.json"), "{ this is not valid json }")
+        .expect("failed to write malformed fixture");
+    (temp, scan_dir.to_string_lossy().to_string())
+}
+
 #[test]
 fn quiet_mode_suppresses_stderr_output() {
     let (temp, scan_dir) = create_scan_fixture();
     let output_file = temp.path().join("out.json");
 
-    let output = Command::new(binary_path())
+    let output = provenant_command()
         .args([
             "--json-pp",
             output_file.to_str().expect("utf8 output path"),
@@ -68,10 +59,11 @@ fn default_mode_emits_summary_to_stderr() {
     let (temp, scan_dir) = create_scan_fixture();
     let output_file = temp.path().join("out.json");
 
-    let output = Command::new(binary_path())
+    let output = provenant_command()
         .args([
             "--json-pp",
             output_file.to_str().expect("utf8 output path"),
+            "--package",
             &scan_dir,
         ])
         .output()
@@ -87,11 +79,12 @@ fn verbose_mode_emits_file_by_file_paths() {
     let (temp, scan_dir) = create_scan_fixture();
     let output_file = temp.path().join("out.json");
 
-    let output = Command::new(binary_path())
+    let output = provenant_command()
         .args([
             "--json-pp",
             output_file.to_str().expect("utf8 output path"),
             "--verbose",
+            "--package",
             &scan_dir,
         ])
         .output()
@@ -100,4 +93,56 @@ fn verbose_mode_emits_file_by_file_paths() {
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("a.txt"));
+}
+
+#[test]
+fn default_mode_keeps_parser_failures_concise_on_stderr() {
+    let (temp, scan_dir) = create_malformed_package_fixture();
+    let output_file = temp.path().join("out.json");
+
+    let output = provenant_command()
+        .args([
+            "--json-pp",
+            output_file.to_str().expect("utf8 output path"),
+            "--package",
+            &scan_dir,
+        ])
+        .output()
+        .expect("failed to run provenant");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Path:"),
+        "default mode should report the failing path"
+    );
+    assert!(
+        !stderr.contains("Failed to read or parse package.json"),
+        "default mode should avoid duplicating parser failure details"
+    );
+}
+
+#[test]
+fn verbose_mode_includes_structured_parser_failure_details() {
+    let (temp, scan_dir) = create_malformed_package_fixture();
+    let output_file = temp.path().join("out.json");
+
+    let output = provenant_command()
+        .args([
+            "--json-pp",
+            output_file.to_str().expect("utf8 output path"),
+            "--verbose",
+            "--package",
+            &scan_dir,
+        ])
+        .output()
+        .expect("failed to run provenant");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("package.json"));
+    assert!(
+        stderr.contains("Failed to read or parse package.json"),
+        "verbose mode should include structured parser failure details"
+    );
 }

@@ -43,7 +43,7 @@ impl PackageParser for NpmWorkspaceParser {
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
-                log::warn!("Failed to read npm workspace file at {:?}: {}", path, e);
+                crate::parser_warn!("Failed to read npm workspace file at {:?}: {}", path, e);
                 return vec![default_package_data()];
             }
         };
@@ -51,7 +51,7 @@ impl PackageParser for NpmWorkspaceParser {
         let workspace_data: Value = match serde_yaml::from_str(&content) {
             Ok(data) => data,
             Err(e) => {
-                log::warn!("Failed to parse npm workspace file at {:?}: {}", path, e);
+                crate::parser_warn!("Failed to parse npm workspace file at {:?}: {}", path, e);
                 return vec![default_package_data()];
             }
         };

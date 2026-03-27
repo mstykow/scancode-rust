@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use log::warn;
+use crate::parser_warn as warn;
 
 use crate::license_detection::LicenseDetectionEngine;
 use crate::license_detection::expression::{

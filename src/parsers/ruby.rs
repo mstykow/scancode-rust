@@ -25,9 +25,9 @@
 //! - PURL type: "gem"
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
+use crate::parser_warn as warn;
 use crate::parsers::utils::split_name_email;
 use flate2::read::GzDecoder;
-use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 use std::collections::HashMap;
