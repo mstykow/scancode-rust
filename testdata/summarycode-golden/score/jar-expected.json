@@ -77,12 +77,8 @@
       "repository_download_url": "https://repo1.maven.org/maven2/org/jboss/logging/jboss-logging/3.4.2.Final/jboss-logging-3.4.2.Final.jar",
       "api_data_url": "https://repo1.maven.org/maven2/org/jboss/logging/jboss-logging/3.4.2.Final/jboss-logging-3.4.2.Final.pom",
       "package_uid": "pkg:maven/org.jboss.logging/jboss-logging@3.4.2.Final?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml"
-      ],
-      "datasource_ids": [
-        "maven_pom"
-      ],
+      "datafile_paths": ["jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml"],
+      "datasource_ids": ["maven_pom"],
       "purl": "pkg:maven/org.jboss.logging/jboss-logging@3.4.2.Final"
     }
   ],

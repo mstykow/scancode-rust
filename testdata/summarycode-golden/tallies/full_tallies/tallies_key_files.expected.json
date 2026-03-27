@@ -1150,9 +1150,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -1313,9 +1311,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -1682,9 +1678,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -1772,9 +1766,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -1862,9 +1854,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -2603,9 +2593,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -2693,9 +2681,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],

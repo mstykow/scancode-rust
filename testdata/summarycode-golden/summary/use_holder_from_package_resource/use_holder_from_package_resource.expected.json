@@ -97,12 +97,8 @@
       "repository_download_url": null,
       "api_data_url": "https://pypi.org/pypi/atheris/json",
       "package_uid": "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "codebase/setup.py"
-      ],
-      "datasource_ids": [
-        "pypi_setup_py"
-      ],
+      "datafile_paths": ["codebase/setup.py"],
+      "datasource_ids": ["pypi_setup_py"],
       "purl": "pkg:pypi/atheris"
     }
   ],
@@ -216,9 +212,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -358,9 +352,7 @@
           "purl": "pkg:pypi/atheris"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "apache-2.0",
       "detected_license_expression_spdx": "Apache-2.0",
       "license_detections": [

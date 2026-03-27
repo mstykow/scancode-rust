@@ -60,12 +60,8 @@
       "repository_download_url": "https://registry.npmjs.org/@invisionag/eslint-config-ivx/-/eslint-config-ivx-0.0.10.tgz",
       "api_data_url": "https://registry.npmjs.org/@invisionag%2feslint-config-ivx/0.0.10",
       "package_uid": "pkg:npm/%40invisionag/eslint-config-ivx@0.0.10?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "no_license_or_copyright/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["no_license_or_copyright/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "purl": "pkg:npm/%40invisionag/eslint-config-ivx@0.0.10"
     }
   ],

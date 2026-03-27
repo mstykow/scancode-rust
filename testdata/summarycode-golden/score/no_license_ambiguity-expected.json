@@ -38,12 +38,7 @@
           "url": null
         }
       ],
-      "keywords": [
-        "random",
-        "rng",
-        "algorithms",
-        "no-std"
-      ],
+      "keywords": ["random", "rng", "algorithms", "no-std"],
       "homepage_url": "https://rust-random.github.io/book",
       "download_url": null,
       "size": null,
@@ -92,12 +87,7 @@
       "is_virtual": false,
       "extra_data": {
         "workspace": {
-          "members": [
-            "rand_core",
-            "rand_distr",
-            "rand_chacha",
-            "rand_pcg"
-          ]
+          "members": ["rand_core", "rand_distr", "rand_chacha", "rand_pcg"]
         },
         "documentation_url": "https://docs.rs/rand",
         "rust_edition": "2018"
@@ -106,12 +96,8 @@
       "repository_download_url": "https://crates.io/api/v1/crates/rand/0.8.5/download",
       "api_data_url": "https://crates.io/api/v1/crates/rand",
       "package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "no_license_ambiguity/Cargo.toml"
-      ],
-      "datasource_ids": [
-        "cargo_toml"
-      ],
+      "datafile_paths": ["no_license_ambiguity/Cargo.toml"],
+      "datasource_ids": ["cargo_toml"],
       "purl": "pkg:cargo/rand@0.8.5"
     }
   ],
@@ -162,9 +148,7 @@
       "resolved_package": {},
       "extra_data": {
         "version": "1.0.103",
-        "features": [
-          "derive"
-        ]
+        "features": ["derive"]
       },
       "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -202,9 +186,7 @@
       "extra_data": {
         "package": "packed_simd_2",
         "version": "0.3.7",
-        "features": [
-          "into_bits"
-        ]
+        "features": ["into_bits"]
       },
       "dependency_uid": "pkg:cargo/packed_simd?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -578,12 +560,7 @@
               "url": null
             }
           ],
-          "keywords": [
-            "random",
-            "rng",
-            "algorithms",
-            "no-std"
-          ],
+          "keywords": ["random", "rng", "algorithms", "no-std"],
           "homepage_url": "https://rust-random.github.io/book",
           "download_url": null,
           "size": null,
@@ -633,12 +610,7 @@
           "is_virtual": false,
           "extra_data": {
             "workspace": {
-              "members": [
-                "rand_core",
-                "rand_distr",
-                "rand_chacha",
-                "rand_pcg"
-              ]
+              "members": ["rand_core", "rand_distr", "rand_chacha", "rand_pcg"]
             },
             "documentation_url": "https://docs.rs/rand",
             "rust_edition": "2018"
@@ -682,9 +654,7 @@
               "resolved_package": {},
               "extra_data": {
                 "version": "1.0.103",
-                "features": [
-                  "derive"
-                ]
+                "features": ["derive"]
               }
             },
             {
@@ -714,9 +684,7 @@
               "extra_data": {
                 "package": "packed_simd_2",
                 "version": "0.3.7",
-                "features": [
-                  "into_bits"
-                ]
+                "features": ["into_bits"]
               }
             },
             {
@@ -752,9 +720,7 @@
           "purl": "pkg:cargo/rand@0.8.5"
         }
       ],
-      "for_packages": [
-        "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit OR apache-2.0",
       "detected_license_expression_spdx": "MIT OR Apache-2.0",
       "license_detections": [

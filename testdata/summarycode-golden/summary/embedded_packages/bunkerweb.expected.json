@@ -101,12 +101,8 @@
       "repository_download_url": "https://pypi.org/packages/source/B/BunkerWeb/BunkerWeb-1.5.8.tar.gz",
       "api_data_url": "https://pypi.org/pypi/BunkerWeb/1.5.8/json",
       "package_uid": "pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "bunkerweb/pyproject.toml"
-      ],
-      "datasource_ids": [
-        "pypi_pyproject_toml"
-      ],
+      "datafile_paths": ["bunkerweb/pyproject.toml"],
+      "datasource_ids": ["pypi_pyproject_toml"],
       "purl": "pkg:pypi/bunkerweb@1.5.8"
     }
   ],
@@ -326,9 +322,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit",
       "detected_license_expression_spdx": "MIT",
       "license_detections": [
@@ -485,9 +479,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "bsd-new",
       "detected_license_expression_spdx": "BSD-3-Clause",
       "license_detections": [
@@ -660,9 +652,7 @@
           "purl": "pkg:pypi/libinjection@3.9.1"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "bsd-new",
       "detected_license_expression_spdx": "BSD-3-Clause",
       "license_detections": [
@@ -728,9 +718,7 @@
             }
           ],
           "identifier": "bsd_new-90c8b089-2f85-4a93-d0c8-a411247c6395",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         },
         {
           "license_expression": "bsd-new",
@@ -884,9 +872,7 @@
           "purl": "pkg:pypi/bunkerweb@1.5.8"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/bunkerweb@1.5.8?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],

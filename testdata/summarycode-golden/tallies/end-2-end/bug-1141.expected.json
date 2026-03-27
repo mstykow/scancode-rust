@@ -338,9 +338,7 @@
       "copyrights": [],
       "holders": [],
       "authors": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -382,9 +380,7 @@
       "copyrights": [],
       "holders": [],
       "authors": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -586,9 +582,7 @@
         }
       ],
       "authors": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -642,9 +636,7 @@
         }
       ],
       "authors": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,

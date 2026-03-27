@@ -124,12 +124,8 @@
       "repository_download_url": "https://pypi.org/packages/source/p/pip/pip-22.0.4.tar.gz",
       "api_data_url": "https://pypi.org/pypi/pip/22.0.4/json",
       "package_uid": "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "pip-22.0.4/PKG-INFO"
-      ],
-      "datasource_ids": [
-        "pypi_sdist_pkginfo"
-      ],
+      "datafile_paths": ["pip-22.0.4/PKG-INFO"],
+      "datasource_ids": ["pypi_sdist_pkginfo"],
       "purl": "pkg:pypi/pip@22.0.4"
     }
   ],
@@ -325,9 +321,7 @@
       "is_key_file": false,
       "is_community": true,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -345,9 +339,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit",
       "detected_license_expression_spdx": "MIT",
       "license_detections": [
@@ -387,9 +379,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -407,9 +397,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -534,9 +522,7 @@
           "purl": "pkg:pypi/pip@22.0.4"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit",
       "detected_license_expression_spdx": "MIT",
       "license_detections": [
@@ -616,9 +602,7 @@
             }
           ],
           "identifier": "mit-59433771-4926-870e-d21a-8162cfa060a3",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -635,9 +619,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -895,9 +877,7 @@
           "purl": null
         }
       ],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -915,9 +895,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -996,9 +974,7 @@
                 }
               ],
               "identifier": "mit-59433771-4926-870e-d21a-8162cfa060a3",
-              "detection_log": [
-                "package-unknown-reference-to-local-file"
-              ]
+              "detection_log": ["package-unknown-reference-to-local-file"]
             }
           ],
           "other_license_expression": null,
@@ -1019,9 +995,7 @@
           "purl": null
         }
       ],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "unknown-license-reference",
       "detected_license_expression_spdx": "LicenseRef-scancode-unknown-license-reference",
       "license_detections": [
@@ -1059,9 +1033,7 @@
             }
           ],
           "identifier": "mit-59433771-4926-870e-d21a-8162cfa060a3",
-          "detection_log": [
-            "package-unknown-reference-to-local-file"
-          ]
+          "detection_log": ["package-unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -1185,9 +1157,7 @@
           "purl": "pkg:pypi/pip@22.0.4"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit",
       "detected_license_expression_spdx": "MIT",
       "license_detections": [
@@ -1277,9 +1247,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -1297,9 +1265,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -1317,9 +1283,7 @@
       "is_key_file": false,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/pip@22.0.4?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],

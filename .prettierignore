@@ -8,7 +8,17 @@ node_modules/
 # Submodules (external code, do not format)
 reference/
 resources/scancode-licenses/
-testdata/
+testdata/**
+!testdata/**/
+!testdata/**/expected.json
+!testdata/**/*.expected.json
+!testdata/**/*-expected.json
+!testdata/**/expected.yaml
+!testdata/**/*.expected.yaml
+!testdata/**/*-expected.yaml
+!testdata/**/expected.yml
+!testdata/**/*.expected.yml
+!testdata/**/*-expected.yml
 
 # Generated files (if any)
 *.min.js

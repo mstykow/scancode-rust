@@ -9,25 +9,19 @@
     {
       "path": "cli/LICENCING.readme",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/README.first",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/composer.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
@@ -39,145 +33,109 @@
     {
       "path": "cli/docs/prefix-agreement-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-copying-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-copyleft-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-copyright-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-copyrights-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-eula-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-legal-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licence-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licenced-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licences-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licencing-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-license-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licensed-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licenses-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-licensing-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-notice-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-patent-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/prefix-patents-suffix",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
@@ -189,57 +147,43 @@
     {
       "path": "cli/docs/readme/README",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/readme/README.first",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/readme/README.md",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/readme/doc.readme",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/readme/readme.rst",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/docs/readme/readme.txt",
       "type": "file",
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "scan_errors": []
     },
     {
       "path": "cli/haxelib.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
@@ -251,41 +195,31 @@
     {
       "path": "cli/manifest/+compact_manifest",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/bower.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/build.gradle",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/cargo.toml",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/composer.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
@@ -297,41 +231,31 @@
     {
       "path": "cli/manifest/debian/copyright",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/description",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/dist.ini",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/elm-package.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/haxelib.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
@@ -343,81 +267,61 @@
     {
       "path": "cli/manifest/meta-inf/manifest.mf",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/meta.yml",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/metadata",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/package.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/pipfile",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/pom.xml",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/project.clj",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/setup.cfg",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/manifest/setup.py",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/some.c",
       "type": "file",
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "scan_errors": []
     },
     {
@@ -429,33 +333,25 @@
     {
       "path": "cli/src/AGREEMENT",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/src/agreement.lib",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/src/agreement.md",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
       "path": "cli/src/patents.txt",
       "type": "file",
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "scan_errors": []
     },
     {
@@ -467,17 +363,13 @@
     {
       "path": "cli/src/tests/copying.lib",
       "type": "file",
-      "facets": [
-        "tests"
-      ],
+      "facets": ["tests"],
       "scan_errors": []
     },
     {
       "path": "cli/test.json",
       "type": "file",
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "scan_errors": []
     },
     {
@@ -489,19 +381,13 @@
     {
       "path": "cli/tests/composer.json",
       "type": "file",
-      "facets": [
-        "data",
-        "tests"
-      ],
+      "facets": ["data", "tests"],
       "scan_errors": []
     },
     {
       "path": "cli/tests/some.c",
       "type": "file",
-      "facets": [
-        "dev",
-        "tests"
-      ],
+      "facets": ["dev", "tests"],
       "scan_errors": []
     }
   ]

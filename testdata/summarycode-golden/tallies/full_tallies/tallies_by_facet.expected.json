@@ -2189,12 +2189,7 @@
           "url": null
         }
       ],
-      "keywords": [
-        "package manager",
-        "modules",
-        "install",
-        "package.json"
-      ],
+      "keywords": ["package manager", "modules", "install", "package.json"],
       "homepage_url": "https://docs.npmjs.com/",
       "download_url": "https://registry.npmjs.org/npm/-/npm-2.13.5.tgz",
       "size": null,
@@ -2246,12 +2241,8 @@
       "repository_download_url": "https://registry.npmjs.org/npm/-/npm-2.13.5.tgz",
       "api_data_url": "https://registry.npmjs.org/npm/2.13.5",
       "package_uid": "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "scan/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["scan/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "purl": "pkg:npm/npm@2.13.5"
     }
   ],
@@ -4185,9 +4176,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4225,9 +4214,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4265,9 +4252,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "lgpl-2.1-plus",
       "detected_license_expression_spdx": "LGPL-2.1-or-later",
       "license_detections": [
@@ -4318,9 +4303,7 @@
           "end_line": 20
         }
       ],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4347,9 +4330,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "cc-by-2.5",
       "detected_license_expression_spdx": "CC-BY-2.5",
       "license_detections": [
@@ -4411,9 +4392,7 @@
           "end_line": 6
         }
       ],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4440,9 +4419,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "lgpl-2.1-plus",
       "detected_license_expression_spdx": "LGPL-2.1-or-later",
       "license_detections": [
@@ -4493,9 +4470,7 @@
           "end_line": 20
         }
       ],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4522,9 +4497,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4541,9 +4514,7 @@
       ],
       "emails": [],
       "urls": [],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4570,9 +4541,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4589,9 +4558,7 @@
       ],
       "emails": [],
       "urls": [],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4618,9 +4585,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "lgpl-2.1-plus",
       "detected_license_expression_spdx": "LGPL-2.1-or-later",
       "license_detections": [
@@ -4671,9 +4636,7 @@
           "end_line": 20
         }
       ],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4700,9 +4663,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4719,9 +4680,7 @@
       ],
       "emails": [],
       "urls": [],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4748,9 +4707,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4772,9 +4729,7 @@
           "end_line": 4
         }
       ],
-      "facets": [
-        "docs"
-      ],
+      "facets": ["docs"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4801,9 +4756,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -4841,9 +4794,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -4881,9 +4832,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -4905,9 +4854,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -4934,9 +4881,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -4998,9 +4943,7 @@
           "end_line": 27
         }
       ],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -5027,9 +4970,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -5067,9 +5008,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -5091,9 +5030,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -5120,9 +5057,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "cc0-1.0",
       "detected_license_expression_spdx": "CC0-1.0",
       "license_detections": [
@@ -5155,9 +5090,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -7373,12 +7306,7 @@
               "url": null
             }
           ],
-          "keywords": [
-            "package manager",
-            "modules",
-            "install",
-            "package.json"
-          ],
+          "keywords": ["package manager", "modules", "install", "package.json"],
           "homepage_url": "https://docs.npmjs.com/",
           "download_url": "https://registry.npmjs.org/npm/-/npm-2.13.5.tgz",
           "size": null,
@@ -8283,9 +8211,7 @@
           "purl": "pkg:npm/npm@2.13.5"
         }
       ],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "artistic-2.0",
       "detected_license_expression_spdx": "Artistic-2.0",
       "license_detections": [
@@ -8606,9 +8532,7 @@
           "end_line": 1569
         }
       ],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -8635,9 +8559,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -8675,9 +8597,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -8715,9 +8635,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "gpl-2.0-plus WITH ada-linking-exception",
       "detected_license_expression_spdx": "GPL-2.0-or-later WITH GNAT-exception",
       "license_detections": [
@@ -8762,9 +8680,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -8791,9 +8707,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -8831,9 +8745,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -8855,9 +8767,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -8884,9 +8794,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -8924,9 +8832,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -8948,9 +8854,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -8977,9 +8881,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9017,9 +8919,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -9041,9 +8941,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9070,9 +8968,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -9110,9 +9006,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -9135,9 +9029,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9164,9 +9056,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "boost-1.0",
       "detected_license_expression_spdx": "BSL-1.0",
       "license_detections": [
@@ -9217,9 +9107,7 @@
           "end_line": 5
         }
       ],
-      "facets": [
-        "dev"
-      ],
+      "facets": ["dev"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9246,9 +9134,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -9286,9 +9172,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9355,9 +9239,7 @@
           "end_line": 35
         }
       ],
-      "facets": [
-        "data"
-      ],
+      "facets": ["data"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9384,9 +9266,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -9424,9 +9304,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9471,9 +9349,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "tests"
-      ],
+      "facets": ["tests"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9500,9 +9376,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9547,9 +9421,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "tests"
-      ],
+      "facets": ["tests"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9576,9 +9448,7 @@
       "is_source": false,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": null,
       "detected_license_expression_spdx": null,
       "license_detections": [],
@@ -9616,9 +9486,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit-old-style",
       "detected_license_expression_spdx": "Advanced-Cryptics-Dictionary",
       "license_detections": [
@@ -9669,9 +9537,7 @@
           "end_line": 7
         }
       ],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9698,9 +9564,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9756,9 +9620,7 @@
         }
       ],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9785,9 +9647,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9825,9 +9685,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -9849,9 +9707,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
@@ -9878,9 +9734,7 @@
       "is_source": true,
       "is_script": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/npm@2.13.5?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "zlib",
       "detected_license_expression_spdx": "Zlib",
       "license_detections": [
@@ -9918,9 +9772,7 @@
             }
           ],
           "identifier": "zlib-663c0d51-510f-fca6-b163-671ecb188ff9",
-          "detection_log": [
-            "unknown-reference-to-local-file"
-          ]
+          "detection_log": ["unknown-reference-to-local-file"]
         }
       ],
       "license_clues": [],
@@ -9942,9 +9794,7 @@
       "authors": [],
       "emails": [],
       "urls": [],
-      "facets": [
-        "core"
-      ],
+      "facets": ["core"],
       "files_count": 0,
       "dirs_count": 0,
       "size_count": 0,
