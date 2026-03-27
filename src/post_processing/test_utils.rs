@@ -522,7 +522,6 @@ pub(crate) fn compute_fixture_output(
                 include_tallies_with_details: options.include_tallies_with_details,
                 include_tallies_by_facet: options.include_tallies_by_facet,
                 include_generated: options.include_generated,
-                scanned_root: Some(&resolved_scan_root.scan_root),
             },
         },
     ))

@@ -1,5 +1,8 @@
+#[cfg(test)]
 use std::fs;
+#[cfg(test)]
 use std::io::Result;
+#[cfg(test)]
 use std::path::Path;
 
 const GENERATED_KEYWORDS_LOWERED: &[&str] = &[
@@ -26,6 +29,7 @@ const GENERATED_KEYWORDS_LOWERED: &[&str] = &[
     "this file was automatically generated",
 ];
 
+#[cfg(test)]
 pub fn generated_code_hints(path: &Path) -> Result<Vec<String>> {
     let content = fs::read(path)?;
     Ok(generated_code_hints_from_bytes(&content))
