@@ -13,6 +13,29 @@ fn default_rule_length() -> usize {
     0
 }
 
+pub enum SpanIter<'a> {
+    Slice(std::iter::Copied<std::slice::Iter<'a, usize>>),
+    Range(std::ops::Range<usize>),
+}
+
+impl<'a> Iterator for SpanIter<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            SpanIter::Slice(iter) => iter.next(),
+            SpanIter::Range(range) => range.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            SpanIter::Slice(iter) => iter.size_hint(),
+            SpanIter::Range(range) => range.size_hint(),
+        }
+    }
+}
+
 /// Internal matcher kind used to create a license match.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
@@ -680,6 +703,15 @@ impl LicenseMatch {
         }
     }
 
+    pub fn ispan_iter(&self) -> SpanIter<'_> {
+        match &self.ispan_positions {
+            Some(positions) => SpanIter::Slice(positions.iter().copied()),
+            None => {
+                SpanIter::Range(self.rule_start_token..self.rule_start_token + self.matched_length)
+            }
+        }
+    }
+
     pub fn hispan(&self) -> Vec<usize> {
         if let Some(positions) = &self.hispan_positions {
             positions.clone()
@@ -693,6 +725,13 @@ impl LicenseMatch {
             positions.clone()
         } else {
             (self.start_token..self.end_token).collect()
+        }
+    }
+
+    pub fn qspan_iter(&self) -> SpanIter<'_> {
+        match &self.qspan_positions {
+            Some(positions) => SpanIter::Slice(positions.iter().copied()),
+            None => SpanIter::Range(self.start_token..self.end_token),
         }
     }
 
