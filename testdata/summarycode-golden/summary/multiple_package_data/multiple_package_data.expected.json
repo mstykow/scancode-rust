@@ -1,6 +1,6 @@
 {
   "summary": {
-    "declared_license_expression": "mit AND apache-2.0",
+    "declared_license_expression": "apache-2.0 AND mit",
     "license_clarity_score": {
       "score": 90,
       "declared_license": true,
@@ -102,12 +102,8 @@
       "repository_download_url": null,
       "api_data_url": "https://crates.io/api/v1/crates/codebase",
       "package_uid": "pkg:cargo/codebase?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "codebase/cargo.toml"
-      ],
-      "datasource_ids": [
-        "cargo_toml"
-      ],
+      "datafile_paths": ["codebase/cargo.toml"],
+      "datasource_ids": ["cargo_toml"],
       "purl": "pkg:cargo/codebase"
     },
     {
@@ -181,12 +177,8 @@
       "repository_download_url": null,
       "api_data_url": "https://pypi.org/pypi/codebase/json",
       "package_uid": "pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "codebase/setup.py"
-      ],
-      "datasource_ids": [
-        "pypi_setup_py"
-      ],
+      "datafile_paths": ["codebase/setup.py"],
+      "datasource_ids": ["pypi_setup_py"],
       "purl": "pkg:pypi/codebase"
     }
   ],
@@ -430,9 +422,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "apache-2.0 AND (apache-2.0 OR mit)",
       "detected_license_expression_spdx": "Apache-2.0 AND (Apache-2.0 OR MIT)",
       "license_detections": [
@@ -521,9 +511,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "apache-2.0",
       "detected_license_expression_spdx": "Apache-2.0",
       "license_detections": [
@@ -734,9 +722,7 @@
       "is_key_file": true,
       "is_community": false,
       "package_data": [],
-      "for_packages": [
-        "pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "mit",
       "detected_license_expression_spdx": "MIT",
       "license_detections": [
@@ -875,9 +861,7 @@
           "purl": "pkg:pypi/codebase"
         }
       ],
-      "for_packages": [
-        "pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:pypi/codebase?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "detected_license_expression": "apache-2.0",
       "detected_license_expression_spdx": "Apache-2.0",
       "license_detections": [

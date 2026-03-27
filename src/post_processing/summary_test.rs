@@ -660,7 +660,7 @@ fn compute_summary_uses_tallied_primary_language_when_top_level_packages_disagre
     let summary = compute_summary(&[py1, py2, rs], &[cargo, pypi]).expect("summary exists");
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("mit AND apache-2.0")
+        Some("apache-2.0 AND mit")
     );
     assert_eq!(summary.primary_language.as_deref(), Some("Python"));
 }

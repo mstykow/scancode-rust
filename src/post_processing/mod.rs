@@ -910,7 +910,7 @@ fn package_declared_license_expression(
     indexes: &OutputIndexes,
     top_level_package_uids: &HashSet<String>,
 ) -> Option<String> {
-    combine_license_expressions(
+    combine_license_expressions(stable_summary_expressions(
         packages
             .iter()
             .filter(|package| top_level_package_uids.contains(&package.package_uid))
@@ -925,7 +925,7 @@ fn package_declared_license_expression(
                     })
                 })
             }),
-    )
+    ))
     .map(|expr| canonicalize_summary_expression(&expr))
 }
 
@@ -963,10 +963,11 @@ fn compute_license_score(
         .filter(|file| !is_summary_score_key_file(file, &nested_package_roots))
         .collect();
 
-    let key_file_expressions: Vec<String> = key_files
-        .iter()
-        .filter_map(|file| summary_license_expression(file))
-        .collect();
+    let key_file_expressions = stable_summary_expressions(
+        key_files
+            .iter()
+            .filter_map(|file| summary_license_expression(file)),
+    );
     let primary_declared_license = get_primary_license(&key_file_expressions);
 
     let mut scoring = LicenseClarityScore {
@@ -1003,7 +1004,7 @@ fn compute_license_score(
     let declared_license_expression = primary_declared_license
         .map(|expr| canonicalize_summary_expression(&expr))
         .or_else(|| {
-            combine_license_expressions(unique(&key_file_expressions))
+            combine_license_expressions(key_file_expressions)
                 .map(|expr| canonicalize_summary_expression(&expr))
         });
 
@@ -1074,6 +1075,19 @@ fn unique(values: &[String]) -> Vec<String> {
     }
 
     unique_values
+}
+
+fn stable_summary_expressions<I>(values: I) -> Vec<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut expressions: Vec<String> = values
+        .into_iter()
+        .map(|value| canonicalize_summary_expression(&value))
+        .collect();
+    expressions.sort_unstable();
+    expressions.dedup();
+    expressions
 }
 
 fn get_primary_license(declared_license_expressions: &[String]) -> Option<String> {

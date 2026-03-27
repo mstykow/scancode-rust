@@ -1,6 +1,6 @@
 {
   "summary": {
-    "declared_license_expression": "mit AND apache-2.0",
+    "declared_license_expression": "apache-2.0 AND mit",
     "license_clarity_score": {
       "score": 70,
       "declared_license": true,
