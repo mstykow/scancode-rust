@@ -21,7 +21,7 @@ use packageurl::PackageUrl;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use rustpython_parser::{Parse, ast};
 
 use super::PackageParser;

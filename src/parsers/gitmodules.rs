@@ -20,7 +20,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::utils::read_file_to_string;

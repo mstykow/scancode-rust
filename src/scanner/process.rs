@@ -4,7 +4,6 @@ use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 use crate::utils::text::{is_source, remove_verbatim_escape_sequences};
 use anyhow::Error;
-use log::warn;
 use mime_guess::from_path;
 use rayon::prelude::*;
 use std::fs::{self};
@@ -83,6 +82,7 @@ fn process_file(
     let mut generated_flag = None;
     match extract_information_from_content(
         &mut file_info_builder,
+        &mut scan_errors,
         path,
         license_engine,
         include_text,
@@ -156,6 +156,7 @@ fn process_file(
 
 fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
+    scan_errors: &mut Vec<String>,
     path: &Path,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     include_text: bool,
@@ -204,7 +205,7 @@ fn extract_information_from_content(
             }
             Ok(None) => {}
             Err(err) => {
-                warn!("Failed to read scan cache for {:?}: {}", path, err);
+                scan_errors.push(format!("Failed to read scan cache for {:?}: {}", path, err));
             }
         }
     }
@@ -212,9 +213,10 @@ fn extract_information_from_content(
     // Package parsing and text-based detection (copyright, license) are independent.
     // Python ScanCode runs all enabled plugins on every file, so we do the same.
     if text_options.detect_packages
-        && let Some(package_data) = try_parse_file(path)
+        && let Some(parse_result) = try_parse_file(path)
     {
-        file_info_builder.package_data(package_data);
+        file_info_builder.package_data(parse_result.packages);
+        scan_errors.extend(parse_result.scan_errors);
     }
 
     if is_timeout_exceeded(started, text_options.timeout_seconds) {
@@ -272,6 +274,7 @@ fn extract_information_from_content(
 
     extract_license_information(
         file_info_builder,
+        scan_errors,
         text_content_for_license_detection,
         license_engine,
         include_text,
@@ -517,6 +520,7 @@ fn extract_email_url_information(
 
 fn extract_license_information(
     file_info_builder: &mut FileInfoBuilder,
+    scan_errors: &mut Vec<String>,
     text_content: String,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     include_text: bool,
@@ -551,7 +555,7 @@ fn extract_license_information(
             file_info_builder.license_detections(model_detections);
         }
         Err(e) => {
-            warn!("License detection failed: {}", e);
+            scan_errors.push(format!("License detection failed: {}", e));
         }
     }
 

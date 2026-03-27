@@ -21,7 +21,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 

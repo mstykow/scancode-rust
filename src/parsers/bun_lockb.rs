@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::parser_warn as warn;
 use base64::Engine;
-use log::warn;
 use serde_json::Value as JsonValue;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};

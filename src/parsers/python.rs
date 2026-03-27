@@ -32,6 +32,7 @@
 //! - Graceful fallback on parse errors with warning logs
 
 use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::parser_warn as warn;
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -39,7 +40,6 @@ use bzip2::read::BzDecoder;
 use csv::ReaderBuilder;
 use flate2::read::GzDecoder;
 use liblzma::read::XzDecoder;
-use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 use rustpython_parser::{Parse, ast};

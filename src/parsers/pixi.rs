@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use toml::Value as TomlValue;

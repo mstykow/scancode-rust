@@ -20,7 +20,7 @@
 //! - Authors field can be string, object, or array of either
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 use std::fs;

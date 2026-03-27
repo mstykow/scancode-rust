@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 

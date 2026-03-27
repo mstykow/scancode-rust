@@ -17,7 +17,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 use serde_json::json;

@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use regex::Regex;
 use serde_yaml::Value;
 

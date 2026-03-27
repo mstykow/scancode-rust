@@ -19,8 +19,8 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
+use crate::parser_warn as warn;
 use crate::parsers::utils::{npm_purl, parse_sri};
-use log::warn;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;

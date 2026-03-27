@@ -139,7 +139,6 @@ fn run() -> Result<()> {
         let collection_exclude_patterns =
             build_collection_exclude_patterns(Path::new(scan_path), &cache_config, &cli.exclude);
 
-        progress.start_discovery();
         let collected = collect_paths(scan_path, cli.max_depth, &collection_exclude_patterns);
         let total_files = collected.file_count();
         let total_dirs = collected.directory_count();
@@ -160,6 +159,10 @@ fn run() -> Result<()> {
             progress.start_license_detection_engine_creation();
             let engine = init_license_engine(&cli.license_rules_path)?;
             progress.finish_license_detection_engine_creation();
+            progress.output_written(&describe_license_engine_source(
+                &engine,
+                cli.license_rules_path.as_deref(),
+            ));
             Some(engine)
         } else {
             None
@@ -485,21 +488,29 @@ fn init_license_engine(rules_path: &Option<String>) -> Result<Arc<LicenseDetecti
                 return Err(anyhow!("License rules path does not exist: {:?}", path));
             }
             let engine = LicenseDetectionEngine::from_directory(&path)?;
-            println!(
-                "License detection engine initialized with {} rules from {:?}",
-                engine.index().rules_by_rid.len(),
-                path
-            );
             Ok(Arc::new(engine))
         }
         None => {
             let engine = LicenseDetectionEngine::from_embedded()?;
-            println!(
-                "License detection engine initialized with {} rules from embedded artifact",
-                engine.index().rules_by_rid.len()
-            );
             Ok(Arc::new(engine))
         }
+    }
+}
+
+fn describe_license_engine_source(
+    engine: &LicenseDetectionEngine,
+    rules_path: Option<&str>,
+) -> String {
+    match rules_path {
+        Some(path) => format!(
+            "License detection engine initialized with {} rules from {}",
+            engine.index().rules_by_rid.len(),
+            path
+        ),
+        None => format!(
+            "License detection engine initialized with {} rules from embedded artifact",
+            engine.index().rules_by_rid.len()
+        ),
     }
 }
 

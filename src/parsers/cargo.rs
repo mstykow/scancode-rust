@@ -19,8 +19,8 @@
 //! - Direct dependencies: all in manifest are direct (no lockfile)
 
 use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::parser_warn as warn;
 use crate::parsers::utils::split_name_email;
-use log::warn;
 use packageurl::PackageUrl;
 use std::fs::File;
 use std::io::Read;

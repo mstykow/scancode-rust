@@ -80,7 +80,9 @@ mod tests {
                 continue;
             }
 
-            let package_data_vec = try_parse_file(&path).unwrap_or_default();
+            let package_data_vec = try_parse_file(&path)
+                .map(|result| result.packages)
+                .unwrap_or_default();
 
             let relative_path = path
                 .strip_prefix(base_dir)

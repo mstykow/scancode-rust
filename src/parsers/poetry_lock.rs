@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;

@@ -23,7 +23,7 @@
 //! - Supports Go 1.11+ module syntax
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use std::collections::{HashMap, HashSet};
 use std::fs;

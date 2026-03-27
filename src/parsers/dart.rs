@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_yaml::{Mapping, Value};
 

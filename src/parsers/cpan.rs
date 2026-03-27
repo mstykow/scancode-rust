@@ -24,7 +24,7 @@
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;

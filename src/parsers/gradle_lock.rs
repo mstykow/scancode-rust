@@ -19,7 +19,7 @@
 //! - All dependencies are pinned (is_pinned: true)
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
-use log::warn;
+use crate::parser_warn as warn;
 use packageurl::PackageUrl;
 use std::collections::HashMap;
 use std::fs::File;

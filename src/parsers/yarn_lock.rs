@@ -21,8 +21,8 @@
 //! - Graceful error handling with `warn!()` logs
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
+use crate::parser_warn as warn;
 use crate::parsers::utils::{npm_purl, parse_sri};
-use log::warn;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value;
 use std::collections::{HashMap, HashSet};

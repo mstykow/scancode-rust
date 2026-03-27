@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use log::warn;
+use crate::parser_warn as warn;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
