@@ -121,16 +121,16 @@ Create `src/parsers/<ecosystem>.rs`:
 //!
 //! ## Implementation Notes
 //! - Uses serde for JSON/TOML/YAML parsing
-//! - Graceful error handling with warnings
+//! - Graceful error handling with structured scan diagnostics
 //! - No code execution (AST parsing only)
 
 use std::fs;
 use std::path::Path;
 
-use log::warn;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::parser_warn as warn;
 
 use super::PackageParser;
 
@@ -247,7 +247,7 @@ crate::register_parser!(
 
 - ✅ Use `PackageParser` trait
 - ✅ Return `PackageData` struct
-- ✅ Handle errors gracefully with `warn!()`
+- ✅ Handle errors gracefully with `parser_warn!()` / the local `warn!` alias so scanner output captures parser failures in `scan_errors`
 - ✅ Extract all fields Python does
 - ✅ Use established Rust parsers (serde_json, toml, yaml)
 
@@ -255,6 +255,7 @@ crate::register_parser!(
 
 - ❌ Execute code (use AST parsing)
 - ❌ Panic on errors
+- ❌ Use plain `log::warn!()` in parser code for file-scoped failures; that bypasses the structured parser diagnostics path
 - ❌ Use `.unwrap()` in library code
 - ❌ Run broad file-content license detection in parser code
 - ❌ Normalize ambiguous prose/URL/file-hint license metadata into declared expressions
