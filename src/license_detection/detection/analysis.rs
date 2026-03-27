@@ -160,9 +160,15 @@ pub(super) fn is_low_quality_matches(matches: &[LicenseMatch]) -> bool {
 
 /// Check if any match has correct license clue.
 pub(super) fn has_correct_license_clue_matches(matches: &[LicenseMatch]) -> bool {
-    matches
-        .iter()
-        .any(|m| m.is_license_clue() && m.match_coverage >= 99.99)
+    !matches.is_empty()
+        && matches.iter().all(|m| {
+            matches!(
+                m.matcher,
+                MatcherKind::Hash | MatcherKind::SpdxId | MatcherKind::Aho
+            )
+        })
+        && matches.iter().all(|m| m.match_coverage >= 99.99)
+        && matches.iter().all(LicenseMatch::is_license_clue)
 }
 
 /// Check if matches represent undetected licenses.
@@ -1471,6 +1477,39 @@ mod tests {
             analyze_detection(&matches, false),
             DETECTION_LOG_IMPERFECT_COVERAGE
         );
+    }
+
+    #[test]
+    fn test_analyze_detection_mixed_clue_and_detection_is_not_license_clues() {
+        let mut clue = create_test_match_full(
+            "mit",
+            "2-aho",
+            1,
+            3,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit-clue.RULE",
+        );
+        clue.rule_kind = crate::license_detection::models::RuleKind::Clue;
+
+        let detection = create_test_match_full(
+            "mit",
+            "1-hash",
+            4,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+
+        let matches = vec![clue, detection];
+        assert_eq!(analyze_detection(&matches, false), "");
     }
 
     #[test]
