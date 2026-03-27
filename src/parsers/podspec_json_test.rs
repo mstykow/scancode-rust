@@ -67,6 +67,15 @@ mod tests {
             Some("MIT".to_string())
         );
         assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
             package_data.primary_language,
             Some("Objective-C".to_string())
         );
@@ -96,6 +105,15 @@ mod tests {
         let license_statement = package_data.extracted_license_statement.unwrap();
         assert!(license_statement.contains("MIT"));
         assert!(license_statement.contains("Copyright 2024 Test"));
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
     }
 
     #[test]
@@ -423,6 +441,9 @@ mod tests {
                 .unwrap()
                 .contains("Copyright")
         );
+        assert!(package_data.declared_license_expression.is_none());
+        assert!(package_data.declared_license_expression_spdx.is_none());
+        assert!(package_data.license_detections.is_empty());
 
         // Check dependencies
         assert!(!package_data.dependencies.is_empty());

@@ -69,32 +69,9 @@
     "vcs_url": null,
     "copyright": null,
     "holder": null,
-    "declared_license_expression": "gpl-1.0-plus",
-    "declared_license_expression_spdx": "GPL-1.0-or-later",
-    "license_detections": [
-      {
-        "license_expression": "gpl-1.0-plus",
-        "license_expression_spdx": "GPL-1.0-or-later",
-        "matches": [
-          {
-            "license_expression": "gpl-1.0-plus",
-            "license_expression_spdx": "GPL-1.0-or-later",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "1-hash",
-            "score": 50.0,
-            "matched_length": 1,
-            "match_coverage": 100.0,
-            "rule_relevance": 50,
-            "rule_identifier": "gpl_bare_word_only.RULE",
-            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/gpl_bare_word_only.RULE",
-            "matched_text": "GPL"
-          }
-        ],
-        "identifier": "gpl_1_0_plus-473308ff-72ce-7e72-b3a9-5b1cc6680abb"
-      }
-    ],
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

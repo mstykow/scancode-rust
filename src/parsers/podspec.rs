@@ -32,6 +32,7 @@ use regex::Regex;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::PackageParser;
+use crate::parsers::license_normalization::normalize_spdx_declared_license;
 
 /// Parses CocoaPods specification files (.podspec).
 ///
@@ -75,6 +76,8 @@ impl PackageParser for PodspecParser {
             merge_summary_and_description(summary.as_deref(), extract_description(&content));
         let homepage_url = extract_field(&content, &HOMEPAGE_PATTERN);
         let license = extract_license_statement(&content);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_podspec_declared_license(&content, license.as_deref());
         let source = extract_source_url(&content);
         let authors = extract_authors(&content);
 
@@ -155,9 +158,9 @@ impl PackageParser for PodspecParser {
             vcs_url: source,
             copyright: None,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
-            license_detections: Vec::new(),
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
@@ -208,6 +211,44 @@ lazy_static! {
 
 fn extract_license_statement(content: &str) -> Option<String> {
     extract_field(content, &LICENSE_PATTERN).map(|value| normalize_ruby_hash_literal(&value))
+}
+
+fn normalize_podspec_declared_license(
+    content: &str,
+    extracted_license_statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let Some(raw_license) = extract_field(content, &LICENSE_PATTERN) else {
+        return super::license_normalization::empty_declared_license_data();
+    };
+    let normalized_candidate = if raw_license.contains("=>") || raw_license.contains('=') {
+        extract_ruby_hash_type(&raw_license)
+            .map(|license_type| canonicalize_cocoapods_license_type(&license_type))
+    } else {
+        extracted_license_statement.map(canonicalize_cocoapods_license_type)
+    };
+
+    normalize_spdx_declared_license(normalized_candidate.as_deref())
+}
+
+fn canonicalize_cocoapods_license_type(value: &str) -> String {
+    match value.trim() {
+        "Apache License, Version 2.0" => "Apache-2.0".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn extract_ruby_hash_type(raw_license: &str) -> Option<String> {
+    let normalized = raw_license.replace("=>", "=");
+    let type_regex = Regex::new(r#":type\s*=\s*['\"]([^'\"]+)['\"]"#).ok()?;
+    type_regex
+        .captures(&normalized)
+        .and_then(|caps| caps.get(1))
+        .map(|value| value.as_str().trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn normalize_ruby_hash_literal(value: &str) -> String {
@@ -631,5 +672,39 @@ end
             parse_author_string("Jane Smith"),
             ("Jane Smith".to_string(), None)
         );
+    }
+
+    #[test]
+    fn test_normalize_podspec_license_string() {
+        let content = r#"
+Pod::Spec.new do |s|
+  s.license = 'Apache License, Version 2.0'
+end
+"#;
+
+        let extracted = extract_license_statement(content);
+        let (declared, declared_spdx, detections) =
+            normalize_podspec_declared_license(content, extracted.as_deref());
+
+        assert_eq!(declared.as_deref(), Some("apache-2.0"));
+        assert_eq!(declared_spdx.as_deref(), Some("Apache-2.0"));
+        assert_eq!(detections.len(), 1);
+    }
+
+    #[test]
+    fn test_normalize_podspec_hash_type_only() {
+        let content = r#"
+Pod::Spec.new do |s|
+  s.license = { :type => 'MIT', :file => 'LICENSE' }
+end
+"#;
+
+        let extracted = extract_license_statement(content);
+        let (declared, declared_spdx, detections) =
+            normalize_podspec_declared_license(content, extracted.as_deref());
+
+        assert_eq!(declared.as_deref(), Some("mit"));
+        assert_eq!(declared_spdx.as_deref(), Some("MIT"));
+        assert_eq!(detections.len(), 1);
     }
 }

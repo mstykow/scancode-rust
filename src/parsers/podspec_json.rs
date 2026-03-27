@@ -32,6 +32,7 @@ use serde_json::Value;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const FIELD_NAME: &str = "name";
 const FIELD_VERSION: &str = "version";
@@ -102,6 +103,11 @@ impl PackageParser for PodspecJsonParser {
             .filter(|s| !s.is_empty());
 
         let extracted_license_statement = extract_license_statement(&json_content);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_podspec_json_declared_license(
+                &json_content,
+                extracted_license_statement.as_deref(),
+            );
 
         let (vcs_url, download_url) = extract_source_urls(&json_content);
 
@@ -209,9 +215,9 @@ impl PackageParser for PodspecJsonParser {
             vcs_url,
             copyright: None,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
-            license_detections: Vec::new(),
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
@@ -280,6 +286,44 @@ fn extract_license_statement(json: &Value) -> Option<String> {
             None
         }
     })
+}
+
+fn normalize_podspec_json_declared_license(
+    json: &Value,
+    extracted_license_statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    let normalized_candidate = json
+        .get(FIELD_LICENSE)
+        .and_then(|license| {
+            license
+                .as_str()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(canonicalize_cocoapods_license_type)
+                .or_else(|| {
+                    license
+                        .as_object()
+                        .and_then(|obj| obj.get("type"))
+                        .and_then(|value| value.as_str())
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(canonicalize_cocoapods_license_type)
+                })
+        })
+        .or_else(|| extracted_license_statement.map(canonicalize_cocoapods_license_type));
+
+    normalize_spdx_declared_license(normalized_candidate.as_deref())
+}
+
+fn canonicalize_cocoapods_license_type(value: &str) -> String {
+    match value.trim() {
+        "Apache License, Version 2.0" => "Apache-2.0".to_string(),
+        other => other.to_string(),
+    }
 }
 
 /// Extracts VCS URL and download URL from source field.
