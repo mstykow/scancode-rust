@@ -5,6 +5,6 @@
 //! on the ScanCode rules directory.
 //!
 //! The embedded artifact is generated during the build process and contains
-//! serialized `LoadedRule` and `LoadedLicense` values.
+//! the complete pre-built license index including Aho-Corasick automatons.
 
-pub mod schema;
+pub mod index;

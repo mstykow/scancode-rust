@@ -8,21 +8,13 @@ pub mod token_sets;
 // even though the binary doesn't use it directly.
 #[allow(unused_imports)]
 pub use builder::{
-    build_index, build_index_from_loaded, loaded_license_to_license, loaded_rule_to_rule,
+    build_index, build_index_from_loaded, build_index_from_loaded_with_automatons,
+    loaded_license_to_license, loaded_rule_to_rule,
 };
 
+use crate::license_detection::automaton::Automaton;
 use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
-use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
-
-/// Type alias for Aho-Corasick automaton.
-///
-/// The automaton is built from u16 token sequences encoded as bytes.
-/// Each token is encoded as 2 bytes in little-endian format.
-///
-/// Based on the Python ScanCode Toolkit implementation at:
-/// reference/scancode-toolkit/src/licensedcode/match_aho.py
-pub type Automaton = AhoCorasick;
 
 /// License index containing all data structures for efficient license detection.
 ///
@@ -165,7 +157,7 @@ pub struct LicenseIndex {
     /// Corresponds to Python: `get_licenses_db()` in models.py
     pub licenses_by_key: HashMap<String, crate::license_detection::models::License>,
 
-    /// Maps AhoCorasick pattern_id to rule id (rid).
+    /// Maps AhoCorasick pattern_id to rule ids (rids).
     ///
     /// This is needed because the AhoCorasick pattern_id is just the index
     /// in the patterns iterator used to build the automaton, not the actual
@@ -173,8 +165,12 @@ pub struct LicenseIndex {
     /// values, so the rid is retrieved from the stored value. In Rust, we
     /// maintain this mapping instead.
     ///
+    /// Multiple rules can share the same token pattern (e.g., rules that differ
+    /// only in license_expression). Each pattern_id maps to a list of all rule IDs
+    /// that share that pattern.
+    ///
     /// Corresponds to Python: automaton values contain (rid, istart, iend)
-    pub pattern_id_to_rid: Vec<usize>,
+    pub pattern_id_to_rid: Vec<Vec<usize>>,
 
     /// Mapping from SPDX license key to rule ID.
     ///
@@ -217,6 +213,8 @@ impl LicenseIndex {
     /// # Returns
     /// A new LicenseIndex instance with empty index structures
     pub fn new(dictionary: TokenDictionary) -> Self {
+        use crate::license_detection::automaton::AutomatonBuilder;
+
         let len_legalese = dictionary.legalese_count();
         Self {
             dictionary,
@@ -224,10 +222,8 @@ impl LicenseIndex {
             rid_by_hash: HashMap::new(),
             rules_by_rid: Vec::new(),
             tids_by_rid: Vec::new(),
-            rules_automaton: Automaton::new(std::iter::empty::<&[u8]>())
-                .expect("Failed to create empty automaton"),
-            unknown_automaton: Automaton::new(std::iter::empty::<&[u8]>())
-                .expect("Failed to create empty automaton"),
+            rules_automaton: AutomatonBuilder::new().build(),
+            unknown_automaton: AutomatonBuilder::new().build(),
             sets_by_rid: HashMap::new(),
             msets_by_rid: HashMap::new(),
             high_sets_by_rid: HashMap::new(),
@@ -301,8 +297,9 @@ mod tests {
 
     #[test]
     fn test_automaton_default() {
-        let automaton =
-            Automaton::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
+        use crate::license_detection::automaton::AutomatonBuilder;
+
+        let automaton = AutomatonBuilder::new().build();
         let _ = format!("{:?}", automaton);
     }
 

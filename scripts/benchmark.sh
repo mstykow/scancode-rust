@@ -68,6 +68,7 @@ START_TIME=$(date +%s.%N)
 /usr/bin/time -v "${PROVENANT_BIN}" \
     --json "${OUTPUT_FILE}" \
     --package \
+    --license \
     --copyright \
     --email \
     --url \

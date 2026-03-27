@@ -19,6 +19,7 @@ serde_json = { version = "1.0.149", features = ["preserve_order"] }
 serde_yaml = "0.9.34"
 url = "2.5.8"
 zstd = "0.13.3"
+bincode = { version = "2.0.1", features = ["serde"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"
@@ -40,9 +41,9 @@ name = "generate-supported-formats"
 path = "src/bin/generate_supported_formats.rs"
 
 [[bin]]
-name = "generate-license-loader-artifact"
-path = "src/bin/generate_license_loader_artifact.rs"
-
-[[bin]]
 name = "update-license-golden"
 path = "src/bin/update_license_golden.rs"
+
+[[bin]]
+name = "generate-index-artifact"
+path = "src/bin/generate_index_artifact.rs"

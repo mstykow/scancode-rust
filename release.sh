@@ -39,16 +39,16 @@ cd ../..
 
 if [ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]; then
     echo "✅ License data updated: $CURRENT_COMMIT → $NEW_COMMIT"
-    echo "🔧 Regenerating embedded license loader artifact..."
-    cargo run --manifest-path xtask/Cargo.toml --bin generate-license-loader-artifact
+    echo "🔧 Regenerating embedded license index artifact..."
+    cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
     
     if [ -n "$EXECUTE_FLAG" ]; then
-        git add reference/scancode-toolkit resources/license_detection/license_index_loader.msgpack.zst
+        git add reference/scancode-toolkit resources/license_detection/license_index.bincode.zst
         git commit -m "chore: update license rules/licenses to latest"
         echo "✅ Committed license data update"
     else
         echo "ℹ️  License data would be updated (dry-run mode)"
-        git restore reference/scancode-toolkit resources/license_detection/license_index_loader.msgpack.zst
+        git restore reference/scancode-toolkit resources/license_detection/license_index.bincode.zst
     fi
 else
     echo "✅ License data already up to date"

@@ -1,6 +1,7 @@
 //! License Detection Engine
 
 pub mod aho_match;
+pub mod automaton;
 mod detection;
 pub mod embedded;
 
@@ -31,7 +32,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::license_detection::index::build_index_from_loaded;
+use crate::license_detection::embedded::index::EmbeddedLicenseIndex;
+use crate::license_detection::index::{LicenseIndex, build_index_from_loaded};
 use crate::license_detection::query::Query;
 use crate::license_detection::rules::{
     load_loaded_licenses_from_directory, load_loaded_rules_from_directory,
@@ -449,24 +451,38 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing the engine or an error
     pub fn from_embedded() -> Result<Self> {
+        use std::time::Instant;
+        let t0 = Instant::now();
+
         let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index_loader.msgpack.zst");
-        let decompressed = zstd::decode_all(&artifact_bytes[..])
-            .map_err(|e| anyhow::anyhow!("Failed to decompress embedded artifact: {}", e))?;
-        let snapshot: embedded::schema::EmbeddedLoaderSnapshot =
-            rmp_serde::from_slice(&decompressed)
-                .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded artifact: {}", e))?;
+            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        eprintln!(
+            "[from_embedded] artifact_bytes.len() = {} MB",
+            artifact_bytes.len() / 1_000_000
+        );
 
-        if snapshot.schema_version != embedded::schema::SCHEMA_VERSION {
-            anyhow::bail!(
-                "Embedded artifact schema version mismatch: expected {}, got {}",
-                embedded::schema::SCHEMA_VERSION,
-                snapshot.schema_version
-            );
-        }
+        let t1 = Instant::now();
+        let embedded = EmbeddedLicenseIndex::deserialize_from_bytes(artifact_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded index: {}", e))?;
+        eprintln!(
+            "[from_embedded] deserialize_from_bytes took {:?}",
+            t1.elapsed()
+        );
 
-        let index = build_index_from_loaded(snapshot.rules, snapshot.licenses, false);
-        Self::from_index(index)
+        let t2 = Instant::now();
+        let index = LicenseIndex::try_from(embedded)
+            .map_err(|e| anyhow::anyhow!("Failed to convert embedded index: {}", e))?;
+        eprintln!(
+            "[from_embedded] LicenseIndex::try_from took {:?}",
+            t2.elapsed()
+        );
+
+        let t3 = Instant::now();
+        let result = Self::from_index(index);
+        eprintln!("[from_embedded] from_index took {:?}", t3.elapsed());
+
+        eprintln!("[from_embedded] TOTAL took {:?}", t0.elapsed());
+        result
     }
 
     /// Create a new license detection engine from a directory of license rules.
