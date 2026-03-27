@@ -1406,7 +1406,7 @@ fn summary_holder_from_copyright(copyright: &str) -> Option<String> {
         value = stripped.trim_start();
     }
 
-    let cleaned = value.trim_matches(|ch: char| ch.is_whitespace() || ch == '.' || ch == ',');
+    let cleaned = value.trim_matches(|ch: char| ch.is_whitespace() || ch == ',');
     if cleaned.is_empty() {
         return None;
     }
@@ -1419,6 +1419,27 @@ fn summary_holder_from_copyright(copyright: &str) -> Option<String> {
         .strip_suffix(". Individual")
         .unwrap_or(cleaned)
         .trim();
+
+    let cleaned = if cleaned.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+        cleaned
+            .trim_start_matches(|ch: char| {
+                ch.is_ascii_digit() || ch == ' ' || ch == ',' || ch == '-'
+            })
+            .trim()
+    } else {
+        cleaned
+    };
+
+    let cleaned_without_email = cleaned
+        .split_whitespace()
+        .take_while(|token| !token.contains('@'))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let cleaned = if cleaned_without_email.is_empty() {
+        cleaned
+    } else {
+        cleaned_without_email.as_str()
+    };
 
     (!cleaned.is_empty()).then(|| cleaned.to_string())
 }
@@ -2006,6 +2027,46 @@ fn compute_declared_holders(
     packages: &[Package],
     indexes: &OutputIndexes,
 ) -> Vec<String> {
+    let mut package_datafile_holders = Vec::new();
+    for package in packages {
+        for datafile_path in &package.datafile_paths {
+            if let Some(file) = indexes
+                .first_file_index_by_path
+                .get(datafile_path)
+                .and_then(|index| files.get(*index))
+            {
+                if file.is_legal {
+                    continue;
+                }
+                for holder in &file.holders {
+                    let canonical_holder = canonicalize_summary_holder_display(&holder.holder);
+                    if !package_datafile_holders.contains(&canonical_holder) {
+                        package_datafile_holders.push(canonical_holder);
+                    }
+                }
+            }
+        }
+    }
+
+    let package_copyright_holders = unique(
+        &packages
+            .iter()
+            .filter_map(|package| package.copyright.as_deref())
+            .filter_map(summary_holder_from_copyright)
+            .map(|holder| canonicalize_summary_holder_display(&holder))
+            .collect::<Vec<_>>(),
+    );
+    if !package_copyright_holders.is_empty() {
+        if !package_datafile_holders.is_empty()
+            && package_copyright_holders
+                .iter()
+                .all(|holder| package_datafile_holders.contains(holder))
+        {
+            return package_datafile_holders;
+        }
+        return package_copyright_holders;
+    }
+
     let mut counts: HashMap<String, usize> = HashMap::new();
 
     for holder in packages
@@ -2017,31 +2078,7 @@ fn compute_declared_holders(
             .or_insert(0) += 1;
     }
 
-    let mut package_datafile_holders = Vec::new();
-
-    if counts.is_empty() {
-        for package in packages {
-            for datafile_path in &package.datafile_paths {
-                if let Some(file) = indexes
-                    .first_file_index_by_path
-                    .get(datafile_path)
-                    .and_then(|index| files.get(*index))
-                {
-                    if file.is_legal {
-                        continue;
-                    }
-                    for holder in &file.holders {
-                        let canonical_holder = canonicalize_summary_holder_display(&holder.holder);
-                        if !package_datafile_holders.contains(&canonical_holder) {
-                            package_datafile_holders.push(canonical_holder);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if !package_datafile_holders.is_empty() {
+    if counts.is_empty() && !package_datafile_holders.is_empty() {
         return package_datafile_holders;
     }
 
@@ -2209,9 +2246,7 @@ fn top_level_package_uids(
                     .first_file_index_by_path
                     .get(datafile_path)
                     .and_then(|index| files.get(*index))
-                    .is_some_and(|file| {
-                        file.file_type == FileType::File && file.is_top_level && file.is_key_file
-                    })
+                    .is_some_and(|file| file.file_type == FileType::File)
             })
         })
         .map(|package| package.package_uid.clone())

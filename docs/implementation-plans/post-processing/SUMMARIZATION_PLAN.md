@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, and active score/generated/classify/tally parity are implemented; residual summary edge cases remain open here
+> **Status**: 🟡 In Progress — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, package-copyright holder precedence, package-datafile summary eligibility, and active summary/score/generated/classify/tally parity are implemented; performance hardening remains open here
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -200,6 +200,8 @@ Provenant should match the useful behavior surface without inheriting those stru
   - score parity for `no_license_text` and `no_license_or_copyright`
   - score parity for single joined-expression declarations without false ambiguity
   - score parity for nested manifest-style key files without declared copyrights
+  - package-copyright-derived declared-holder precedence unless the package datafile already provides a richer holder set
+  - package declared-license summary origin from any present package datafile, even when a sibling package datafile is the only top-level key-classified manifest
 - ✅ Broader classify parity for active fixtures:
   - resource-level `is_top_level` on root directories and their direct children
   - `is_legal` / `is_readme` checks using both file name and base name
@@ -223,7 +225,7 @@ The remaining hot spots are localized and should stay explicit in this plan:
 
 ### Missing
 
-- ❌ Residual summary package-precedence and edge-case parity
+- ❌ No remaining functional summary-parity gaps are currently tracked here; the remaining open work in this plan is Phase 11 performance hardening
 
 ### Already handled elsewhere
 
@@ -248,7 +250,7 @@ The remaining hot spots are localized and should stay explicit in this plan:
 7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). ✅
 8. **Phase 7**: Full license clarity parity. ✅ Complete for the active emitted ScanCode `score/` fixture surface (`basic`, `no_license_text`, `no_license_or_copyright`, `no_license_ambiguity`, `inconsistent_licenses_copyleft`, and `jar`), including joined-expression resolution, score-only key-file evidence, manifest allowlist behavior, ambiguity/conflict penalties, and the current holder-driven score cases.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
-10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
+10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. ✅ Complete: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, package-copyright holder precedence, empty declared-holder parity, tallied-language fallback when packages disagree, package-datafile eligibility for declared-license summary origin, the main ambiguity/holder fixtures, and localized regression coverage including `package_copyright_precedence`.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. ✅ Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage with localized fixture coverage.
 12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns.
 

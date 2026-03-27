@@ -498,6 +498,36 @@ fn compute_summary_uses_package_datafile_holders_before_global_holder_fallback()
 }
 
 #[test]
+fn compute_summary_prefers_package_copyright_holders_over_package_resource_holders() {
+    let mut package = package("pkg:nuget/demo?uuid=test", "codebase/Demo.nuspec");
+    package.package_type = Some(PackageType::Nuget);
+    package.copyright = Some("Copyright Example Corp.".to_string());
+    package.declared_license_expression = Some("mit".to_string());
+
+    let mut nuspec = file("codebase/Demo.nuspec");
+    nuspec.is_manifest = true;
+    nuspec.is_key_file = true;
+    nuspec.is_top_level = true;
+    nuspec.for_packages = vec![package.package_uid.clone()];
+    nuspec.holders = vec![Holder {
+        holder: "Different Holder".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let summary = compute_summary(&[nuspec], &[package]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
+    assert_eq!(
+        summary.other_holders,
+        vec![TallyEntry {
+            value: Some("Different Holder".to_string()),
+            count: 1,
+        }]
+    );
+}
+
+#[test]
 fn compute_summary_keeps_null_other_license_expressions_when_declared_expression_exists() {
     let mut readme = file("project/README.md");
     readme.is_key_file = true;
@@ -663,6 +693,59 @@ fn compute_summary_uses_tallied_primary_language_when_top_level_packages_disagre
         Some("apache-2.0 AND mit")
     );
     assert_eq!(summary.primary_language.as_deref(), Some("Python"));
+}
+
+#[test]
+fn compute_summary_combines_package_licenses_when_present_datafile_is_not_key_classified() {
+    let mut pypi = package("pkg:pypi/codebase?uuid=test1", "codebase/setup.py");
+    pypi.package_type = Some(PackageType::Pypi);
+    pypi.declared_license_expression = Some("apache-2.0".to_string());
+    pypi.primary_language = Some("Python".to_string());
+
+    let mut cargo = package("pkg:cargo/codebase?uuid=test2", "codebase/cargo.toml");
+    cargo.package_type = Some(PackageType::Cargo);
+    cargo.declared_license_expression = Some("mit".to_string());
+    cargo.primary_language = Some("Rust".to_string());
+
+    let mut setup = file("codebase/setup.py");
+    setup.is_manifest = true;
+    setup.is_key_file = false;
+    setup.is_top_level = false;
+    setup.for_packages = vec![pypi.package_uid.clone()];
+
+    let mut cargo_toml = file("codebase/cargo.toml");
+    cargo_toml.is_manifest = true;
+    cargo_toml.is_key_file = true;
+    cargo_toml.is_top_level = true;
+    cargo_toml.for_packages = vec![cargo.package_uid.clone()];
+    cargo_toml.license_expression = Some("mit".to_string());
+    cargo_toml.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("codebase/cargo.toml".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(1),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let summary = compute_summary(&[setup, cargo_toml], &[pypi, cargo]).expect("summary exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("apache-2.0 AND mit")
+    );
 }
 
 #[test]
@@ -985,7 +1068,7 @@ fn compute_score_mode_does_not_treat_with_expression_as_covering_base_license() 
 
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0")
+        Some("gpl-2.0 AND gpl-2.0 WITH classpath-exception-2.0")
     );
     let score = summary.license_clarity_score.expect("clarity exists");
     assert_eq!(score.score, 90);
