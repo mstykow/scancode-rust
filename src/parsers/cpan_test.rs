@@ -71,6 +71,15 @@ mod tests {
             package.extracted_license_statement,
             Some("perl_5".to_string())
         );
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("gpl-1.0-plus OR artistic-perl-1.0")
+        );
+        assert_eq!(
+            package.declared_license_expression_spdx.as_deref(),
+            Some("GPL-1.0-or-later OR Artistic-1.0-Perl")
+        );
+        assert_eq!(package.license_detections.len(), 1);
     }
 
     #[test]
@@ -197,6 +206,15 @@ mod tests {
             package.extracted_license_statement,
             Some("artistic_2".to_string())
         );
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("artistic-2.0")
+        );
+        assert_eq!(
+            package.declared_license_expression_spdx.as_deref(),
+            Some("Artistic-2.0")
+        );
+        assert_eq!(package.license_detections.len(), 1);
     }
 
     #[test]
@@ -487,6 +505,15 @@ mod tests {
             package.extracted_license_statement,
             Some("apache_2_0 AND mit".to_string())
         );
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("apache-2.0 AND mit")
+        );
+        assert_eq!(
+            package.declared_license_expression_spdx.as_deref(),
+            Some("Apache-2.0 AND MIT")
+        );
+        assert_eq!(package.license_detections.len(), 1);
     }
 
     #[test]

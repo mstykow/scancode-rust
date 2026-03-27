@@ -65,6 +65,7 @@ mod tests {
         assert_eq!(pkg.primary_language.as_deref(), Some("Python"));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
         assert!(pkg.is_virtual);
+        assert!(pkg.dependencies.is_empty());
 
         // Check extra_data
         assert!(pkg.extra_data.is_some());
@@ -124,5 +125,49 @@ mod tests {
         // Should return default package on parse error
         assert_eq!(pkg.package_type, Some(PackageType::Pypi));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
+    }
+
+    #[test]
+    fn test_parse_requires_dist_dependencies() {
+        let content = r#"{
+  "version": "1",
+  "installed": [
+    {
+      "metadata": {
+        "name": "demo",
+        "version": "1.0.0",
+        "license": "MIT",
+        "requires_dist": [
+          "typing-extensions>=4.0.0",
+          "importlib-metadata; python_version < \"3.10\""
+        ]
+      },
+      "requested": true,
+      "direct_url": {
+        "url": "file:///path/to/demo"
+      }
+    }
+  ]
+}"#;
+        let pkg = parse_pip_inspect_deplock(content);
+
+        assert_eq!(pkg.declared_license_expression.as_deref(), Some("mit"));
+        assert_eq!(pkg.declared_license_expression_spdx.as_deref(), Some("MIT"));
+        assert_eq!(pkg.license_detections.len(), 1);
+        assert_eq!(pkg.dependencies.len(), 2);
+        assert!(
+            pkg.dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:pypi/typing-extensions"))
+        );
+        assert!(pkg.dependencies.iter().any(|dep| {
+            dep.purl.as_deref() == Some("pkg:pypi/importlib-metadata")
+                && dep
+                    .extra_data
+                    .as_ref()
+                    .and_then(|extra| extra.get("python_version"))
+                    .and_then(|value| value.as_str())
+                    == Some("< 3.10")
+        }));
     }
 }

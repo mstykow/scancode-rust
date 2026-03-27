@@ -103,6 +103,7 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
     let mut license_list = Vec::new();
     let mut keywords = Vec::new();
     let mut requires_list = Vec::new();
+    let mut tool_requires_list = Vec::new();
 
     for stmt in class_def.body.iter() {
         match stmt {
@@ -123,18 +124,31 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
                 }
             }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
-                if let Some(requires) = extract_self_requires_calls(body) {
+                if let Some(requires) = extract_self_requires_calls(body, "requires") {
                     requires_list.extend(requires);
+                }
+                if let Some(tool_requires) = extract_self_requires_calls(body, "tool_requires") {
+                    tool_requires_list.extend(tool_requires);
                 }
             }
             _ => {}
         }
     }
 
-    let dependencies = requires_list
+    let mut dependencies = requires_list
         .into_iter()
         .filter_map(|req| parse_conan_reference(&req))
-        .collect();
+        .collect::<Vec<_>>();
+    dependencies.extend(
+        tool_requires_list
+            .into_iter()
+            .filter_map(|req| parse_conan_reference(&req))
+            .map(|dep| Dependency {
+                scope: Some("build".to_string()),
+                is_runtime: Some(false),
+                ..dep
+            }),
+    );
 
     let extracted_license = if !license_list.is_empty() {
         Some(license_list.join(", "))
@@ -215,18 +229,11 @@ fn get_list_values(expr: &ast::Expr) -> Vec<String> {
 }
 
 /// Extract self.requires() method calls from function body
-fn extract_self_requires_calls(body: &[ast::Stmt]) -> Option<Vec<String>> {
+fn extract_self_requires_calls(body: &[ast::Stmt], method_name: &str) -> Option<Vec<String>> {
     let mut requires = Vec::new();
 
     for stmt in body {
-        if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = stmt
-            && let ast::Expr::Call(call) = value.as_ref()
-            && is_self_requires_call(call)
-            && let Some(arg) = call.args.first()
-            && let Some(req) = get_string_value(arg)
-        {
-            requires.push(req);
-        }
+        collect_self_method_calls(stmt, method_name, &mut requires);
     }
 
     if requires.is_empty() {
@@ -236,12 +243,64 @@ fn extract_self_requires_calls(body: &[ast::Stmt]) -> Option<Vec<String>> {
     }
 }
 
-/// Check if call is self.requires()
-fn is_self_requires_call(call: &ast::ExprCall) -> bool {
+fn collect_self_method_calls(stmt: &ast::Stmt, method_name: &str, out: &mut Vec<String>) {
+    match stmt {
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            if let ast::Expr::Call(call) = value.as_ref()
+                && is_self_method_call(call, method_name)
+                && let Some(arg) = call.args.first()
+                && let Some(req) = get_string_value(arg)
+            {
+                out.push(req);
+            }
+        }
+        ast::Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            for nested in body.iter().chain(orelse.iter()) {
+                collect_self_method_calls(nested, method_name, out);
+            }
+        }
+        ast::Stmt::With(ast::StmtWith { body, .. })
+        | ast::Stmt::While(ast::StmtWhile { body, .. })
+        | ast::Stmt::For(ast::StmtFor { body, .. })
+        | ast::Stmt::AsyncFor(ast::StmtAsyncFor { body, .. })
+        | ast::Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            for nested in body {
+                collect_self_method_calls(nested, method_name, out);
+            }
+        }
+        ast::Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            for nested in body.iter().chain(orelse.iter()).chain(finalbody.iter()) {
+                collect_self_method_calls(nested, method_name, out);
+            }
+            for handler in handlers {
+                let ast::ExceptHandler::ExceptHandler(handler) = handler;
+                for nested in &handler.body {
+                    collect_self_method_calls(nested, method_name, out);
+                }
+            }
+        }
+        ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            for case in cases {
+                for nested in &case.body {
+                    collect_self_method_calls(nested, method_name, out);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_self_method_call(call: &ast::ExprCall, method_name: &str) -> bool {
     if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref()
         && let ast::Expr::Name(ast::ExprName { id, .. }) = value.as_ref()
     {
-        return id.as_str() == "self" && attr.as_str() == "requires";
+        return id.as_str() == "self" && attr.as_str() == method_name;
     }
     false
 }

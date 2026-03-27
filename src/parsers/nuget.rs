@@ -35,6 +35,7 @@ use quick_xml::events::Event;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
+use super::license_normalization::{empty_declared_license_data, normalize_spdx_declared_license};
 
 const PROJECT_FILE_EXTENSIONS: [&str; 3] = ["csproj", "vbproj", "fsproj"];
 
@@ -401,11 +402,12 @@ impl PackageParser for NuspecParser {
 
         let purl = build_nuget_purl(name.as_deref(), version.as_deref());
 
-        // Extract license statement only - detection happens in separate engine
-        // Do NOT populate declared_license_expression or license_detections here
-        let declared_license_expression = None;
-        let declared_license_expression_spdx = None;
-        let license_detections = Vec::new();
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            if license_type.as_deref() == Some("expression") {
+                normalize_spdx_declared_license(extracted_license_statement.as_deref())
+            } else {
+                empty_declared_license_data()
+            };
 
         let holder = None;
 
@@ -1300,6 +1302,13 @@ impl PackageParser for PackageReferenceProjectParser {
             );
         }
 
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            if license_type.as_deref() == Some("expression") {
+                normalize_spdx_declared_license(extracted_license_statement.as_deref())
+            } else {
+                empty_declared_license_data()
+            };
+
         vec![PackageData {
             datasource_id: Some(datasource_id),
             package_type: Some(Self::PACKAGE_TYPE),
@@ -1310,6 +1319,9 @@ impl PackageParser for PackageReferenceProjectParser {
             homepage_url,
             parties,
             dependencies,
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             extracted_license_statement,
             copyright,
             vcs_url,
@@ -2704,11 +2716,12 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
     let (repository_homepage_url, repository_download_url, api_data_url) =
         build_nuget_urls(name.as_deref(), version.as_deref());
 
-    // Extract license statement only - detection happens in separate engine
-    // Do NOT populate declared_license_expression or license_detections here
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
-    let license_detections = Vec::new();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        if license_type.as_deref() == Some("expression") {
+            normalize_spdx_declared_license(extracted_license_statement.as_deref())
+        } else {
+            empty_declared_license_data()
+        };
 
     let holder = None;
 

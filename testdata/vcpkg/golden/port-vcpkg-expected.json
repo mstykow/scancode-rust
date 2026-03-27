@@ -48,6 +48,18 @@
         "extra_data": {
           "host": true
         }
+      },
+      {
+        "purl": "pkg:generic/vcpkg/icu",
+        "extracted_requirement": "icu",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "feature": "unicode"
+        }
       }
     ],
     "datasource_id": "vcpkg_json",

@@ -3271,6 +3271,10 @@ fn value_to_string_pairs(value: &Value) -> Option<Vec<(String, String)>> {
 
 fn extract_rfc822_dependencies(headers: &HashMap<String, Vec<String>>) -> Vec<Dependency> {
     let requires_dist = super::rfc822::get_header_all(headers, "requires-dist");
+    extract_requires_dist_dependencies(&requires_dist)
+}
+
+pub(crate) fn extract_requires_dist_dependencies(requires_dist: &[String]) -> Vec<Dependency> {
     requires_dist
         .iter()
         .filter_map(|entry| build_rfc822_dependency(entry))
@@ -3700,6 +3704,20 @@ fn extract_from_pypi_json(path: &Path) -> PackageData {
         .map(|urls| select_pypi_json_artifact(urls))
         .unwrap_or((None, None, None));
 
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(license.as_deref());
+    let dependencies = info
+        .get("requires_dist")
+        .and_then(|value| value.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| entry.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .map(|entries| extract_requires_dist_dependencies(&entries))
+        .unwrap_or_default();
+
     let (repository_homepage_url, repository_download_url, api_data_url, purl) =
         build_pypi_urls(name.as_deref(), version.as_deref());
 
@@ -3727,9 +3745,9 @@ fn extract_from_pypi_json(path: &Path) -> PackageData {
         vcs_url,
         copyright: None,
         holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         other_license_expression: None,
         other_license_expression_spdx: None,
         other_license_detections: Vec::new(),
@@ -3744,7 +3762,7 @@ fn extract_from_pypi_json(path: &Path) -> PackageData {
         } else {
             Some(extra_data)
         },
-        dependencies: Vec::new(),
+        dependencies,
         repository_homepage_url,
         repository_download_url,
         api_data_url,
@@ -3891,11 +3909,20 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
             });
         }
 
-        // Extract license statement only - detection happens in separate engine
-        let license_detections = Vec::new();
-        let declared_license_expression = None;
-        let declared_license_expression_spdx = None;
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_spdx_declared_license(license.as_deref());
         let extracted_license_statement = license.clone();
+        let requires_dist = metadata
+            .get("requires_dist")
+            .and_then(|v| v.as_array())
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|entry| entry.as_str().map(ToOwned::to_owned))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let parsed_dependencies = extract_requires_dist_dependencies(&requires_dist);
 
         let purl = name.as_ref().and_then(|n| {
             let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n).ok()?;
@@ -3961,7 +3988,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 } else {
                     Some(extra_data)
                 },
-                dependencies: Vec::new(),
+                dependencies: parsed_dependencies,
                 repository_homepage_url: None,
                 repository_download_url: None,
                 api_data_url: None,
@@ -4006,7 +4033,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 is_private: false,
                 is_virtual: true,
                 extra_data: None,
-                dependencies: Vec::new(),
+                dependencies: parsed_dependencies,
                 repository_homepage_url: None,
                 repository_download_url: None,
                 api_data_url: None,
@@ -4030,11 +4057,50 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
     }
 
     if let Some(mut main_pkg) = main_package {
+        let direct_requirement_purls: HashSet<String> = main_pkg
+            .dependencies
+            .iter()
+            .filter_map(|dep| dep.purl.as_deref().map(base_dependency_purl))
+            .collect();
+
+        let resolved_requirement_purls: HashSet<String> = dependencies
+            .iter()
+            .filter_map(|dep| dep.purl.as_deref().map(base_dependency_purl))
+            .collect();
+
+        let unresolved_dependencies = main_pkg
+            .dependencies
+            .iter()
+            .filter(|dep| {
+                dep.purl.as_ref().is_some_and(|purl| {
+                    !resolved_requirement_purls.contains(&base_dependency_purl(purl))
+                })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for dependency in &mut dependencies {
+            if dependency
+                .purl
+                .as_ref()
+                .is_some_and(|purl| direct_requirement_purls.contains(&base_dependency_purl(purl)))
+            {
+                dependency.is_direct = Some(true);
+            }
+        }
+
         main_pkg.dependencies = dependencies;
+        main_pkg.dependencies.extend(unresolved_dependencies);
         main_pkg
     } else {
         default_package_data()
     }
+}
+
+fn base_dependency_purl(purl: &str) -> String {
+    purl.split_once('@')
+        .map(|(base, _)| base.to_string())
+        .unwrap_or_else(|| purl.to_string())
 }
 
 type IniSections = HashMap<String, HashMap<String, Vec<String>>>;

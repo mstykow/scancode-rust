@@ -61,13 +61,29 @@ fn test_conanfile_py_dependencies() {
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
     let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.dependencies.len(), 1);
+    assert_eq!(result.dependencies.len(), 3);
     let dep = &result.dependencies[0];
     assert_eq!(dep.purl, Some("pkg:conan/libiconv@1.17".to_string()));
     assert_eq!(dep.extracted_requirement, Some("1.17".to_string()));
     assert_eq!(dep.scope, Some("install".to_string()));
     assert_eq!(dep.is_runtime, Some(true));
     assert_eq!(dep.is_pinned, Some(true));
+
+    let msys2 = result
+        .dependencies
+        .iter()
+        .find(|dep| dep.purl.as_deref() == Some("pkg:conan/msys2@cci.latest"))
+        .expect("Should have msys2 tool requirement");
+    assert_eq!(msys2.scope.as_deref(), Some("build"));
+    assert_eq!(msys2.is_runtime, Some(false));
+
+    let automake = result
+        .dependencies
+        .iter()
+        .find(|dep| dep.purl.as_deref() == Some("pkg:conan/automake@1.16.5"))
+        .expect("Should have automake tool requirement");
+    assert_eq!(automake.scope.as_deref(), Some("build"));
+    assert_eq!(automake.is_runtime, Some(false));
 }
 
 #[test]

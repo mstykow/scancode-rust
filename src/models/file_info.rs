@@ -277,7 +277,7 @@ pub struct PackageData {
     pub declared_license_expression: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub declared_license_expression_spdx: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub license_detections: Vec<LicenseDetection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub other_license_expression: Option<String>,
@@ -299,7 +299,7 @@ pub struct PackageData {
     pub is_virtual: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub dependencies: Vec<Dependency>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository_homepage_url: Option<String>,

@@ -35,6 +35,24 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true
+      },
+      {
+        "purl": "pkg:conan/msys2@cci.latest",
+        "extracted_requirement": "cci.latest",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:conan/automake@1.16.5",
+        "extracted_requirement": "1.16.5",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
       }
     ],
     "datasource_id": "conan_conanfile_py"

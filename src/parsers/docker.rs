@@ -8,6 +8,7 @@ use crate::models::{DatasourceId, PackageData, PackageType};
 use crate::parsers::utils::read_file_to_string;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const PACKAGE_TYPE: PackageType = PackageType::Docker;
 const OCI_LABEL_PREFIX: &str = "org.opencontainers.image.";
@@ -55,6 +56,9 @@ pub(crate) fn parse_dockerfile(content: &str) -> PackageData {
     let oci_labels = extract_oci_labels(content);
     let extra_data = (!oci_labels.is_empty())
         .then(|| HashMap::from([("oci_labels".to_string(), json!(oci_labels))]));
+    let extracted_license_statement = oci_labels.get("org.opencontainers.image.licenses").cloned();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(extracted_license_statement.as_deref());
 
     PackageData {
         package_type: Some(PACKAGE_TYPE),
@@ -67,7 +71,10 @@ pub(crate) fn parse_dockerfile(content: &str) -> PackageData {
         homepage_url: oci_labels.get("org.opencontainers.image.url").cloned(),
         vcs_url: oci_labels.get("org.opencontainers.image.source").cloned(),
         version: oci_labels.get("org.opencontainers.image.version").cloned(),
-        extracted_license_statement: oci_labels.get("org.opencontainers.image.licenses").cloned(),
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
+        extracted_license_statement,
         extra_data,
         ..Default::default()
     }

@@ -134,16 +134,33 @@ fn test_parse_vcpkg_port_manifest() {
     );
     assert!(extra.get("features").is_some());
 
-    assert_eq!(pkg.dependencies.len(), 2);
-    assert!(
-        pkg.dependencies
-            .iter()
-            .all(|dep| dep.is_runtime == Some(false))
-    );
+    assert_eq!(pkg.dependencies.len(), 3);
     assert!(
         pkg.dependencies
             .iter()
             .all(|dep| dep.scope.as_deref() == Some("dependencies"))
+    );
+
+    assert!(
+        pkg.dependencies
+            .iter()
+            .filter(|dep| dep.purl.as_deref() != Some("pkg:generic/vcpkg/icu"))
+            .all(|dep| dep.is_runtime == Some(false))
+    );
+
+    let icu = pkg
+        .dependencies
+        .iter()
+        .find(|dep| dep.purl.as_deref() == Some("pkg:generic/vcpkg/icu"))
+        .expect("expected icu feature dependency");
+    assert_eq!(icu.is_runtime, Some(true));
+    assert_eq!(icu.is_direct, Some(true));
+    assert_eq!(
+        icu.extra_data
+            .as_ref()
+            .and_then(|extra| extra.get("feature"))
+            .and_then(|value| value.as_str()),
+        Some("unicode")
     );
 }
 

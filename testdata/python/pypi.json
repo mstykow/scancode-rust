@@ -9,6 +9,10 @@
     "author_email": "hs@example.com",
     "license": "MIT",
     "keywords": "attrs,dataclasses",
+    "requires_dist": [
+      "typing-extensions>=4.0.0",
+      "importlib-metadata; python_version < \"3.10\""
+    ],
     "classifiers": ["Private :: Do Not Upload"],
     "project_urls": {
       "Documentation": "https://www.attrs.org/",

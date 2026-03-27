@@ -142,6 +142,13 @@ fn compare_json_values_parser_only(
                         }
                     },
                     (Some(_), None) => {
+                        if (key == "license_detections" || key == "dependencies")
+                            && a.get(key)
+                                .and_then(Value::as_array)
+                                .is_some_and(|arr| arr.is_empty())
+                        {
+                            continue;
+                        }
                         return Err(format!("Extra field in actual: {}", field_path));
                     }
                     (None, None) => unreachable!(),

@@ -1803,9 +1803,15 @@ Test package description.
         );
         assert!(package_data.is_virtual);
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("apache-2.0 AND bsd-3-clause AND mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("Apache-2.0 AND BSD-3-Clause AND MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         let extra_data = package_data
@@ -1820,7 +1826,7 @@ Test package description.
             Some("1")
         );
 
-        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(package_data.dependencies.len(), 5);
 
         let dep_purls: Vec<&str> = package_data
             .dependencies
@@ -1840,12 +1846,28 @@ Test package description.
                 .any(|p| p.starts_with("pkg:pypi/setuptools@")),
             "Should contain setuptools dependency"
         );
+        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/attrs"));
+        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/semantic-version"));
+        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/semver"));
 
         for dep in &package_data.dependencies {
             assert_eq!(dep.is_runtime, Some(true));
             assert_eq!(dep.is_optional, Some(false));
-            assert_eq!(dep.is_pinned, Some(true));
-            assert!(dep.resolved_package.is_some());
+            if dep
+                .purl
+                .as_deref()
+                .is_some_and(|purl| purl.starts_with("pkg:pypi/packaging@"))
+                || dep
+                    .purl
+                    .as_deref()
+                    .is_some_and(|purl| purl.starts_with("pkg:pypi/setuptools@"))
+            {
+                assert_eq!(dep.is_pinned, Some(true));
+                assert!(dep.resolved_package.is_some());
+            } else {
+                assert_eq!(dep.is_pinned, Some(false));
+                assert!(dep.resolved_package.is_none());
+            }
         }
     }
 
@@ -1860,10 +1882,45 @@ Test package description.
             .filter(|d| d.is_direct == Some(true))
             .collect();
 
+        assert_eq!(direct_deps.len(), 5, "Should have 5 direct dependencies");
+    }
+
+    #[test]
+    fn test_extract_from_pip_inspect_preserves_reference_merge_semantics() {
+        let test_file = PathBuf::from("testdata/python/pip-inspect/pip-inspect.deplock");
+        let package_data = PythonParser::extract_first_package(&test_file);
+
+        let packaging = package_data
+            .dependencies
+            .iter()
+            .find(|dep| {
+                dep.purl
+                    .as_deref()
+                    .is_some_and(|purl| purl.starts_with("pkg:pypi/packaging@"))
+            })
+            .expect("packaging dependency missing");
+        assert_eq!(packaging.is_direct, Some(true));
+        assert_eq!(packaging.is_pinned, Some(true));
+        assert!(packaging.resolved_package.is_some());
+        assert!(packaging.extracted_requirement.is_none());
+        assert!(packaging.scope.is_none());
+        assert!(packaging.extra_data.is_none());
+
+        let semver = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/semver"))
+            .expect("semver dependency missing");
+        assert_eq!(semver.is_direct, Some(true));
+        assert_eq!(semver.is_pinned, Some(false));
+        assert!(semver.resolved_package.is_none());
         assert_eq!(
-            direct_deps.len(),
-            1,
-            "Should have 1 direct dependency (setuptools with requested=true)"
+            semver
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("python_version"))
+                .and_then(|value| value.as_str()),
+            Some("< 3.8")
         );
     }
 
@@ -2300,6 +2357,10 @@ classifiers = ["Private :: Do Not Upload"]
     "author_email": "hs@example.com",
     "license": "MIT",
     "keywords": "attrs,dataclasses",
+    "requires_dist": [
+      "typing-extensions>=4.0.0",
+      "importlib-metadata; python_version < \"3.10\""
+    ],
     "classifiers": ["Private :: Do Not Upload"],
     "project_urls": {
       "Documentation": "https://www.attrs.org/",
@@ -2361,6 +2422,29 @@ classifiers = ["Private :: Do Not Upload"]
         assert!(package_data.is_private);
         assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiJson));
         assert_eq!(package_data.purl, Some("pkg:pypi/attrs@24.1.0".to_string()));
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(package_data.dependencies.iter().any(|dep| {
+            dep.purl.as_deref() == Some("pkg:pypi/typing-extensions")
+                && dep.extracted_requirement.as_deref() == Some(">=4.0.0")
+        }));
+        assert!(package_data.dependencies.iter().any(|dep| {
+            dep.purl.as_deref() == Some("pkg:pypi/importlib-metadata")
+                && dep
+                    .extra_data
+                    .as_ref()
+                    .and_then(|extra| extra.get("python_version"))
+                    .and_then(|value| value.as_str())
+                    == Some("< 3.10")
+        }));
     }
 
     #[test]

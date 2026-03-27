@@ -66,6 +66,19 @@ LABEL org.opencontainers.image.title="Jitsi Broadcasting Infrastructure (jibri)"
             package.extracted_license_statement.as_deref(),
             Some("Apache-2.0")
         );
+        assert_eq!(
+            package.declared_license_expression.as_deref(),
+            Some("apache-2.0")
+        );
+        assert_eq!(
+            package.declared_license_expression_spdx.as_deref(),
+            Some("Apache-2.0")
+        );
+        assert_eq!(package.license_detections.len(), 1);
+        assert_eq!(
+            package.license_detections[0].license_expression_spdx,
+            "Apache-2.0"
+        );
 
         let oci_labels = package
             .extra_data
