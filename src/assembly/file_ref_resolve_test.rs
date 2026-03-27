@@ -548,9 +548,11 @@ fn test_resolve_rpm_namespace() {
 
     assert_eq!(packages[0].namespace, Some("fedora".to_string()));
     assert_eq!(packages[0].purl.as_deref(), Some("pkg:rpm/fedora/bash@5.0"));
-    assert!(packages[0]
-        .package_uid
-        .starts_with("pkg:rpm/fedora/bash@5.0?uuid="));
+    assert!(
+        packages[0]
+            .package_uid
+            .starts_with("pkg:rpm/fedora/bash@5.0?uuid=")
+    );
     assert_eq!(dependencies[0].namespace, Some("fedora".to_string()));
     assert_eq!(
         dependencies[0].purl.as_deref(),
@@ -749,10 +751,12 @@ fn test_merge_rpm_yumdb_metadata() {
 
     assert_eq!(packages.len(), 1);
     assert!(packages[0].datasource_ids.contains(&DatasourceId::RpmYumdb));
-    assert!(packages[0]
-        .datafile_paths
-        .iter()
-        .any(|path| path.contains("var/lib/yum/yumdb")));
+    assert!(
+        packages[0]
+            .datafile_paths
+            .iter()
+            .any(|path| path.contains("var/lib/yum/yumdb"))
+    );
     let yumdb = packages[0]
         .extra_data
         .as_ref()
