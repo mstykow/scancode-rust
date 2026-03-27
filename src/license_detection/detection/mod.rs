@@ -13,10 +13,11 @@ pub use types::{DetectionGroup, LicenseDetection};
 
 use crate::license_detection::spdx_mapping::SpdxMapping;
 
+use crate::license_detection::expression::parse_expression;
 use analysis::{
     analyze_detection, classify_detection, compute_detection_score, determine_license_expression,
     determine_spdx_expression, determine_spdx_expression_from_scancode, filter_license_intros,
-    filter_license_intros_and_references,
+    filter_license_intros_and_references, has_correct_license_clue_matches,
 };
 #[cfg(test)]
 use identifier::compute_detection_identifier;
@@ -36,6 +37,9 @@ pub const DETECTION_LOG_LICENSE_CLUES: &str = "license-clues";
 pub const DETECTION_LOG_FALSE_POSITIVE: &str = "false-positive";
 
 pub const DETECTION_LOG_LOW_QUALITY_MATCH_FRAGMENTS: &str = "low-quality-match-fragments";
+
+pub const DETECTION_LOG_NOT_LICENSE_CLUES_AS_MORE_DETECTIONS_PRESENT: &str =
+    "not-license-clues-as-more-detections-present";
 
 /// Imperfect match coverage - at least one match has coverage < 100%.
 pub const DETECTION_LOG_IMPERFECT_COVERAGE: &str = "imperfect-match-coverage";
@@ -159,7 +163,8 @@ pub fn populate_detection_from_group_with_spdx(
 /// # Returns
 ///
 /// A fully populated LicenseDetection
-pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
+#[cfg(test)]
+fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
     let mut detection = LicenseDetection {
         license_expression: None,
         license_expression_spdx: None,
@@ -172,37 +177,19 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
         return detection;
     }
 
-    let log_category = analyze_detection(&group.matches, false);
-
-    let matches_for_expression = select_matches_for_expression(&group.matches, log_category);
-
-    // Store RAW matches in detection.matches (matching Python behavior)
-    // Python's LicenseDetection.from_matches() stores original unfiltered matches
-    detection.matches = group.matches.clone();
-
-    let _score = compute_detection_score(&detection.matches);
-
-    // Use FILTERED matches for expression computation (matching Python behavior)
-    if let Ok(expr) = determine_license_expression(&matches_for_expression) {
-        detection.license_expression = Some(expr.clone());
-
-        if let Ok(spdx_expr) = determine_spdx_expression(&matches_for_expression) {
-            detection.license_expression_spdx = Some(spdx_expr);
-        }
-    }
-
-    detection.detection_log.push(log_category.to_string());
-
-    // Compute identifier like Python: detection.identifier = detection.identifier_with_expression
-    if let Some(ref expr) = detection.license_expression {
-        let id_safe_expression = python_safe_name(expr);
-        let content_uuid = compute_content_identifier(&detection.matches);
-        detection.identifier = Some(format!("{}-{}", id_safe_expression, content_uuid));
-    } else {
-        detection.identifier = None;
-    }
+    populate_detection_from_group(&mut detection, group);
 
     detection
+}
+
+pub(crate) fn empty_detection() -> LicenseDetection {
+    LicenseDetection {
+        license_expression: None,
+        license_expression_spdx: None,
+        matches: Vec::new(),
+        detection_log: Vec::new(),
+        identifier: None,
+    }
 }
 
 fn select_matches_for_expression(
@@ -340,6 +327,7 @@ pub fn post_process_detections(
     min_score: f32,
 ) -> Vec<LicenseDetection> {
     let filtered = filter_detections_by_score(detections, min_score);
+    let promoted = promote_non_clue_no_expression_detections(filtered);
     // NOTE: We do NOT call remove_duplicate_detections here.
     //
     // Python's get_unique_detections() groups detections by identifier and creates
@@ -355,9 +343,72 @@ pub fn post_process_detections(
     //
     // TODO: Implement UniqueDetection with file_regions aggregation for output
     // formatting when we add full ScanCode output compatibility.
-    let preferred = apply_detection_preferences(filtered);
+    let preferred = apply_detection_preferences(promoted);
     let ranked = rank_detections(preferred);
     sort_detections_by_line(ranked)
+}
+
+fn promote_non_clue_no_expression_detections(
+    mut detections: Vec<LicenseDetection>,
+) -> Vec<LicenseDetection> {
+    if detections.len() <= 1 {
+        return detections;
+    }
+
+    let detected_license_keys = detections
+        .iter()
+        .filter_map(|detection| detection.license_expression.as_deref())
+        .flat_map(license_keys_from_expression)
+        .collect::<std::collections::HashSet<_>>();
+
+    for detection in &mut detections {
+        if detection.license_expression.is_some()
+            || has_correct_license_clue_matches(&detection.matches)
+        {
+            continue;
+        }
+
+        let Some(license_expression) = promoted_expression_from_matches(&detection.matches) else {
+            continue;
+        };
+        let license_keys = license_keys_from_expression(&license_expression);
+
+        if !license_keys.is_empty()
+            && license_keys
+                .iter()
+                .all(|key| detected_license_keys.contains(key))
+        {
+            detection.license_expression = Some(license_expression.clone());
+            detection.license_expression_spdx = determine_spdx_expression(&detection.matches).ok();
+            detection
+                .detection_log
+                .push(DETECTION_LOG_NOT_LICENSE_CLUES_AS_MORE_DETECTIONS_PRESENT.to_string());
+            let content_uuid = compute_content_identifier(&detection.matches);
+            detection.identifier = Some(format!(
+                "{}-{}",
+                python_safe_name(&license_expression),
+                content_uuid
+            ));
+        }
+    }
+
+    detections
+}
+
+fn promoted_expression_from_matches(
+    matches: &[crate::license_detection::models::LicenseMatch],
+) -> Option<String> {
+    crate::utils::spdx::combine_license_expressions(
+        matches
+            .iter()
+            .map(|match_item| match_item.license_expression.clone()),
+    )
+}
+
+fn license_keys_from_expression(expression: &str) -> Vec<String> {
+    parse_expression(expression)
+        .map(|parsed| parsed.license_keys())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -913,6 +964,94 @@ mod tests {
     fn test_post_process_detections_empty() {
         let result = post_process_detections(vec![], 0.0);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_post_process_detections_promotes_covered_low_quality_detection() {
+        let mut proper_match = create_perfect_match(10, 30);
+        proper_match.license_expression = "bsd-new".to_string();
+        proper_match.license_expression_spdx = Some("BSD-3-Clause".to_string());
+
+        let mut low_quality_match = create_test_match(31, 36, "3-seq", "bsd-new_1319.RULE");
+        low_quality_match.license_expression = "bsd-new".to_string();
+        low_quality_match.license_expression_spdx = Some("BSD-3-Clause".to_string());
+        low_quality_match.match_coverage = 32.96;
+        low_quality_match.score = 32.96;
+
+        let proper = LicenseDetection {
+            license_expression: Some("bsd-new".to_string()),
+            license_expression_spdx: Some("BSD-3-Clause".to_string()),
+            matches: vec![proper_match],
+            detection_log: vec![],
+            identifier: Some("bsd_new-proper".to_string()),
+        };
+        let low_quality = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: vec![low_quality_match],
+            detection_log: vec![DETECTION_LOG_LOW_QUALITY_MATCH_FRAGMENTS.to_string()],
+            identifier: None,
+        };
+
+        let result = post_process_detections(vec![proper, low_quality], 0.0);
+        let promoted = result
+            .iter()
+            .find(|detection| {
+                detection.detection_log.contains(
+                    &DETECTION_LOG_NOT_LICENSE_CLUES_AS_MORE_DETECTIONS_PRESENT.to_string(),
+                )
+            })
+            .expect("promoted detection");
+
+        assert_eq!(promoted.license_expression.as_deref(), Some("bsd-new"));
+        assert_eq!(
+            promoted.license_expression_spdx.as_deref(),
+            Some("BSD-3-Clause")
+        );
+        assert!(promoted.identifier.is_some());
+    }
+
+    #[test]
+    fn test_post_process_detections_does_not_promote_true_license_clues() {
+        let mut proper_match = create_perfect_match(10, 30);
+        proper_match.license_expression = "mit".to_string();
+        proper_match.license_expression_spdx = Some("MIT".to_string());
+
+        let mut clue_match = create_perfect_match(1, 2);
+        clue_match.rule_kind = crate::license_detection::models::RuleKind::Clue;
+
+        let proper = LicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: Some("MIT".to_string()),
+            matches: vec![proper_match],
+            detection_log: vec![],
+            identifier: Some("mit-proper".to_string()),
+        };
+        let clue = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: vec![clue_match],
+            detection_log: vec![DETECTION_LOG_LICENSE_CLUES.to_string()],
+            identifier: None,
+        };
+
+        let result = post_process_detections(vec![proper, clue], 0.0);
+        let preserved_clue = result
+            .iter()
+            .find(|detection| {
+                detection
+                    .detection_log
+                    .contains(&DETECTION_LOG_LICENSE_CLUES.to_string())
+            })
+            .expect("clue detection");
+
+        assert!(preserved_clue.license_expression.is_none());
+        assert!(preserved_clue.identifier.is_none());
+        assert!(
+            !preserved_clue
+                .detection_log
+                .contains(&DETECTION_LOG_NOT_LICENSE_CLUES_AS_MORE_DETECTIONS_PRESENT.to_string(),)
+        );
     }
 
     #[test]
