@@ -25,7 +25,7 @@ license is included in the section entitled "GNU Free Documentation License"."#;
         assert!(!detections.is_empty(), "Should have detections");
 
         let det = &detections[0];
-        eprintln!("Detection: {}", det.license_expression);
+        eprintln!("Detection: {:?}", det.license_expression);
         for m in &det.matches {
             eprintln!(
                 "  Rule: {}, score: {:.2}, coverage: {:.2}%",

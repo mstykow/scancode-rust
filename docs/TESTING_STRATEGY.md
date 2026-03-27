@@ -24,8 +24,9 @@ Provenant uses a **behavior-focused, multi-layered testing approach** that prior
 4. **Complementary Layers**
    - Doctests verify API documentation examples work
    - Unit tests verify component correctness
+   - Scanner/assembly contract tests verify parser data survives real scan wiring
    - Golden tests catch regressions
-   - Integration tests validate end-to-end behavior
+   - System integration tests validate end-to-end behavior
 
 ---
 
@@ -158,18 +159,56 @@ hoisting.
 
 ---
 
-### Layer 3: Integration Tests
+### Layer 3: Scanner/Assembly Contract Tests
 
-**Purpose**: Validate end-to-end scanner behavior (file discovery → parsing → output)
-
-**Location**: `tests/scanner_integration.rs` (top-level integration test suite)
+**Purpose**: Validate scanner-wired package behavior that sits above parser-only extraction and below
+full-system integration (file discovery → parsing → assembly/output contracts)
 
 **Characteristics**:
 
-- Test the full `process()` pipeline
+- Run the full `collect_paths()`/`process_collected()` pipeline for targeted fixtures
+- Verify package visibility after assembly, `for_packages`, dependency hoisting, and
+  `datafile_paths`
+- Catch parser regressions that only appear once scanner wiring and assembly are involved
+- Stay close to the owning parser behavior while exercising higher-level contracts
+
+**Location**: `src/parsers/*_scan_test.rs`
+
+**When to Write**:
+
+- When parser behavior depends on scanner wiring or assembly/file-reference handling
+- When installed metadata must link files back to the assembled package
+- When downstream package/dependency contracts must stay stable
+- For broad retroactive coverage work across many existing parsers
+
+**Example Scenarios Covered**:
+
+- installed metadata linking files back to the assembled package
+- archive/extracted layouts where normalized paths matter
+- intentionally unassembled formats whose scanner behavior must stay stable
+- package-input fields whose downstream consumers depend on the assembled/output contract (for
+  example `purl`, `namespace`/`name`, declared-license fields, dependency hoisting, and
+  `datafile_paths`)
+
+**Why This Matters**: Parser golden tests prove extraction; scanner/assembly contract tests prove
+that the extracted data survives the real scan pipeline and assembly behavior.
+
+---
+
+### Layer 4: System Integration Tests
+
+**Purpose**: Validate end-to-end scanner behavior and user-facing contracts across the full system
+
+**Location**: top-level `tests/*.rs` suites such as `tests/scanner_integration.rs`,
+`tests/progress_cli_integration.rs`, `tests/scanner_copyright_credits.rs`, and
+`tests/output_format_golden.rs`
+
+**Characteristics**:
+
+- Test the full `process()` pipeline across multiple subsystems
 - Verify multi-parser coordination
-- Validate error handling and graceful degradation
-- Test scanner options (exclusions, depth limits, etc.)
+- Validate CLI/runtime behavior and graceful degradation
+- Test output-format and fixture-backed contracts that matter to end users
 
 **When to Write**:
 
@@ -189,34 +228,16 @@ hoisting.
 - Scan-result cache entry persistence (first scan writes cache, repeat scan reuses stable findings)
 - Cache-control CLI wiring behavior (`--cache-dir`, `--cache-clear`) via startup/runtime tests
 
-**Why This Matters**: Unit tests verify components work; integration tests verify they work together correctly.
+**Why This Matters**: Layer 3 proves scanner-wired package contracts; Layer 4 proves the system still works together from the user's perspective.
 
-### Ecosystem-Local Scanner/Assembly Tests
+These are **not** a replacement for the top-level `tests/*.rs` suites. Parser-local scan tests stay
+close to the owning parser behavior they protect, while system integration tests stay cross-parser
+and user-facing.
 
-In addition to the top-level integration suite, some parsers benefit from a small number of
-ecosystem-local scanner/assembly tests under `src/parsers/*_scan_test.rs`.
-
-For broad retroactive coverage work across many existing parsers, use parser-local `*_scan_test.rs`
-files even when the effort is planned and implemented as one audit batch.
-
-These are appropriate when behavior depends on scanner wiring or assembly/file-reference handling,
-for example:
-
-- installed metadata linking files back to the assembled package
-- archive/extracted layouts where normalized paths matter
-- intentionally unassembled formats whose scanner behavior must stay stable
-- package-input fields whose downstream consumers depend on the assembled/output contract (for
-  example `purl`, `namespace`/`name`, declared-license fields, dependency hoisting, and
-  `datafile_paths`)
-
-These are **not** a replacement for `tests/scanner_integration.rs`. The top-level integration suite
-should stay cross-parser and system-oriented, while ecosystem-local scan tests stay close to the
-owning parser behavior they protect.
-
-For parsers that emit meaningful downstream package/dependency data, this layer should be treated as
+For parsers that emit meaningful downstream package/dependency data, Layer 3 should be treated as
 the default expectation rather than an optional extra.
 
-**Example**:
+**Layer 4 Example**:
 
 ```rust
 #[test]
@@ -254,8 +275,9 @@ fn test_scanner_discovers_all_registered_parsers() {
 
 - Doctests for API documentation verification
 - Comprehensive unit tests for component behavior
+- Scanner/assembly contract tests for parser data after real scan wiring
 - Golden tests for regression detection
-- Integration tests for end-to-end validation
+- System integration tests for end-to-end validation
 
 **Trade-offs**:
 
@@ -314,10 +336,14 @@ fn test_scanner_discovers_all_registered_parsers() {
 src/parsers/
 ├── npm.rs                    # Implementation
 ├── npm_test.rs               # Unit tests (co-located)
+├── npm_scan_test.rs          # Scanner/assembly contract tests
 └── npm_golden_test.rs        # Golden tests (separate file)
 
 tests/
-└── scanner_integration.rs    # Integration tests (top-level)
+├── scanner_integration.rs    # Cross-parser integration tests
+├── progress_cli_integration.rs
+├── scanner_copyright_credits.rs
+└── output_format_golden.rs   # Fixture-backed output contract tests
 
 testdata/
 ├── npm/                      # Unit test data
@@ -348,7 +374,11 @@ testdata/
 
 - `test_golden_<ecosystem>_<format>` (e.g., `test_golden_npm_package_json`)
 
-**Integration Tests**:
+**Scanner/Assembly Contract Tests**:
+
+- `test_<behavior>_<scanner_or_assembly_scenario>`
+
+**System Integration Tests**:
 
 - `test_<scanner_feature>_<scenario>` (e.g., `test_scanner_discovers_all_registered_parsers`)
 
@@ -362,18 +392,23 @@ testdata/
 cargo test                    # Run all tests except golden tests
 cargo test --lib              # Run only library tests (faster, excludes integration)
 cargo test --doc              # Run only doctests
-cargo test --test '*'         # Run only integration tests
+cargo test --test scanner_integration  # Run one top-level system integration suite
 cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
 ```
 
 > **Note**: Golden tests (comparing output against Python ScanCode reference) are gated behind the `golden-tests` feature flag because they are slow and require the reference submodule. They run automatically in CI but are excluded from `cargo test` by default for faster local development.
 
+We do **not** feature-gate scanner/assembly contract tests or system integration tests. Those layers are
+still part of the normal test surface; CI selects them with explicit Cargo test targets/filters rather
+than hiding them behind additional features.
+
 ### Specific Test Categories
 
 ```bash
 cargo test npm_test           # All npm unit tests
+cargo test --lib _scan_test:: # All parser-local scanner/assembly contract tests
 cargo test golden             # All golden tests
-cargo test scanner_integration  # All integration tests
+cargo test --test scanner_integration  # Cross-parser integration suite
 cargo test --doc              # All API documentation examples
 ```
 
@@ -433,10 +468,24 @@ Tests run automatically on:
 - Every push to main
 - Every pull request
 
-All tests must pass before merging. Commands:
+All tests must pass before merging. CI uses a minimal split so the scanner-wired tests no longer sit
+on the same critical path as the main Rust quality job, without introducing lots of tiny shards.
+Commands:
 
-- `cargo test --all --verbose` — unit tests, doctests, integration tests
-- `cargo test --all --verbose --features golden-tests` — all of the above plus golden tests
+- **Rust Quality**
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+  - `cargo check --all --verbose`
+  - `cargo test --lib --release --verbose -- --skip _scan_test::`
+  - `cargo test --doc --release --verbose`
+- **Rust Scan/Integration Tests**
+  - `cargo test --lib --release --verbose _scan_test::`
+  - `cargo test --test scanner_integration --release --verbose`
+  - `cargo test --test scanner_copyright_credits --release --verbose`
+  - `cargo test --test progress_cli_integration --release --verbose`
+  - `cargo test --test output_format_golden --release --verbose`
+- **Golden Tests**
+  - `cargo test --all --verbose --features golden-tests` via the existing golden-test shard matrix
 
 ---
 
@@ -446,7 +495,8 @@ Before marking a parser complete, verify:
 
 - [ ] **Unit tests** cover all public functions and edge cases
 - [ ] **Golden tests** exist for at least one real-world file per format
-- [ ] **Integration test** verifies parser is discovered and invoked correctly (if adding new ecosystem)
+- [ ] **Layer 3 scan/assembly contract test** verifies parser data survives scanner wiring and assembly when applicable
+- [ ] **Layer 4 integration test** verifies parser is discovered and invoked correctly (if adding new ecosystem)
 - [ ] All tests pass (`cargo test`)
 - [ ] No clippy warnings (`cargo clippy`)
 - [ ] Code formatted (`cargo fmt`)
@@ -476,8 +526,9 @@ Write tests that:
 
 - Doctests verify API documentation examples actually work
 - Unit tests verify components work correctly
+- Scanner/assembly contract tests verify parser data survives real scan wiring and assembly
 - Golden tests ensure feature parity with Python reference
-- Integration tests validate end-to-end behavior
+- System integration tests validate end-to-end and user-facing behavior
 - Fast CI/CD feedback loop (parallel execution, instant failure isolation)
 
 **Result**: High-quality, maintainable test suite that gives developers confidence to refactor and evolve the codebase.

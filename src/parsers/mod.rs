@@ -49,6 +49,8 @@ mod chef_test;
 mod clojure;
 #[cfg(test)]
 mod clojure_test;
+#[cfg(test)]
+mod cocoapods_scan_test;
 mod composer;
 #[cfg(test)]
 mod composer_scan_test;

@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust-check:
-    name: Rust Quality
+  rust-quality:
+    name: Code Quality
     runs-on: ubuntu-latest
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
@@ -45,11 +45,47 @@ jobs:
       - name: Check compilation
         run: cargo check --all --verbose
 
-      - name: Run unit/integration/doc tests
-        run: cargo test --all --release --verbose
+      - name: Run library tests except scanner/assembly contract layer
+        run: "cargo test --lib --release --verbose -- --skip _scan_test::"
+
+      - name: Run doctests
+        run: cargo test --doc --release --verbose
 
       - name: Check for unused dependencies
         run: ./scripts/check_unused_deps.sh
+
+  rust-scan-integration-tests:
+    name: Scan and Integration Tests
+    runs-on: ubuntu-latest
+    if: |
+      !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.94.0
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-scan-integration-tests-release
+
+      - name: Run parser-local scanner/assembly contract tests
+        run: "cargo test --lib --release --verbose _scan_test::"
+
+      - name: Run scanner integration suite
+        run: cargo test --test scanner_integration --release --verbose
+
+      - name: Run scanner copyright/credits integration suite
+        run: cargo test --test scanner_copyright_credits --release --verbose
+
+      - name: Run progress CLI integration suite
+        run: cargo test --test progress_cli_integration --release --verbose
+
+      - name: Run output contract fixture suite
+        run: cargo test --test output_format_golden --release --verbose
 
   golden-tests:
     name: Golden Tests (${{ matrix.shard }})
