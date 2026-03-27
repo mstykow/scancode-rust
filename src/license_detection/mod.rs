@@ -39,7 +39,9 @@ use crate::license_detection::rules::{
 use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
-use crate::license_detection::detection::populate_detection_from_group_with_spdx;
+use crate::license_detection::detection::{
+    empty_detection, populate_detection_from_group_with_spdx,
+};
 use crate::license_detection::models::MatcherKind;
 
 /// Path to the license rules directory in the reference scancode-toolkit submodule.
@@ -60,8 +62,7 @@ pub const SCANCODE_LICENSES_LICENSES_PATH: &str =
 pub const SCANCODE_LICENSES_DATA_PATH: &str = "reference/scancode-toolkit/src/licensedcode/data";
 
 pub use detection::{
-    LicenseDetection, create_detection_from_group, group_matches_by_region,
-    post_process_detections, sort_matches_by_line,
+    LicenseDetection, group_matches_by_region, post_process_detections, sort_matches_by_line,
 };
 pub use models::LicenseMatch;
 
@@ -534,7 +535,7 @@ impl LicenseDetectionEngine {
                 let detections: Vec<LicenseDetection> = groups
                     .iter()
                     .map(|group| {
-                        let mut detection = create_detection_from_group(group);
+                        let mut detection = empty_detection();
                         populate_detection_from_group_with_spdx(
                             &mut detection,
                             group,
@@ -639,7 +640,7 @@ impl LicenseDetectionEngine {
         let detections: Vec<LicenseDetection> = groups
             .iter()
             .map(|group| {
-                let mut detection = create_detection_from_group(group);
+                let mut detection = empty_detection();
                 populate_detection_from_group_with_spdx(&mut detection, group, &self.spdx_mapping);
                 detection
             })
