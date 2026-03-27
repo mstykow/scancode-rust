@@ -19,6 +19,9 @@
 mod candidates;
 mod matching;
 
+#[cfg(test)]
+mod gfdl_debug_test;
+
 pub use candidates::{Candidate, compute_candidates_with_msets};
 pub use matching::seq_match_with_candidates;
 
