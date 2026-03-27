@@ -170,6 +170,11 @@ mod tests {
             "licenses: {:#?}",
             scanned.license_detections
         );
+        assert!(
+            scanned.license_clues.is_empty(),
+            "license clues: {:#?}",
+            scanned.license_clues
+        );
     }
 
     #[test]

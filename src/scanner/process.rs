@@ -195,6 +195,7 @@ fn extract_information_from_content(
                     .package_data(findings.package_data)
                     .license_expression(findings.license_expression)
                     .license_detections(findings.license_detections)
+                    .license_clues(findings.license_clues)
                     .copyrights(findings.copyrights)
                     .holders(findings.holders)
                     .authors(findings.authors)
@@ -532,10 +533,19 @@ fn extract_license_information(
 
     match engine.detect_with_kind(&text_content, false, from_binary_strings) {
         Ok(detections) => {
-            let model_detections: Vec<LicenseDetection> = detections
-                .into_iter()
-                .filter_map(|d| convert_detection_to_model(d, include_text, &text_content))
-                .collect();
+            let mut model_detections = Vec::new();
+            let mut model_clues = Vec::new();
+
+            for detection in detections {
+                let (public_detection, clue_matches) =
+                    convert_detection_to_model(detection, include_text, &text_content);
+
+                if let Some(public_detection) = public_detection {
+                    model_detections.push(public_detection);
+                }
+
+                model_clues.extend(clue_matches);
+            }
 
             if !model_detections.is_empty() {
                 let expressions: Vec<String> = model_detections
@@ -553,6 +563,7 @@ fn extract_license_information(
             }
 
             file_info_builder.license_detections(model_detections);
+            file_info_builder.license_clues(model_clues);
         }
         Err(e) => {
             scan_errors.push(format!("License detection failed: {}", e));
@@ -566,54 +577,64 @@ fn convert_detection_to_model(
     detection: crate::license_detection::LicenseDetection,
     include_text: bool,
     text_content: &str,
-) -> Option<LicenseDetection> {
-    let license_expression = detection.license_expression?;
-    let license_expression_spdx = detection.license_expression_spdx.unwrap_or_default();
-
+) -> (Option<LicenseDetection>, Vec<Match>) {
     let matches: Vec<Match> = detection
         .matches
         .into_iter()
-        .map(|m| {
-            let rule_url = if m.rule_url.is_empty() {
-                None
-            } else {
-                Some(m.rule_url)
-            };
-            let matched_text = if include_text {
-                m.matched_text.or_else(|| {
-                    Some(crate::license_detection::query::matched_text_from_text(
-                        text_content,
-                        m.start_line,
-                        m.end_line,
-                    ))
-                })
-            } else {
-                None
-            };
-            Match {
-                license_expression: m.license_expression,
-                license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
-                from_file: m.from_file,
-                start_line: m.start_line,
-                end_line: m.end_line,
-                matcher: Some(m.matcher.to_string()),
-                score: m.score as f64,
-                matched_length: Some(m.matched_length),
-                match_coverage: Some(m.match_coverage as f64),
-                rule_relevance: Some(m.rule_relevance as usize),
-                rule_identifier: Some(m.rule_identifier),
-                rule_url,
-                matched_text,
-            }
-        })
+        .map(|m| convert_match_to_model(m, include_text, text_content))
         .collect();
 
-    Some(LicenseDetection {
-        license_expression,
-        license_expression_spdx,
-        matches,
-        identifier: detection.identifier,
-    })
+    if let Some(license_expression) = detection.license_expression {
+        (
+            Some(LicenseDetection {
+                license_expression,
+                license_expression_spdx: detection.license_expression_spdx.unwrap_or_default(),
+                matches,
+                identifier: detection.identifier,
+            }),
+            Vec::new(),
+        )
+    } else {
+        (None, matches)
+    }
+}
+
+fn convert_match_to_model(
+    m: crate::license_detection::models::LicenseMatch,
+    include_text: bool,
+    text_content: &str,
+) -> Match {
+    let rule_url = if m.rule_url.is_empty() {
+        None
+    } else {
+        Some(m.rule_url)
+    };
+    let matched_text = if include_text {
+        m.matched_text.or_else(|| {
+            Some(crate::license_detection::query::matched_text_from_text(
+                text_content,
+                m.start_line,
+                m.end_line,
+            ))
+        })
+    } else {
+        None
+    };
+    Match {
+        license_expression: m.license_expression,
+        license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
+        from_file: m.from_file,
+        start_line: m.start_line,
+        end_line: m.end_line,
+        matcher: Some(m.matcher.to_string()),
+        score: m.score as f64,
+        matched_length: Some(m.matched_length),
+        match_coverage: Some(m.match_coverage as f64),
+        rule_relevance: Some(m.rule_relevance as usize),
+        rule_identifier: Some(m.rule_identifier),
+        rule_url,
+        matched_text,
+    }
 }
 
 fn should_skip_text_detection(path: &Path, buffer: &[u8]) -> bool {
@@ -680,11 +701,12 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         programming_language: None,
         package_data: Vec::new(), // TODO: implement
         license_expression: None,
+        license_detections: Vec::new(), // TODO: implement
+        license_clues: Vec::new(),      // TODO: implement
         copyrights: Vec::new(),         // TODO: implement
         holders: Vec::new(),            // TODO: implement
         authors: Vec::new(),            // TODO: implement
         emails: Vec::new(),             // TODO: implement
-        license_detections: Vec::new(), // TODO: implement
         urls: Vec::new(),               // TODO: implement
         for_packages: Vec::new(),
         scan_errors: Vec::new(),
@@ -759,8 +781,8 @@ mod tests {
             "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE",
         );
 
-        let converted =
-            convert_detection_to_model(detection, false, "").expect("detection should convert");
+        let (converted, clues) = convert_detection_to_model(detection, false, "");
+        let converted = converted.expect("detection should convert");
 
         assert_eq!(
             converted.matches[0].rule_url.as_deref(),
@@ -768,16 +790,48 @@ mod tests {
                 "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE"
             )
         );
+        assert!(clues.is_empty());
     }
 
     #[test]
     fn test_convert_detection_to_model_emits_null_for_empty_rule_url() {
         let detection = make_detection("");
 
-        let converted =
-            convert_detection_to_model(detection, false, "").expect("detection should convert");
+        let (converted, clues) = convert_detection_to_model(detection, false, "");
+        let converted = converted.expect("detection should convert");
 
         assert_eq!(converted.matches[0].rule_url, None);
+        assert!(clues.is_empty());
+    }
+
+    #[test]
+    fn test_convert_detection_to_model_routes_expressionless_detection_to_license_clues() {
+        let mut detection = make_detection(
+            "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/license-clue_1.RULE",
+        );
+        detection.license_expression = None;
+        detection.license_expression_spdx = None;
+        detection.identifier = None;
+        detection.matches[0].license_expression = "unknown-license-reference".to_string();
+        detection.matches[0].license_expression_spdx =
+            Some("LicenseRef-scancode-unknown-license-reference".to_string());
+        detection.matches[0].rule_identifier = "license-clue_1.RULE".to_string();
+        detection.matches[0].rule_kind = RuleKind::Clue;
+
+        let (converted, clues) = convert_detection_to_model(detection, true, "clue text");
+
+        assert!(converted.is_none());
+        assert_eq!(clues.len(), 1);
+        assert_eq!(clues[0].license_expression, "unknown-license-reference");
+        assert_eq!(
+            clues[0].license_expression_spdx,
+            "LicenseRef-scancode-unknown-license-reference"
+        );
+        assert_eq!(
+            clues[0].rule_identifier.as_deref(),
+            Some("license-clue_1.RULE")
+        );
+        assert_eq!(clues[0].matched_text.as_deref(), Some("MIT"));
     }
 
     #[test]

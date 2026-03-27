@@ -43,6 +43,7 @@ fn test_file(path: &str, package_data: Vec<PackageData>) -> FileInfo {
         vec![],
         vec![],
         vec![],
+        vec![],
     )
 }
 
@@ -115,6 +116,7 @@ fn test_find_package_root() {
             vec![],
             vec![],
             vec![],
+            vec![],
         ),
         FileInfo::new(
             "MANIFEST.MF".to_string(),
@@ -131,6 +133,7 @@ fn test_find_package_root() {
             None,
             vec![],
             None,
+            vec![],
             vec![],
             vec![],
             vec![],
@@ -174,6 +177,7 @@ fn test_find_package_root_debian() {
             vec![],
             vec![],
             vec![],
+            vec![],
         ),
         FileInfo::new(
             "copyright".to_string(),
@@ -190,6 +194,7 @@ fn test_find_package_root_debian() {
             None,
             vec![],
             None,
+            vec![],
             vec![],
             vec![],
             vec![],

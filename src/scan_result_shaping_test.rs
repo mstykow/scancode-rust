@@ -40,6 +40,7 @@ fn file(path: &str) -> FileInfo {
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        Vec::new(),
     )
 }
 
@@ -67,6 +68,7 @@ fn dir(path: &str) -> FileInfo {
         None,
         Vec::new(),
         None,
+        Vec::new(),
         Vec::new(),
         Vec::new(),
         Vec::new(),
@@ -278,6 +280,36 @@ fn only_findings_keeps_all_supported_finding_types() {
     assert!(paths.contains("project/license.txt"));
     assert!(paths.contains("project/pkg.json"));
     assert!(paths.contains("project/error.txt"));
+    assert!(!paths.contains("project/empty.txt"));
+}
+
+#[test]
+fn only_findings_keeps_clue_only_files() {
+    let mut files = vec![
+        dir("project"),
+        file("project/NOTICE"),
+        file("project/empty.txt"),
+    ];
+    files[1].license_clues = vec![crate::models::Match {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        from_file: Some("project/NOTICE".to_string()),
+        start_line: 1,
+        end_line: 2,
+        matcher: Some("2-aho".to_string()),
+        score: 100.0,
+        matched_length: Some(19),
+        match_coverage: Some(100.0),
+        rule_relevance: Some(100),
+        rule_identifier: Some("license-clue_1.RULE".to_string()),
+        rule_url: None,
+        matched_text: None,
+    }];
+
+    apply_only_findings_filter(&mut files);
+
+    let paths: HashSet<_> = files.into_iter().map(|f| f.path).collect();
+    assert!(paths.contains("project/NOTICE"));
     assert!(!paths.contains("project/empty.txt"));
 }
 

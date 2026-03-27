@@ -71,6 +71,7 @@ pub(crate) fn apply_include_filter(files: &mut Vec<FileInfo>, include_patterns: 
 fn has_findings(file: &FileInfo) -> bool {
     file.license_expression.is_some()
         || !file.license_detections.is_empty()
+        || !file.license_clues.is_empty()
         || !file.copyrights.is_empty()
         || !file.holders.is_empty()
         || !file.authors.is_empty()
