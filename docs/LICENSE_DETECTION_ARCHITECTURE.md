@@ -17,6 +17,9 @@ The license detection system is a multi-phase, multi-strategy detection engine t
 
 **Default behavior**: Uses the built-in embedded license index. No external files required.
 
+> Remaining public output and CLI parity work is tracked in
+> [`docs/implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md).
+
 **Custom rules**: Use `--license-rules-path /path/to/rules` to load from a custom directory containing `.LICENSE` and `.RULE` files.
 
 ### Initialization Flow
@@ -418,6 +421,18 @@ const TINY_RULE: usize = 6;                   // Very small rules
 
 ## Output Structure
 
+The engine still carries richer internal detection metadata than the current
+public ScanCode-style JSON output. In particular, `detection_log`, clue-only
+classification, and file-region metadata are not all preserved in the current
+serialized `crate::models::LicenseDetection` surface.
+
+The remaining public-output parity work is tracked in
+[`docs/implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md)
+and
+[`docs/license-detection/PLAN-019-file-region-and-unique-detection.md`](license-detection/PLAN-019-file-region-and-unique-detection.md).
+
+### Internal Detection Structure
+
 ```rust
 pub struct LicenseDetection {
     pub license_expression: Option<String>,      // ScanCode key
@@ -430,6 +445,9 @@ pub struct LicenseDetection {
 ```
 
 ### JSON Output Example
+
+The current public JSON output uses a reduced detection shape and does **not**
+currently emit `detection_log` or `file_region`.
 
 ```json
 {
@@ -444,7 +462,6 @@ pub struct LicenseDetection {
       "start_line": 1,
       "end_line": 20
     }
-  ],
-  "detection_log": ["perfect-detection"]
+  ]
 }
 ```

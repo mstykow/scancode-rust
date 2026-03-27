@@ -8,7 +8,7 @@ A Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-t
 
 Today the repository covers high-level scanning workflows for:
 
-- License detection and license reference output
+- License detection and ScanCode-style license-result output, with remaining license-reference parity tracked in [LICENSE_DETECTION_PLAN.md](docs/implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md)
 - Package and dependency metadata extraction across many ecosystems
 - Package assembly for related manifests and lockfiles
 - File metadata and scan environment metadata
@@ -93,6 +93,8 @@ Commonly used options include:
 - `--cache-dir`, `--cache-clear`, `--from-json`, `--no-assemble`
 - `--filter-clues`, `--only-findings`, `--mark-source`
 - `--license`, `--copyright`, `--email`, `--url`
+- `--classify`, `--summary`, `--license-clarity-score`, `--tallies`
+- `--tallies-key-files`, `--tallies-with-details`, `--facet`, `--tallies-by-facet`, `--generated`
 
 ### Example
 

@@ -80,11 +80,13 @@ This plan is based on:
 
 ### Post-parity guardrails
 
-- Baseline parity work is complete for the formats tracked in
+- Baseline parity work is complete for most formats tracked in
   [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md).
-- There are no open mandatory parity gaps in this plan.
-- Future work is optional hardening (for example: deeper validator checks) and
-  regression response if a parity test fails.
+- SPDX-specific license conclusion/info parity is still blocked by the missing
+  license-output surfaces tracked in
+  [`../text-detection/LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).
+- Future work is optional hardening plus regression response unless a format is
+  explicitly marked partial in the scorecard.
 
 ## Design Decisions
 

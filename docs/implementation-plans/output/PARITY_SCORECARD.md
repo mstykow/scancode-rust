@@ -46,11 +46,12 @@ This scorecard tracks parity against Python ScanCode output format behavior and 
 - **Local fixtures**:
   [`testdata/output-formats/spdx-empty-expected.tv`](../../../testdata/output-formats/spdx-empty-expected.tv),
   [`testdata/output-formats/spdx-simple-expected.tv`](../../../testdata/output-formats/spdx-simple-expected.tv)
-- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Status**: 🟡 Partial — baseline fixture coverage exists, but license conclusion/info fields still lag the current ScanCode semantics
 - **Acceptance criteria**:
   - Empty scan sentinel matches Python fixture
   - `SPDX-2.2` document baseline with stable package/file blocks
   - Deterministic package verification code and file ordering
+  - Package/file license conclusions and info-from-files consume real declared/detected license data instead of placeholder `NOASSERTION` / `NONE`
 
 ### SPDX RDF
 
@@ -58,10 +59,11 @@ This scorecard tracks parity against Python ScanCode output format behavior and 
   [`spdx/simple/expected.rdf`](../../../reference/scancode-toolkit/tests/formattedcode/data/spdx/simple/expected.rdf)
 - **Local fixture**:
   [`testdata/output-formats/spdx-simple-expected.rdf`](../../../testdata/output-formats/spdx-simple-expected.rdf)
-- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Status**: 🟡 Partial — structural baseline is covered, but emitted license semantics still lag the current ScanCode behavior
 - **Acceptance criteria**:
   - Equivalent SPDX semantics after structural normalization
   - Deterministic handling of generated identifiers and timestamps
+  - RDF license fields consume real declared/detected license data instead of placeholder `noassertion` / `none`
 
 ### CycloneDX JSON
 

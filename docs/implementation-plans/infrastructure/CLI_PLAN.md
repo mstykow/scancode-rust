@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 Core CLI parity implemented; cache controls are now wired, with remaining feature-blocked flags still pending
+> **Status**: 🟡 Core CLI parity implemented; cache controls are wired, and the remaining license/output parity flags are now tracked explicitly
 > **Priority**: P1 - High (user-facing drop-in replacement parity)
 > **Dependencies**: Some flags depend on underlying features (license detection, post-scan processing, caching)
 
@@ -17,41 +17,44 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Implemented (drop-in-oriented core)
 
-| Parameter                  | Notes                                                                                                                                   |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `<dir_path>`               | Positional argument                                                                                                                     |
-| `--json <FILE>`            | Compact JSON output                                                                                                                     |
-| `--json-pp <FILE>`         | Pretty JSON output                                                                                                                      |
-| `--json-lines <FILE>`      | JSON Lines output                                                                                                                       |
-| `--yaml <FILE>`            | YAML output                                                                                                                             |
-| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                                          |
-| `--html <FILE>`            | HTML report output                                                                                                                      |
-| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                                                   |
-| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                                                     |
-| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                                                   |
-| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                                                    |
-| `--custom-output <FILE>`   | Custom template output file                                                                                                             |
-| `--custom-template <FILE>` | Required with `--custom-output`                                                                                                         |
-| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                                             |
-| `-n, --processes`          | Compatible with `0` and `-1` values                                                                                                     |
-| `--timeout`                | Per-file timeout option                                                                                                                 |
-| `-q, --quiet`              | Quiet mode                                                                                                                              |
-| `-v, --verbose`            | Verbose path mode                                                                                                                       |
-| `--strip-root`             | Relative path normalization                                                                                                             |
-| `--full-root`              | Absolute path reporting                                                                                                                 |
-| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                                          |
-| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--package/--copyright/--email/--url/--generated` |
-| `--include`                | Include path patterns                                                                                                                   |
-| `--mark-source`            | Mark source-heavy files/directories                                                                                                     |
-| `--only-findings`          | Filter output to files with findings                                                                                                    |
-| `--filter-clues`           | Filter redundant clues                                                                                                                  |
-| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                                                |
-| `-e, --email`              | Enable email detection                                                                                                                  |
-| `-p, --package`            | Enable package manifest, lockfile, and related package-data scanning                                                                    |
-| `-u, --url`                | Enable URL detection                                                                                                                    |
-| `--no-assemble`            | Rust-specific                                                                                                                           |
-| `--max-email`              | Threshold (default 50, requires `--email`)                                                                                              |
-| `--max-url`                | Threshold (default 50, requires `--url`)                                                                                                |
+| Parameter                  | Notes                                                                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<dir_path>`               | Positional argument                                                                                                                                                |
+| `--json <FILE>`            | Compact JSON output                                                                                                                                                |
+| `--json-pp <FILE>`         | Pretty JSON output                                                                                                                                                 |
+| `--json-lines <FILE>`      | JSON Lines output                                                                                                                                                  |
+| `--yaml <FILE>`            | YAML output                                                                                                                                                        |
+| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                                                                     |
+| `--html <FILE>`            | HTML report output                                                                                                                                                 |
+| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                                                                              |
+| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                                                                                |
+| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                                                                              |
+| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                                                                               |
+| `--custom-output <FILE>`   | Custom template output file                                                                                                                                        |
+| `--custom-template <FILE>` | Required with `--custom-output`                                                                                                                                    |
+| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                                                                        |
+| `-n, --processes`          | Compatible with `0` and `-1` values                                                                                                                                |
+| `--timeout`                | Per-file timeout option                                                                                                                                            |
+| `-q, --quiet`              | Quiet mode                                                                                                                                                         |
+| `-v, --verbose`            | Verbose path mode                                                                                                                                                  |
+| `--strip-root`             | Relative path normalization                                                                                                                                        |
+| `--full-root`              | Absolute path reporting                                                                                                                                            |
+| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                                                                     |
+| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--package/--copyright/--email/--url/--generated`                            |
+| `--include`                | Include path patterns                                                                                                                                              |
+| `--mark-source`            | Mark source-heavy files/directories                                                                                                                                |
+| `--only-findings`          | Filter output to files with findings                                                                                                                               |
+| `--filter-clues`           | Filter redundant clues                                                                                                                                             |
+| `-l, --license`            | Enable license scanning; broader ScanCode output/flag parity remains tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md)         |
+| `--license-rules-path`     | Load custom `.LICENSE`/`.RULE` data; requires `--license`                                                                                                          |
+| `--include-text`           | Rust's current matched-text flag; upstream naming/diagnostics parity remains tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                                                                           |
+| `-e, --email`              | Enable email detection                                                                                                                                             |
+| `-p, --package`            | Enable package manifest, lockfile, and related package-data scanning                                                                                               |
+| `-u, --url`                | Enable URL detection                                                                                                                                               |
+| `--no-assemble`            | Rust-specific                                                                                                                                                      |
+| `--max-email`              | Threshold (default 50, requires `--email`)                                                                                                                         |
+| `--max-url`                | Threshold (default 50, requires `--url`)                                                                                                                           |
 
 ### Core Parameters (partial)
 
@@ -61,12 +64,15 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Scan Option Flags (pending)
 
-| Parameter         | Blocked By                                                                     |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `--license`       | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-score` | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-text`  | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--classify`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| Parameter                    | Blocked By                                                                 |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| `--license-score`            | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--license-text`             | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--license-text-diagnostics` | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--license-diagnostics`      | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--unknown-licenses`         | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--license-url-template`     | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--classify`                 | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)        |
 
 Runtime dependency notes:
 
@@ -75,13 +81,14 @@ Runtime dependency notes:
 
 ### Post-Scan Flags (pending)
 
-| Parameter           | Blocked By                                                                     |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `--is-license-text` | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--is-generated`    | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| Parameter              | Blocked By                                                                 |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `--license-references` | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
+| `--is-generated`       | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)        |
 
 Runtime dependency notes:
 
+- Upstream `--is-license-text` is no longer a live parity target; current parity should track the emitted `percentage_of_license_text` field in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).
 - `--license-clarity-score` requires `--classify` for parity-compatible behavior.
 - `--tallies-key-files` requires `--classify` and `--tallies`.
 
