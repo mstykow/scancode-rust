@@ -280,7 +280,6 @@ fn run() -> Result<()> {
                 include_tallies_with_details: cli.tallies_with_details,
                 include_tallies_by_facet: cli.tallies_by_facet,
                 include_generated: cli.generated,
-                scanned_root: cli.dir_path.first().map(Path::new),
             },
         },
     );

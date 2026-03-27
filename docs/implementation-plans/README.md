@@ -25,7 +25,7 @@ implementation-plans/
 ### Post-Processing (`post-processing/`)
 
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
-  - Status: 🟡 Active — summary/tally/classify/generated parity is implemented through Phase 10, including package-preferred summary origin and localized fixture coverage; the remaining open work in [SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md) is Phase 11 performance hardening
+  - Status: ✅ Complete — summary/tally/classify/generated parity and Phase 11 performance hardening are implemented, including package-preferred summary origin, localized fixture coverage, facet-rule optimization, and scanner-owned generated flags
 
 - **[SCAN_RESULT_SHAPING_PLAN.md](post-processing/SCAN_RESULT_SHAPING_PLAN.md)** - Include/filter/root/source output shaping
   - Status: 🟡 Active — the core shaping pipeline is implemented in `src/scan_result_shaping.rs`; the plan now records scope, ordering, and remaining compatibility/performance watch items
