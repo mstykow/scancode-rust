@@ -596,9 +596,16 @@ fn is_community_file(file: &FileInfo) -> bool {
 
 const FACETS: [&str; 6] = ["core", "dev", "tests", "docs", "data", "examples"];
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FacetMatchTarget {
+    Path,
+    NameOrPath,
+}
+
 #[derive(Clone)]
 pub(crate) struct FacetRule {
-    facet: String,
+    facet_index: usize,
+    target: FacetMatchTarget,
     pattern: Pattern,
 }
 
@@ -630,13 +637,13 @@ pub(crate) fn build_facet_rules(facets: &[String]) -> Result<Vec<FacetRule>> {
             ));
         }
 
-        if !FACETS.contains(&facet.as_str()) {
+        let Some(facet_index) = FACETS.iter().position(|candidate| *candidate == facet) else {
             return Err(anyhow!(
                 "Invalid --facet option: unknown <facet> in \"{}\". Valid values are: {}",
                 facet_def,
                 FACETS.join(", ")
             ));
-        }
+        };
 
         let pattern = Pattern::new(pattern_text).map_err(|err| {
             anyhow!(
@@ -646,11 +653,20 @@ pub(crate) fn build_facet_rules(facets: &[String]) -> Result<Vec<FacetRule>> {
             )
         })?;
 
-        if !rules
-            .iter()
-            .any(|rule: &FacetRule| rule.facet == facet && rule.pattern.as_str() == pattern_text)
-        {
-            rules.push(FacetRule { facet, pattern });
+        let target = if pattern_text.contains('/') || pattern_text.contains('\\') {
+            FacetMatchTarget::Path
+        } else {
+            FacetMatchTarget::NameOrPath
+        };
+
+        if !rules.iter().any(|rule: &FacetRule| {
+            rule.facet_index == facet_index && rule.pattern.as_str() == pattern_text
+        }) {
+            rules.push(FacetRule {
+                facet_index,
+                target,
+                pattern,
+            });
         }
     }
 
@@ -668,14 +684,26 @@ fn assign_facets(files: &mut [FileInfo], facet_rules: &[FacetRule]) {
             continue;
         }
 
-        let mut facets: Vec<String> = facet_rules
-            .iter()
-            .filter(|rule| rule.pattern.matches(&file.path) || rule.pattern.matches(&file.name))
-            .map(|rule| rule.facet.clone())
-            .collect();
+        const FACET_SORT_ORDER: [usize; FACETS.len()] = [0, 4, 1, 3, 5, 2];
+        let mut matched_facets = [false; FACETS.len()];
+        for rule in facet_rules {
+            let is_match = match rule.target {
+                FacetMatchTarget::Path => rule.pattern.matches(&file.path),
+                FacetMatchTarget::NameOrPath => {
+                    rule.pattern.matches(&file.name) || rule.pattern.matches(&file.path)
+                }
+            };
 
-        facets.sort();
-        facets.dedup();
+            if is_match {
+                matched_facets[rule.facet_index] = true;
+            }
+        }
+
+        let facets: Vec<String> = FACET_SORT_ORDER
+            .into_iter()
+            .filter(|&index| matched_facets[index])
+            .map(|index| FACETS[index].to_string())
+            .collect();
 
         file.facets = if facets.is_empty() {
             vec![FACETS[0].to_string()]

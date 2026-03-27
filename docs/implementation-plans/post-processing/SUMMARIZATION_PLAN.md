@@ -220,7 +220,7 @@ Implemented Rust behavior is already materially leaner than Python:
 
 The remaining hot spots are localized and should stay explicit in this plan:
 
-- ⚠️ `assign_facets()` is roughly `O(files × facet_rules)`
+- ⚠️ `assign_facets()` now precomputes rule match scope and uses a fixed facet mask instead of per-file string sort/dedup churn, but it still scales with `O(files × facet_rules)` as rule count grows
 - ⚠️ generated-file fallback rereads still exist for paths that arrive without scanner-populated `is_generated` values (for example preloaded/legacy inputs), so that path should remain narrow and intentional
 
 ### Missing
@@ -252,7 +252,7 @@ The remaining hot spots are localized and should stay explicit in this plan:
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. ✅ Complete: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, package-copyright holder precedence, empty declared-holder parity, tallied-language fallback when packages disagree, package-datafile eligibility for declared-license summary origin, the main ambiguity/holder fixtures, and localized regression coverage including `package_copyright_precedence`.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. ✅ Implemented: `--classify`, `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, `--tallies-by-facet`, `--facet`, and `--generated` reducer/runtime coverage with localized fixture coverage.
-12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns.
+12. **Phase 11**: Performance hardening. 🟡 Preserve the current indexed/in-place design as more parity features land, keep the fallback generated reread path narrow, and watch facet-rule scaling instead of reintroducing Python-style repeated-walk/recount/copy patterns. Implemented so far: facet rules now precompute path-vs-broad matching scope and `assign_facets()` uses a fixed facet mask/materialization pass instead of cloning, sorting, and deduping matched facet strings per file.
 
 ## Success Criteria
 
