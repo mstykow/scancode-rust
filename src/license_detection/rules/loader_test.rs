@@ -792,12 +792,17 @@ fn test_ibmpl_detection() {
         eprintln!("  {} (coverage: {:.1}%)", expr, coverage);
     }
 
-    // Should find ibmpl-1.0
-    let has_ibmpl = detections.iter().any(|d| {
-        d.license_expression
-            .as_deref()
-            .map(|e| e.contains("ibmpl-1.0"))
-            .unwrap_or(false)
+    let has_ibmpl_match = detections.iter().any(|d| {
+        d.matches
+            .iter()
+            .any(|m| m.license_expression.contains("ibmpl-1.0"))
     });
-    assert!(has_ibmpl, "Should detect ibmpl-1.0 in split text");
+    assert!(
+        has_ibmpl_match,
+        "Should preserve the ibmpl-1.0 match in split text"
+    );
+    assert!(
+        detections.iter().all(|d| d.license_expression.is_none()),
+        "Single low-quality fragment should remain expressionless"
+    );
 }
