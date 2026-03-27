@@ -33,6 +33,46 @@ fn build_facet_rules_and_assign_facets_match_reference_semantics() {
 }
 
 #[test]
+fn assign_facets_uses_path_only_for_slash_patterns_and_keeps_broad_slashless_matching() {
+    let rules = build_facet_rules(&[
+        "data=*.json".to_string(),
+        "dev=*ada*".to_string(),
+        "docs=*/docs/*".to_string(),
+    ])
+    .expect("facet rules should compile");
+
+    let mut files = vec![
+        file("project/nested/config.json"),
+        file("project/ada/config.txt"),
+        file("project/docs/config.txt"),
+        file("project/config.txt"),
+    ];
+
+    assign_facets(&mut files, &rules);
+
+    assert_eq!(files[0].facets, vec!["data".to_string()]);
+    assert_eq!(files[1].facets, vec!["dev".to_string()]);
+    assert_eq!(files[2].facets, vec!["docs".to_string()]);
+    assert_eq!(files[3].facets, vec!["core".to_string()]);
+}
+
+#[test]
+fn assign_facets_emits_each_facet_once_even_when_multiple_rules_match() {
+    let rules = build_facet_rules(&[
+        "dev=*.rs".to_string(),
+        "dev=*src*".to_string(),
+        "dev=*.rs".to_string(),
+    ])
+    .expect("facet rules should compile");
+
+    let mut files = vec![file("project/src/lib.rs")];
+
+    assign_facets(&mut files, &rules);
+
+    assert_eq!(files[0].facets, vec!["dev".to_string()]);
+}
+
+#[test]
 fn compute_tallies_by_facet_uses_fixed_order_and_drops_null_buckets() {
     let files = vec![
         FileInfo {
