@@ -748,6 +748,7 @@ mod tests {
                     }],
                     identifier: None,
                 }],
+                vec![],
                 vec![Copyright {
                     copyright: "Copyright (c) Example".to_string(),
                     start_line: 1,

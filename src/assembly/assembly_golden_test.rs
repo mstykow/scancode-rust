@@ -121,6 +121,7 @@ mod tests {
                 package_data: package_data_vec,
                 license_expression: None,
                 license_detections: vec![],
+                license_clues: vec![],
                 copyrights: vec![],
                 holders: vec![],
                 authors: vec![],

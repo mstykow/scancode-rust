@@ -5,6 +5,7 @@ use super::*;
 use crate::assembly;
 use crate::models::{Copyright, Holder, Match, Package, Tallies};
 use crate::scan_result_shaping::normalize_paths;
+use serde_json::json;
 
 #[test]
 fn create_output_gates_summary_tallies_and_generated_sections() {
@@ -195,6 +196,79 @@ fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
     assert!(summary.other_license_expressions.is_empty());
     assert!(summary.other_holders.is_empty());
     assert!(summary.other_languages.is_empty());
+}
+
+#[test]
+fn create_output_preserves_file_level_license_clues_in_json_shape() {
+    let start = Utc::now();
+    let end = start;
+    let mut clue_file = file("project/NOTICE");
+    clue_file.license_clues = vec![Match {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        from_file: Some("project/NOTICE".to_string()),
+        start_line: 1,
+        end_line: 2,
+        matcher: Some("2-aho".to_string()),
+        score: 100.0,
+        matched_length: Some(19),
+        match_coverage: Some(100.0),
+        rule_relevance: Some(100),
+        rule_identifier: Some("license-clue_1.RULE".to_string()),
+        rule_url: Some("https://example.com/license-clue_1.RULE".to_string()),
+        matched_text: Some(
+            "This product currently only contains code developed by authors".to_string(),
+        ),
+    }];
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), clue_file],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_classify: false,
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    let value = serde_json::to_value(&output).expect("output should serialize");
+    let notice = value["files"]
+        .as_array()
+        .expect("files array")
+        .iter()
+        .find(|entry| entry["path"] == json!("project/NOTICE"))
+        .expect("notice file present");
+
+    assert_eq!(notice["license_detections"], json!([]));
+    assert_eq!(
+        notice["detected_license_expression_spdx"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        notice["license_clues"][0]["license_expression"],
+        "unknown-license-reference"
+    );
+    assert_eq!(notice["license_clues"][0]["matcher"], "2-aho");
 }
 
 #[test]

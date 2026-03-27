@@ -68,6 +68,7 @@ pub(crate) fn file(path: &str) -> FileInfo {
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        Vec::new(),
     )
 }
 
@@ -95,6 +96,7 @@ pub(crate) fn dir(path: &str) -> FileInfo {
         None,
         Vec::new(),
         None,
+        Vec::new(),
         Vec::new(),
         Vec::new(),
         Vec::new(),

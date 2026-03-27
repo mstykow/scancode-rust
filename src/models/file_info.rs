@@ -42,6 +42,9 @@ pub struct FileInfo {
     #[serde(default)]
     pub license_detections: Vec<LicenseDetection>,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub license_clues: Vec<Match>,
+    #[builder(default)]
     #[serde(default)]
     pub copyrights: Vec<Copyright>,
     #[builder(default)]
@@ -116,6 +119,7 @@ impl FileInfoBuilder {
             self.package_data.clone().unwrap_or_default(),
             self.license_expression.clone().flatten(),
             self.license_detections.clone().unwrap_or_default(),
+            self.license_clues.clone().unwrap_or_default(),
             self.copyrights.clone().unwrap_or_default(),
             self.holders.clone().unwrap_or_default(),
             self.authors.clone().unwrap_or_default(),
@@ -146,6 +150,7 @@ impl FileInfo {
         package_data: Vec<PackageData>,
         mut license_expression: Option<String>,
         mut license_detections: Vec<LicenseDetection>,
+        license_clues: Vec<Match>,
         copyrights: Vec<Copyright>,
         holders: Vec<Holder>,
         authors: Vec<Author>,
@@ -193,6 +198,7 @@ impl FileInfo {
             package_data,
             license_expression,
             license_detections,
+            license_clues,
             copyrights,
             holders,
             authors,
@@ -343,7 +349,7 @@ pub struct LicenseDetection {
 /// Individual license text match with location and confidence score.
 ///
 /// Represents a specific region of text that matched a known license pattern.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Match {
     pub license_expression: String,
     pub license_expression_spdx: String,

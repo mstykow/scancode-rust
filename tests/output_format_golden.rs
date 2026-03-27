@@ -1614,6 +1614,7 @@ fn sample_directory_file(path: &str) -> FileInfo {
         vec![],
         vec![],
         vec![],
+        vec![],
     )
 }
 
@@ -1641,6 +1642,7 @@ fn sample_plain_text_file(
         None,
         package_data,
         None,
+        vec![],
         vec![],
         vec![],
         vec![],
@@ -1696,6 +1698,7 @@ fn sample_html_simple_output() -> Output {
                 Some("C".to_string()),
                 vec![],
                 None,
+                vec![],
                 vec![],
                 vec![Copyright {
                     copyright: "Copyright (c) 2000 ACME, Inc.".to_string(),
@@ -1867,6 +1870,7 @@ fn sample_csv_tree_file(path: &str, name: &str) -> FileInfo {
         None,
         vec![],
         None,
+        vec![],
         vec![],
         vec![Copyright {
             copyright: "Copyright (c) 2000 ACME, Inc.".to_string(),

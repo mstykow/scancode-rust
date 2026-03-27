@@ -114,6 +114,7 @@ fn test_resolve_basic_alpine() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -149,6 +150,7 @@ fn test_resolve_basic_alpine() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -184,6 +186,7 @@ fn test_resolve_basic_alpine() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -309,6 +312,7 @@ fn test_resolve_missing_refs() {
         }],
         license_expression: None,
         license_detections: vec![],
+        license_clues: vec![],
         copyrights: vec![],
         holders: vec![],
         authors: vec![],
@@ -415,6 +419,7 @@ fn test_resolve_rpm_namespace() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -455,6 +460,7 @@ fn test_resolve_rpm_namespace() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -542,11 +548,9 @@ fn test_resolve_rpm_namespace() {
 
     assert_eq!(packages[0].namespace, Some("fedora".to_string()));
     assert_eq!(packages[0].purl.as_deref(), Some("pkg:rpm/fedora/bash@5.0"));
-    assert!(
-        packages[0]
-            .package_uid
-            .starts_with("pkg:rpm/fedora/bash@5.0?uuid=")
-    );
+    assert!(packages[0]
+        .package_uid
+        .starts_with("pkg:rpm/fedora/bash@5.0?uuid="));
     assert_eq!(dependencies[0].namespace, Some("fedora".to_string()));
     assert_eq!(
         dependencies[0].purl.as_deref(),
@@ -577,6 +581,7 @@ fn test_merge_rpm_yumdb_metadata() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -612,6 +617,7 @@ fn test_merge_rpm_yumdb_metadata() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -743,12 +749,10 @@ fn test_merge_rpm_yumdb_metadata() {
 
     assert_eq!(packages.len(), 1);
     assert!(packages[0].datasource_ids.contains(&DatasourceId::RpmYumdb));
-    assert!(
-        packages[0]
-            .datafile_paths
-            .iter()
-            .any(|path| path.contains("var/lib/yum/yumdb"))
-    );
+    assert!(packages[0]
+        .datafile_paths
+        .iter()
+        .any(|path| path.contains("var/lib/yum/yumdb")));
     let yumdb = packages[0]
         .extra_data
         .as_ref()
@@ -796,6 +800,7 @@ fn test_strip_leading_slash() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -831,6 +836,7 @@ fn test_strip_leading_slash() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -962,6 +968,7 @@ fn test_resolve_python_metadata_file_references() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -997,6 +1004,7 @@ fn test_resolve_python_metadata_file_references() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1032,6 +1040,7 @@ fn test_resolve_python_metadata_file_references() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1067,6 +1076,7 @@ fn test_resolve_python_metadata_file_references() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1182,6 +1192,7 @@ fn test_resolve_python_pkg_info_installed_files_references() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1217,6 +1228,7 @@ fn test_resolve_python_pkg_info_installed_files_references() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1329,6 +1341,7 @@ fn test_resolve_python_metadata_file_references_in_dist_packages() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1364,6 +1377,7 @@ fn test_resolve_python_metadata_file_references_in_dist_packages() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1476,6 +1490,7 @@ fn test_python_metadata_file_references_do_not_assign_outside_packages_dirs() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1511,6 +1526,7 @@ fn test_python_metadata_file_references_do_not_assign_outside_packages_dirs() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1618,6 +1634,7 @@ fn test_python_sources_file_references_do_not_escape_project_root() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1653,6 +1670,7 @@ fn test_python_sources_file_references_do_not_escape_project_root() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1760,6 +1778,7 @@ fn test_resolve_debian_installed_file_references_from_status_db() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1822,6 +1841,7 @@ fn test_resolve_debian_installed_file_references_from_status_db() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1873,6 +1893,7 @@ fn test_resolve_debian_installed_file_references_from_status_db() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1908,6 +1929,7 @@ fn test_resolve_debian_installed_file_references_from_status_db() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -1943,6 +1965,7 @@ fn test_resolve_debian_installed_file_references_from_status_db() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2049,6 +2072,7 @@ fn test_resolve_debian_installed_file_references_matches_ubuntu_package_namespac
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2100,6 +2124,7 @@ fn test_resolve_debian_installed_file_references_matches_ubuntu_package_namespac
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2135,6 +2160,7 @@ fn test_resolve_debian_installed_file_references_matches_ubuntu_package_namespac
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2238,6 +2264,7 @@ fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2290,6 +2317,7 @@ fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2342,6 +2370,7 @@ fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
             }],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2377,6 +2406,7 @@ fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
@@ -2412,6 +2442,7 @@ fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
             package_data: vec![],
             license_expression: None,
             license_detections: vec![],
+            license_clues: vec![],
             copyrights: vec![],
             holders: vec![],
             authors: vec![],
