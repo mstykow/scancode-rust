@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 Core CLI parity implemented; cache controls are wired, and the remaining license/output parity flags are now tracked explicitly
+> **Status**: 🟡 Active — core scan/output parity is substantial, but gaps remain across positional-input parity, `--info`-related behavior, package scanning extensions, output filtering, Debian output, and a few post-scan workflows
 > **Priority**: P1 - High (user-facing drop-in replacement parity)
 > **Dependencies**: Some flags depend on underlying features (license detection, post-scan processing, caching)
 
@@ -11,125 +11,143 @@ CLI parameter parity with Python ScanCode. Rust uses `clap`; Python uses
 
 This plan tracks progress toward a **drop-in replacement CLI surface**.
 
+It records both implemented compatibility coverage and the remaining explicit
+CLI backlog, including upstream flags that would otherwise remain implicit gaps.
+
 **Location**: [`src/cli.rs`](../../../src/cli.rs)
 
-## Parameter Mapping
+## Planning Rules
 
-### Implemented (drop-in-oriented core)
+### How flags are classified
 
-| Parameter                  | Notes                                                                                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<dir_path>`               | Positional argument                                                                                                                                                |
-| `--json <FILE>`            | Compact JSON output                                                                                                                                                |
-| `--json-pp <FILE>`         | Pretty JSON output                                                                                                                                                 |
-| `--json-lines <FILE>`      | JSON Lines output                                                                                                                                                  |
-| `--yaml <FILE>`            | YAML output                                                                                                                                                        |
-| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                                                                     |
-| `--html <FILE>`            | HTML report output                                                                                                                                                 |
-| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                                                                              |
-| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                                                                                |
-| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                                                                              |
-| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                                                                               |
-| `--custom-output <FILE>`   | Custom template output file                                                                                                                                        |
-| `--custom-template <FILE>` | Required with `--custom-output`                                                                                                                                    |
-| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                                                                        |
-| `-n, --processes`          | Compatible with `0` and `-1` values                                                                                                                                |
-| `--timeout`                | Per-file timeout option                                                                                                                                            |
-| `-q, --quiet`              | Quiet mode                                                                                                                                                         |
-| `-v, --verbose`            | Verbose path mode                                                                                                                                                  |
-| `--strip-root`             | Relative path normalization                                                                                                                                        |
-| `--full-root`              | Absolute path reporting                                                                                                                                            |
-| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                                                                     |
-| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--package/--copyright/--email/--url/--generated`                            |
-| `--include`                | Include path patterns                                                                                                                                              |
-| `--mark-source`            | Mark source-heavy files/directories                                                                                                                                |
-| `--only-findings`          | Filter output to files with findings                                                                                                                               |
-| `--filter-clues`           | Filter redundant clues                                                                                                                                             |
-| `-l, --license`            | Enable license scanning; broader ScanCode output/flag parity remains tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md)         |
-| `--license-rules-path`     | Load custom `.LICENSE`/`.RULE` data; requires `--license`                                                                                                          |
-| `--include-text`           | Rust's current matched-text flag; upstream naming/diagnostics parity remains tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                                                                           |
-| `-e, --email`              | Enable email detection                                                                                                                                             |
-| `-p, --package`            | Enable package manifest, lockfile, and related package-data scanning                                                                                               |
-| `-u, --url`                | Enable URL detection                                                                                                                                               |
-| `--no-assemble`            | Rust-specific                                                                                                                                                      |
-| `--max-email`              | Threshold (default 50, requires `--email`)                                                                                                                         |
-| `--max-url`                | Threshold (default 50, requires `--url`)                                                                                                                           |
+- List each flag or positional argument exactly once.
+- Group flags by what a user expects them to do, not by which subsystem owns the implementation.
+- Keep active user-facing scan/output functionality in the parity backlog.
+- Mark legacy, review-only, internal, test-harness, or meta-only surfaces as `Won't do` instead of treating them as normal missing work.
+- Keep Provenant-only conveniences visible, but label them `Rust-specific` so they do not look like parity requirements.
 
-### Core Parameters (partial)
+### Status Legend
 
-| Parameter         | Status                                                                   |
-| ----------------- | ------------------------------------------------------------------------ |
-| `--max-in-memory` | Parsed and exposed; full parity memory/disk-spill behavior still pending |
+| Status          | Meaning                                                                        |
+| --------------- | ------------------------------------------------------------------------------ |
+| `Done`          | Implemented and intended to remain part of the offered CLI surface             |
+| `Partial`       | Implemented enough to expose, but parity details or edge semantics remain open |
+| `Planned`       | Worth offering for active user-facing functionality, but not implemented yet   |
+| `Won't do`      | Intentionally not offered for current Provenant scope                          |
+| `Rust-specific` | Provenant-only convenience, not part of ScanCode parity                        |
 
-### Scan Option Flags (pending)
+## Flag Inventory
 
-| Parameter                    | Blocked By                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------- |
-| `--license-score`            | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--license-text`             | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--license-text-diagnostics` | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--license-diagnostics`      | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--unknown-licenses`         | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--license-url-template`     | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--classify`                 | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)        |
+### Invocation & Input Handling
 
-Runtime dependency notes:
+| Flag                   | What it does                                            | Status    | Notes                                                                                                                   |
+| ---------------------- | ------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `<input>...`           | Supplies the path or paths to scan                      | `Partial` | Single-input scans work; upstream multi-input relative-path semantics are not fully matched outside `--from-json`.      |
+| `-h, --help`           | Prints CLI help                                         | `Done`    | Provided by `clap`.                                                                                                     |
+| `-V, --version`        | Prints CLI version                                      | `Done`    | Provided by `clap`.                                                                                                     |
+| `-q, --quiet`          | Reduces runtime output                                  | `Done`    | Matches the current quiet-mode surface.                                                                                 |
+| `-v, --verbose`        | Increases runtime path reporting                        | `Done`    | Matches the current verbose-path surface.                                                                               |
+| `-m, --max-depth`      | Limits recursive scan depth                             | `Done`    | `0` means no depth limit.                                                                                               |
+| `-n, --processes`      | Controls worker count                                   | `Done`    | Compatible with `0` and `-1` values.                                                                                    |
+| `--timeout`            | Sets per-file processing timeout                        | `Done`    | Wired through the scanner runtime.                                                                                      |
+| `--exclude / --ignore` | Excludes files by glob pattern                          | `Done`    | `--ignore` is the ScanCode-facing alias.                                                                                |
+| `--include`            | Re-includes matching paths after filtering              | `Done`    | Implemented in scan-result shaping.                                                                                     |
+| `--strip-root`         | Rewrites paths relative to the scan root                | `Done`    | Normal scans match current intended behavior.                                                                           |
+| `--full-root`          | Preserves absolute/rooted output paths                  | `Done`    | Normal scans match current intended behavior.                                                                           |
+| `--from-json`          | Loads prior scan JSON instead of rescanning input files | `Partial` | Implemented, but currently rejects `--strip-root` / `--full-root` and has narrower multi-input semantics than upstream. |
 
-- `--summary` requires `--classify` for parity-compatible behavior.
-- `--facet <facet>=<pattern>` defines per-facet glob rules; files not matched by any facet default to `core` in the reference implementation.
+### Output Formats & Result Shaping
 
-### Post-Scan Flags (pending)
+| Flag                                  | What it does                                           | Status    | Notes                                                                                       |
+| ------------------------------------- | ------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------- |
+| `--json <FILE>`                       | Writes compact JSON output                             | `Done`    | Core output format.                                                                         |
+| `--json-pp <FILE>`                    | Writes pretty-printed JSON output                      | `Done`    | Core output format.                                                                         |
+| `--json-lines <FILE>`                 | Writes JSON Lines output                               | `Done`    | Core output format.                                                                         |
+| `--yaml <FILE>`                       | Writes YAML output                                     | `Done`    | Core output format.                                                                         |
+| `--csv <FILE>`                        | Writes CSV output                                      | `Done`    | Upstream-deprecated but still supported.                                                    |
+| `--html <FILE>`                       | Writes HTML report output                              | `Done`    | Core output format.                                                                         |
+| `--html-app <FILE>`                   | Writes the deprecated HTML app output                  | `Done`    | Supported and hidden, matching the upstream source-level treatment of this deprecated flag. |
+| `--spdx-tv <FILE>`                    | Writes SPDX tag/value output                           | `Done`    | Core output format.                                                                         |
+| `--spdx-rdf <FILE>`                   | Writes SPDX RDF/XML output                             | `Done`    | Core output format.                                                                         |
+| `--cyclonedx <FILE>`                  | Writes CycloneDX JSON output                           | `Done`    | Core output format.                                                                         |
+| `--cyclonedx-xml <FILE>`              | Writes CycloneDX XML output                            | `Done`    | Core output format.                                                                         |
+| `--custom-output <FILE>`              | Writes output using a custom template                  | `Done`    | Requires `--custom-template`.                                                               |
+| `--custom-template <FILE>`            | Supplies the template for `--custom-output`            | `Done`    | Requires `--custom-output`.                                                                 |
+| `--debian <FILE>`                     | Writes Debian copyright output                         | `Planned` | Active user-facing output parity gap.                                                       |
+| `--mark-source`                       | Marks source-heavy files and directories               | `Partial` | Behavior exists, but upstream ties this to `--info`, which Provenant does not yet expose.   |
+| `--only-findings`                     | Filters output down to files with findings             | `Done`    | Implemented in scan-result shaping.                                                         |
+| `--filter-clues`                      | Removes redundant clue output                          | `Done`    | Implemented in scan-result shaping.                                                         |
+| `-i, --info`                          | Gates file-info output and related info-only workflows | `Planned` | Provenant currently always emits file-info fields instead of exposing this gate.            |
+| `--ignore-author <pattern>`           | Filters author findings by pattern                     | `Planned` | User-facing filtering gap.                                                                  |
+| `--ignore-copyright-holder <pattern>` | Filters copyright-holder findings by pattern           | `Planned` | User-facing filtering gap.                                                                  |
 
-| Parameter              | Blocked By                                                                 |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `--license-references` | [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) |
-| `--is-generated`       | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)        |
+### Scan & Detection Controls
 
-Runtime dependency notes:
+| Flag                         | What it does                                        | Status    | Notes                                                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-l, --license`              | Enables license scanning                            | `Done`    | The toggle exists; broader license-output parity is tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                 |
+| `--license-rules-path`       | Loads extra license rules from disk                 | `Done`    | Requires `--license`.                                                                                                                                                      |
+| `--include-text`             | Includes matched license text in results            | `Partial` | Current matched-text switch exists, but upstream naming/diagnostics parity remains in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).          |
+| `--license-score`            | Filters or reports by license score thresholds      | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `--license-text`             | Emits license text output                           | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `--license-text-diagnostics` | Emits detailed license-text diagnostics             | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `--license-diagnostics`      | Emits detailed license-match diagnostics            | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `--unknown-licenses`         | Reports unknown-license detections                  | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `--license-url-template`     | Customizes license reference URLs                   | `Planned` | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                                                     |
+| `-c, --copyright`            | Enables copyright, holder, and author detection     | `Done`    | Core scan toggle.                                                                                                                                                          |
+| `-e, --email`                | Enables email detection                             | `Done`    | Core scan toggle.                                                                                                                                                          |
+| `--max-email`                | Caps email findings per file                        | `Done`    | Requires `--email`; `0` means no limit.                                                                                                                                    |
+| `-u, --url`                  | Enables URL detection                               | `Done`    | Core scan toggle.                                                                                                                                                          |
+| `--max-url`                  | Caps URL findings per file                          | `Done`    | Requires `--url`; `0` means no limit.                                                                                                                                      |
+| `-p, --package`              | Enables package manifest and lockfile scanning      | `Done`    | Core scan toggle.                                                                                                                                                          |
+| `--generated`                | Detects and reports generated files during scanning | `Partial` | Implemented, but this compatibility surface is still tracked alongside summary/reporting semantics in [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md). |
+| `--facet <facet>=<pattern>`  | Assigns files to facets such as `core` or `tests`   | `Partial` | Implemented, but keep remaining CLI-compatibility notes centralized here; behavior is owned by [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md).        |
 
-- Upstream `--is-license-text` is no longer a live parity target; current parity should track the emitted `percentage_of_license_text` field in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).
-- `--license-clarity-score` requires `--classify` for parity-compatible behavior.
-- `--tallies-key-files` requires `--classify` and `--tallies`.
+### Post-Scan Analysis & Reporting
 
-### Partially Implemented Post-Processing Flags
+| Flag                      | What it does                                                                   | Status     | Notes                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--classify`              | Classifies key files and related project-level signals                         | `Partial`  | Implemented enough to expose; broader parity is still summarized in [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md).    |
+| `--summary`               | Emits top-level project summary output                                         | `Partial`  | Requires `--classify`; broader parity remains tracked in [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md).               |
+| `--license-clarity-score` | Emits project-level license clarity scoring                                    | `Partial`  | Requires `--classify`; heuristics and edge semantics remain tracked in [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md). |
+| `--tallies`               | Emits top-level tallies                                                        | `Partial`  | Implemented over the current tally families; keep CLI parity tracking here.                                                                 |
+| `--tallies-with-details`  | Emits per-resource tallies                                                     | `Partial`  | Implemented for file and directory resources; keep CLI parity tracking here.                                                                |
+| `--tallies-key-files`     | Emits tallies for key files only                                               | `Partial`  | Requires `--classify` and `--tallies`.                                                                                                      |
+| `--tallies-by-facet`      | Emits tallies split by facet                                                   | `Partial`  | Requires `--facet` and `--tallies`.                                                                                                         |
+| `--license-references`    | Emits top-level license reference blocks                                       | `Planned`  | Tracked in [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).                                                      |
+| `--license-policy`        | Evaluates findings against a license policy                                    | `Planned`  | Active functionality gap, but not yet implemented.                                                                                          |
+| `--is-generated`          | Reports percentage/license-text-style generated indicators in post-scan output | `Planned`  | Tracked in [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md).                                                             |
+| `--timing`                | Emits per-resource scan timing details                                         | `Planned`  | Diagnostic reporting surface; not yet implemented.                                                                                          |
+| `--consolidate`           | Emits the legacy consolidated package/component view                           | `Won't do` | Intentionally out of scope; see [`CONSOLIDATION_PLAN.md`](../post-processing/CONSOLIDATION_PLAN.md).                                        |
+| `--todo`                  | Emits manual-review TODO workflow output                                       | `Won't do` | Intentionally out of scope; see [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md).                                        |
 
-| Parameter                   | Notes                                                                                                                                                                                   |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--classify`                | Accepted as a compatibility flag; current runtime computes key-file classification plus top-level/community classification substrate, but full ScanCode classify parity remains open    |
-| `--summary`                 | Implemented top-level summary output gating; current runtime includes package-preferred origin, `other_*` rollups, and initial clarity scoring, but broader summary parity remains open |
-| `--license-clarity-score`   | Implemented gating plus initial clarity penalties; fuller match-quality heuristics and edge-case parity remain open                                                                     |
-| `--tallies`                 | Implemented top-level tally gating over the current five tally families                                                                                                                 |
-| `--tallies-with-details`    | Implemented per-resource `files[*].tallies` gating for files and directories                                                                                                            |
-| `--tallies-key-files`       | Implemented top-level `tallies_of_key_files` gating over classified key files                                                                                                           |
-| `--facet <facet>=<pattern>` | Implemented with six-facet validation, repeatable rules, multi-facet matching, and default-to-`core` file assignment                                                                    |
-| `--tallies-by-facet`        | Implemented top-level `tallies_by_facet` output; currently requires `--facet` definitions and reuses existing tally output rather than full tally CLI gating                            |
-| `--generated`               | Implemented file-level `is_generated` detection from conspicuous header clues                                                                                                           |
+### Package, Compatibility & Meta Commands
 
-### Explicitly Deferred / Not Planned
+| Flag                                                 | What it does                                                 | Status     | Notes                                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `--system-package`                                   | Enables system-package style package detection               | `Planned`  | Package-related parity gap.                                                                                          |
+| `--package-in-compiled`                              | Extracts package metadata from compiled artifacts            | `Planned`  | Package-related parity gap.                                                                                          |
+| `--package-only`                                     | Restricts output to package-focused results                  | `Planned`  | Package-related parity gap.                                                                                          |
+| `--list-packages`                                    | Lists supported package handlers or package-related surfaces | `Won't do` | Inventory/meta surface rather than core scan-output functionality.                                                   |
+| `-A, --about`                                        | Prints about/help text beyond normal help output             | `Won't do` | Meta/help surface, not part of core scan-result functionality.                                                       |
+| `--examples`                                         | Prints usage examples                                        | `Won't do` | Meta/help surface, not part of core scan-result functionality.                                                       |
+| `--plugins`                                          | Lists plugin surfaces                                        | `Won't do` | Provenant intentionally does not plan a runtime plugin system; see [`PLUGIN_SYSTEM_PLAN.md`](PLUGIN_SYSTEM_PLAN.md). |
+| `--print-options`                                    | Prints option inventory metadata                             | `Won't do` | Meta/help surface, not part of core scan-result functionality.                                                       |
+| `--keep-temp-files`                                  | Preserves temporary debug files                              | `Won't do` | Hidden debugging/housekeeping flag, not part of the intended CLI surface.                                            |
+| `--check-version / --no-check-version`               | Controls upstream version-check behavior                     | `Won't do` | Hidden update-check convenience, not part of scan/output parity.                                                     |
+| `--test-mode / --test-slow-mode / --test-error-mode` | Exposes upstream internal test-harness modes                 | `Won't do` | Hidden test-only flags, not part of the intended CLI surface.                                                        |
 
-| Parameter       | Decision                                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `--consolidate` | Intentionally not planned for current Provenant scope; see [`CONSOLIDATION_PLAN.md`](../post-processing/CONSOLIDATION_PLAN.md) |
+### Cache & Rust-Specific Extras
 
-### Input/Output Control (implemented)
-
-| Parameter         | Notes                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| `--from-json`     | Load from previous scan JSON input(s); disallows `--package/--copyright/--email/--url/--generated` |
-| `--include`       | Include patterns                                                                                   |
-| `--mark-source`   | Mark source files                                                                                  |
-| `--only-findings` | Filter output                                                                                      |
-
-### Cache Control (partial)
-
-| Parameter         | Positioning / Status                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------- |
-| `--cache-dir`     | Implemented and wired in runtime startup cache bootstrap                                        |
-| `--cache-clear`   | Implemented and wired to clear persisted cache before directory scan starts                     |
-| `--max-in-memory` | Implemented as CLI surface; parity-equivalent spill behavior remains pending in caching roadmap |
-| `--no-cache`      | Optional Rust-specific convenience; not parity-required                                         |
-| `--incremental`   | CACHING_PLAN.md (beyond parity; defer until robust model)                                       |
+| Flag                 | What it does                                        | Status          | Notes                                                                                                     |
+| -------------------- | --------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
+| `--cache-dir`        | Chooses the persistent cache location               | `Done`          | Implemented and wired at runtime startup.                                                                 |
+| `--cache-clear`      | Clears persisted cache entries before scanning      | `Done`          | Implemented and wired before directory scans.                                                             |
+| `--max-in-memory`    | Caps in-memory scan buffering before spill behavior | `Partial`       | Currently parse-only; upstream default `10000`, `-1` acceptance, and spill semantics are not yet matched. |
+| `--no-assemble`      | Skips package assembly after manifest detection     | `Rust-specific` | Provenant-only convenience; Python ScanCode always assembles.                                             |
+| `--no-cache`         | Disables Provenant caching                          | `Rust-specific` | Optional convenience, not a parity requirement.                                                           |
+| `--incremental`      | Enables future incremental scan behavior            | `Rust-specific` | Beyond-parity idea; deferred until the caching model is robust.                                           |
+| `--show_attribution` | Prints embedded-data attribution notices            | `Rust-specific` | Provenant-only convenience for bundled license-detection data notices.                                    |
 
 ## Key Design Decisions
 
@@ -146,9 +164,11 @@ Runtime dependency notes:
 
 - No plugin runtime architecture (compile-time wiring instead)
 - `--consolidate` is intentionally not planned because it is compatibility-oriented and upstream-deprecated
+- `--todo` is intentionally not planned because it is a manual-review workflow rather than a core scan-result surface
 - Thread pool via rayon instead of multiprocessing
 - JSON output structure matches Python (`OUTPUT_FORMAT_VERSION`)
 - `--no-cache` is not a parity requirement (upstream removed it); if retained, it is Rust-specific
+- `--show_attribution` is a Rust-specific convenience flag for printing embedded-data notices
 
 ## References
 
@@ -156,4 +176,10 @@ Runtime dependency notes:
   [`reference/scancode-toolkit/src/scancode/cli.py`](../../../reference/scancode-toolkit/src/scancode/cli.py)
 - **Output plugins (reference CLI options)**:
   [`reference/scancode-toolkit/src/formattedcode/`](../../../reference/scancode-toolkit/src/formattedcode/)
+- **Official ScanCode help reference**:
+  https://scancode-toolkit.readthedocs.io/en/stable/reference/scancode-cli/cli-help-text-options.html
+- **Official ScanCode post-scan reference**:
+  https://scancode-toolkit.readthedocs.io/en/stable/reference/scancode-cli/cli-post-scan-options.html
+- **Official ScanCode output-format reference**:
+  https://scancode-toolkit.readthedocs.io/en/stable/reference/scancode-cli/cli-output-format-options.html
 - **Clap docs**: https://docs.rs/clap/
