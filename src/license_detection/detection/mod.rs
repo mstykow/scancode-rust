@@ -33,6 +33,10 @@ const LINES_THRESHOLD: usize = 4;
 /// License clues - low quality matches.
 pub const DETECTION_LOG_LICENSE_CLUES: &str = "license-clues";
 
+pub const DETECTION_LOG_FALSE_POSITIVE: &str = "false-positive";
+
+pub const DETECTION_LOG_LOW_QUALITY_MATCH_FRAGMENTS: &str = "low-quality-match-fragments";
+
 /// Imperfect match coverage - at least one match has coverage < 100%.
 pub const DETECTION_LOG_IMPERFECT_COVERAGE: &str = "imperfect-match-coverage";
 
@@ -73,7 +77,9 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
 
     let _score = compute_detection_score(&detection.matches);
 
-    if let Ok(expr) = determine_license_expression(&matches_for_expression) {
+    if should_compute_public_expression(log_category)
+        && let Ok(expr) = determine_license_expression(&matches_for_expression)
+    {
         detection.license_expression = Some(expr.clone());
 
         if let Ok(spdx_expr) = determine_spdx_expression(&matches_for_expression) {
@@ -91,6 +97,15 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
     } else {
         detection.identifier = None;
     }
+}
+
+fn should_compute_public_expression(log_category: &str) -> bool {
+    !matches!(
+        log_category,
+        DETECTION_LOG_FALSE_POSITIVE
+            | DETECTION_LOG_LICENSE_CLUES
+            | DETECTION_LOG_LOW_QUALITY_MATCH_FRAGMENTS
+    )
 }
 
 /// Populate LicenseDetection from a DetectionGroup with SPDX mapping.
@@ -491,8 +506,61 @@ mod tests {
         assert!(
             detection
                 .detection_log
-                .contains(&"false-positive".to_string())
+                .contains(&DETECTION_LOG_FALSE_POSITIVE.to_string())
         );
+        assert!(detection.license_expression.is_none());
+        assert!(detection.identifier.is_none());
+    }
+
+    #[test]
+    fn test_populate_detection_from_group_license_clues_have_no_expression() {
+        let mut m = create_perfect_match(1, 2);
+        m.rule_kind = crate::license_detection::models::RuleKind::Clue;
+        let group = DetectionGroup::new(vec![m]);
+        let mut detection = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: Vec::new(),
+            detection_log: Vec::new(),
+            identifier: None,
+        };
+
+        populate_detection_from_group(&mut detection, &group);
+
+        assert!(
+            detection
+                .detection_log
+                .contains(&DETECTION_LOG_LICENSE_CLUES.to_string())
+        );
+        assert!(detection.license_expression.is_none());
+        assert!(detection.license_expression_spdx.is_none());
+        assert!(detection.identifier.is_none());
+    }
+
+    #[test]
+    fn test_populate_detection_from_group_low_quality_matches_have_no_expression() {
+        let mut m = create_test_match(1, 3, "2-aho", "mit.LICENSE");
+        m.match_coverage = 50.0;
+        m.score = 50.0;
+        let group = DetectionGroup::new(vec![m]);
+        let mut detection = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: Vec::new(),
+            detection_log: Vec::new(),
+            identifier: None,
+        };
+
+        populate_detection_from_group(&mut detection, &group);
+
+        assert!(
+            detection
+                .detection_log
+                .contains(&DETECTION_LOG_LOW_QUALITY_MATCH_FRAGMENTS.to_string())
+        );
+        assert!(detection.license_expression.is_none());
+        assert!(detection.license_expression_spdx.is_none());
+        assert!(detection.identifier.is_none());
     }
 
     #[test]
