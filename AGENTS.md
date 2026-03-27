@@ -8,8 +8,8 @@ This guide provides essential information for AI coding agents working on the `P
 
 - **Architecture & Design Decisions**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - System design, components, principles
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
-- **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
-- **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
+- **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Index of accepted design decisions and contributor guidance
+- **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Index of parser and subsystem improvements beyond Python parity
 - **License Detection Architecture**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](docs/LICENSE_DETECTION_ARCHITECTURE.md) - Current license detection architecture, embedded index flow, and maintainer workflow
 - **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
 - **API Reference**: Run `cargo doc --open` - Complete API documentation
@@ -62,10 +62,9 @@ git submodule update --init   # Ensure all submodules are initialized
 # Build & Test
 cargo build                   # Development build
 cargo build --release         # Optimized build
-cargo test                    # Run all tests (excludes golden tests)
-cargo test <test_name>        # Run specific test (e.g., test_extract_from_testdata)
-cargo test --lib              # Test library code only (faster)
-cargo test --release --features golden-tests  # Local golden tests: always use --release
+cargo test parsers::npm_test::tests::test_extract_from_testdata  # Prefer exact test paths for local iteration
+cargo test parsers::npm_test::tests::test_is_match               # Keep local verification tightly scoped
+cargo test --release --features golden-tests --lib parsers::golden_test::python_golden_test::golden_tests::test_golden_metadata  # Only when a targeted golden test is required
 
 # Code Quality
 cargo fmt                     # Format code
@@ -75,7 +74,7 @@ npm run check:docs            # Markdown lint + formatting check
 npm run validate:urls         # Validate documentation/docstring URLs (can take a few minutes)
 
 # Run Tool
-cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
+cargo run -- --json-pp output.json <dir> --ignore "*.git*" --ignore "target/*"
 ```
 
 ## Documentation Tooling
@@ -86,17 +85,20 @@ cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
 
 ## Running Single Tests
 
+Local runs must stay tightly scoped. This repository has thousands of tests and many are slow, so agents should default to the smallest command that proves the change they just made. Prefer exact test paths over substring filters, and prefer a handful of related tests over broad module- or crate-wide sweeps. Let CI handle the full sharded suite after code is pushed.
+
 To run a specific test, use its full path from `cargo test -- --list`:
 
 ```bash
 cargo test parsers::npm_test::tests::test_extract_from_testdata
 cargo test parsers::npm_test::tests::test_is_match
-cargo test test_is_match       # Runs all tests with "test_is_match" in name
 ```
+
+Avoid broad local commands such as `cargo test`, `cargo test --all`, `cargo test --lib`, or unfiltered golden test suites unless the user explicitly asks for them or there is no narrower way to validate a shared infrastructure change.
 
 ## Running Golden Tests
 
-For local/manual golden test runs, always use `--release` unless explicitly instructed otherwise. Debug golden test runs are far too slow for normal agent work.
+Only run golden tests locally when the change directly affects golden-test-covered behavior, and then run the narrowest possible golden test target. Always use `--release` unless explicitly instructed otherwise. Debug golden test runs are far too slow for normal agent work.
 
 To count failing golden test cases:
 
@@ -104,7 +106,7 @@ To count failing golden test cases:
 cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
 ```
 
-Running golden tests is expensive, so file-based caching should be used for more complex, incremental analysis.
+Running golden tests is expensive, so keep them narrowly targeted and use file-based caching for more complex, incremental analysis.
 
 ## Project Architecture
 
@@ -301,19 +303,23 @@ mod tests {
 
 **Pre-commit hooks** (install with `pre-commit install`):
 
-- `cargo fmt --all` - Format code before committing
-- `cargo clippy --all-targets --all-features -- -D warnings` - Lint with warnings as errors
-- `cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
-- `npm run lint:md:fix` - Lint and auto-fix Markdown
-- `npm run format` - Format YAML, JSON, and Markdown with Prettier
+- `cargo fmt --all -- --check` - Verify Rust formatting on Rust changes
+- `cargo clippy --lib --bins --all-features -- -D warnings` - Lint library and binary targets with warnings as errors
+- `./scripts/check_xtask_lockfile_sync.sh` - Verify xtask lockfile sync when related manifests change
+- `cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
+- `markdownlint-cli2 --fix` - Lint and auto-fix changed Markdown files
+- `prettier --write` - Format changed YAML, JSON, and Markdown files
 
 **GitHub Actions** (runs on push to main and PRs):
 
 - Code formatting check: `cargo fmt --all -- --check`
 - Clippy linting: `cargo clippy --all-targets --all-features -- -D warnings`
 - Compilation: `cargo check --all --verbose`
-- Test suite: `cargo test --all --verbose`
-- Golden tests: `cargo test --all --verbose --features golden-tests`
+- Unit/integration/doc tests: `cargo test --all --release --verbose`
+- Golden tests: sharded filtered runs such as `cargo test --lib --features golden-tests "parsers::golden_test::..."`, with some shards using `--release`
+- Additional CI checks: xtask lockfile sync, supported-format generation, unused-dependency checks, Markdown linting, Prettier checks, and URL validation
+
+Agents should treat the full GitHub Actions matrix as CI's job, not the default local workflow. Local iteration should stay focused on the exact tests needed for the files and behavior under change, because CI already shards the expensive broad suites.
 
 **All checks must pass before merging.**
 
@@ -409,7 +415,7 @@ vim src/parsers/npm_test.rs
 vim src/parsers/npm.rs
 
 # STEP 4: Verify correctness against original behavior
-cargo test npm
+cargo test parsers::npm_test::tests::test_extract_from_testdata
 # Run on real-world testdata and compare outputs with original
 ```
 
