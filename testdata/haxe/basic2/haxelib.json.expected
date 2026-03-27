@@ -49,17 +49,17 @@
             "from_file": null,
             "start_line": 1,
             "end_line": 1,
-            "matcher": "1-spdx-id",
+            "matcher": "parser-declared-license",
             "score": 100.0,
             "matched_length": 1,
             "match_coverage": 100.0,
             "rule_relevance": 100,
-            "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+            "rule_identifier": null,
             "rule_url": null,
             "matched_text": "MIT"
           }
         ],
-        "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+        "identifier": null
       }
     ],
     "other_license_expression": null,

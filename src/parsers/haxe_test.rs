@@ -46,6 +46,9 @@ mod tests {
             package_data.extracted_license_statement,
             Some("GPL".to_string())
         );
+        assert!(package_data.declared_license_expression.is_none());
+        assert!(package_data.declared_license_expression_spdx.is_none());
+        assert!(package_data.license_detections.is_empty());
 
         // Check purl
         assert_eq!(
@@ -133,6 +136,15 @@ mod tests {
             package_data.extracted_license_statement,
             Some("MIT".to_string())
         );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(
             package_data.purl,
             Some("pkg:haxe/minimal@1.0.0".to_string())

@@ -26,6 +26,10 @@ use std::io::Read;
 use std::path::Path;
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data_from_pair,
+    empty_declared_license_data,
+};
 
 /// Haxe package manifest (haxelib.json) parser.
 ///
@@ -54,6 +58,9 @@ impl PackageParser for HaxeParser {
 
         // Generate PURL
         let purl = create_package_url(&name, &version);
+        let extracted_license_statement = json_content.license.clone();
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_haxe_declared_license(extracted_license_statement.as_deref());
 
         // Generate URLs
         let (repository_homepage_url, download_url, repository_download_url) =
@@ -130,13 +137,13 @@ impl PackageParser for HaxeParser {
             vcs_url: None,
             copyright: None,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
-            license_detections: Vec::new(),
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
-            extracted_license_statement: json_content.license,
+            extracted_license_statement,
             notice_text: None,
             source_packages: Vec::new(),
             file_references: Vec::new(),
@@ -243,6 +250,23 @@ fn default_package_data() -> PackageData {
         primary_language: Some("Haxe".to_string()),
         datasource_id: Some(DatasourceId::HaxelibJson),
         ..Default::default()
+    }
+}
+
+fn normalize_haxe_declared_license(
+    statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    match statement.map(str::trim).filter(|value| !value.is_empty()) {
+        Some("MIT") => build_declared_license_data_from_pair(
+            "mit",
+            "MIT",
+            DeclaredLicenseMatchMetadata::single_line("MIT"),
+        ),
+        _ => empty_declared_license_data(),
     }
 }
 
