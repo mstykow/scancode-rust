@@ -5,9 +5,11 @@ This guide walks you through adding a new package parser to Provenant.
 ## Prerequisites
 
 - Rust development environment set up
-- Git submodules initialized: `./setup.sh`
+- Git submodules initialized: `git submodule update --init --filter=blob:none` (or `./setup.sh` on Linux, macOS, or WSL)
 - Familiarity with the target package ecosystem
 - Access to sample package manifest files
+
+If you are contributing from Windows, prefer WSL for shell-based setup and helper commands.
 
 ## Overview
 

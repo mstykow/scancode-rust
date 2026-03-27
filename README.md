@@ -45,25 +45,30 @@ This installs the `provenant` binary.
 
 Download the release archive for your platform from the [GitHub Releases](https://github.com/mstykow/provenant/releases) page.
 
-Extract the archive and place the `provenant` binary somewhere on your `PATH`:
+Extract the archive and place the binary somewhere on your `PATH`.
+
+On Linux and macOS:
 
 ```sh
 tar xzf provenant-*.tar.gz
 sudo mv provenant /usr/local/bin/
 ```
 
+On Windows, extract the `.zip` release and add `provenant.exe` to your `PATH`.
+
 ### Build from Source
+
+For a normal source build, you only need the Rust toolchain:
 
 ```sh
 git clone https://github.com/mstykow/provenant.git
 cd provenant
-./setup.sh
 cargo build --release
 ```
 
 Cargo places the compiled binary under `target/release/`.
 
-> **Note**: The binary includes a built-in license index. The `reference/scancode-toolkit/` submodule is only needed for developers updating the embedded license data or using custom license rules.
+> **Note**: The binary includes a built-in license index. The `reference/scancode-toolkit/` submodule is only needed for developers updating the embedded license data, working with helper scripts that depend on it, or using custom license rules.
 
 ## Usage
 
@@ -142,7 +147,7 @@ Contributions are welcome. Please feel free to submit a pull request.
 
 For contributor guidance, start with the [Documentation Index](docs/DOCUMENTATION_INDEX.md), [How to Add a Parser](docs/HOW_TO_ADD_A_PARSER.md), and [Testing Strategy](docs/TESTING_STRATEGY.md).
 
-A typical local setup is:
+A typical local setup on Linux, macOS, or WSL is:
 
 ```sh
 git clone https://github.com/mstykow/provenant.git
@@ -152,7 +157,7 @@ cargo build
 cargo test
 ```
 
-If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's pre-commit configuration.
+If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's pre-commit configuration. Those setup and helper commands are currently shell-oriented, so Windows contributors should prefer running them inside WSL2.
 
 ## Credits
 
