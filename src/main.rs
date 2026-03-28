@@ -12,7 +12,7 @@ use crate::license_detection::LicenseDetectionEngine;
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::post_processing::{
     CreateOutputContext, CreateOutputOptions, build_facet_rules,
-    collect_top_level_license_references, create_output,
+    collect_top_level_license_detections, collect_top_level_license_references, create_output,
 };
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scan_result_shaping::{
@@ -74,6 +74,7 @@ fn run() -> Result<()> {
         mut scan_result,
         total_dirs,
         mut preloaded_assembly,
+        preloaded_license_detections,
         preloaded_license_references,
         preloaded_license_rule_references,
         active_license_engine,
@@ -88,12 +89,18 @@ fn run() -> Result<()> {
             size_count,
             loaded.excluded_count,
         );
-        let (process_result, assembly_result, license_references, license_rule_references) =
-            loaded.into_parts();
+        let (
+            process_result,
+            assembly_result,
+            license_detections,
+            license_references,
+            license_rule_references,
+        ) = loaded.into_parts();
         (
             process_result,
             directories_count,
             assembly_result,
+            license_detections,
             license_references,
             license_rule_references,
             None,
@@ -185,6 +192,7 @@ fn run() -> Result<()> {
             },
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             license_engine,
         )
     };
@@ -274,6 +282,12 @@ fn run() -> Result<()> {
 
     let end_time = Utc::now();
 
+    let license_detections = if cli.from_json {
+        preloaded_license_detections
+    } else {
+        collect_top_level_license_detections(&scan_result.files)
+    };
+
     let (license_references, license_rule_references) = if cli.from_json {
         (
             preloaded_license_references,
@@ -300,6 +314,7 @@ fn run() -> Result<()> {
         CreateOutputContext {
             total_dirs,
             assembly_result,
+            license_detections,
             license_references,
             license_rule_references,
             options: CreateOutputOptions {
