@@ -17,6 +17,7 @@ use crate::models::{
     DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore,
     LicenseDetection, LicenseReference, LicenseRuleReference, Match, OUTPUT_FORMAT_VERSION, Output,
     Package, PackageData, Summary, SystemEnvironment, Tallies, TallyEntry,
+    TopLevelLicenseDetection,
 };
 use crate::scanner;
 #[cfg(test)]
@@ -55,6 +56,7 @@ pub(crate) struct CreateOutputOptions<'a> {
 pub(crate) struct CreateOutputContext<'a> {
     pub(crate) total_dirs: usize,
     pub(crate) assembly_result: assembly::AssemblyResult,
+    pub(crate) license_detections: Vec<TopLevelLicenseDetection>,
     pub(crate) license_references: Vec<crate::models::LicenseReference>,
     pub(crate) license_rule_references: Vec<crate::models::LicenseRuleReference>,
     pub(crate) options: CreateOutputOptions<'a>,
@@ -208,10 +210,47 @@ pub(crate) fn create_output(
         }],
         packages,
         dependencies,
+        license_detections: context.license_detections,
         files,
         license_references: context.license_references,
         license_rule_references: context.license_rule_references,
     }
+}
+
+pub(crate) fn collect_top_level_license_detections(
+    files: &[FileInfo],
+) -> Vec<TopLevelLicenseDetection> {
+    let mut detections_by_identifier: HashMap<String, TopLevelLicenseDetection> = HashMap::new();
+
+    for file in files {
+        for detection in &file.license_detections {
+            let Some(identifier) = detection.identifier.as_ref() else {
+                continue;
+            };
+
+            let entry = detections_by_identifier
+                .entry(identifier.clone())
+                .or_insert_with(|| TopLevelLicenseDetection {
+                    identifier: identifier.clone(),
+                    license_expression: detection.license_expression.clone(),
+                    license_expression_spdx: detection.license_expression_spdx.clone(),
+                    detection_count: 0,
+                    detection_log: detection.detection_log.clone(),
+                    reference_matches: detection.matches.clone(),
+                });
+
+            entry.detection_count += 1;
+        }
+    }
+
+    let mut unique_detections: Vec<_> = detections_by_identifier.into_values().collect();
+    unique_detections.sort_by(|left, right| {
+        left.license_expression
+            .cmp(&right.license_expression)
+            .then_with(|| right.detection_count.cmp(&left.detection_count))
+            .then_with(|| left.identifier.cmp(&right.identifier))
+    });
+    unique_detections
 }
 
 pub(crate) fn collect_top_level_license_references(

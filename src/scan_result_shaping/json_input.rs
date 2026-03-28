@@ -1,11 +1,13 @@
 use anyhow::{Result, anyhow};
 use serde::Deserialize;
+use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::assembly;
 use crate::models::{
     FileInfo, FileType, LicenseReference, LicenseRuleReference, Package, TopLevelDependency,
+    TopLevelLicenseDetection,
 };
 use crate::scanner::ProcessResult;
 
@@ -23,6 +25,8 @@ pub(crate) struct JsonScanInput {
     pub(crate) packages: Vec<Package>,
     #[serde(default)]
     pub(crate) dependencies: Vec<TopLevelDependency>,
+    #[serde(default)]
+    pub(crate) license_detections: Vec<TopLevelLicenseDetection>,
     #[serde(default)]
     pub(crate) license_references: Vec<LicenseReference>,
     #[serde(default)]
@@ -59,6 +63,7 @@ impl JsonScanInput {
     ) -> (
         ProcessResult,
         assembly::AssemblyResult,
+        Vec<TopLevelLicenseDetection>,
         Vec<LicenseReference>,
         Vec<LicenseRuleReference>,
     ) {
@@ -71,6 +76,7 @@ impl JsonScanInput {
                 packages: self.packages,
                 dependencies: self.dependencies,
             },
+            self.license_detections,
             self.license_references,
             self.license_rule_references,
         )
@@ -93,6 +99,8 @@ pub(crate) fn load_and_merge_json_inputs(
             acc.files.append(&mut loaded.files);
             acc.packages.append(&mut loaded.packages);
             acc.dependencies.append(&mut loaded.dependencies);
+            acc.license_detections
+                .append(&mut loaded.license_detections);
             acc.license_references
                 .append(&mut loaded.license_references);
             acc.license_rule_references
@@ -128,6 +136,7 @@ pub(crate) fn normalize_loaded_json_scan(
         && strip_root
     {
         normalize_paths(&mut loaded.files, &scan_root, true, false);
+        normalize_loaded_top_level_detection_paths(loaded, &scan_root, true, false);
         normalize_top_level_output_paths(
             &mut loaded.packages,
             &mut loaded.dependencies,
@@ -204,8 +213,88 @@ fn trim_loaded_json_full_root_paths(loaded: &mut JsonScanInput) {
     for dependency in &mut loaded.dependencies {
         trim_full_root_display_value(&mut dependency.datafile_path);
     }
+
+    normalize_loaded_top_level_detection_paths(loaded, "", false, true);
 }
 
 fn trim_full_root_display_value(path: &mut String) {
     *path = path.replace('\\', "/").trim_matches('/').to_string();
+}
+
+fn normalize_loaded_top_level_detection_paths(
+    loaded: &mut JsonScanInput,
+    scan_root: &str,
+    strip_root: bool,
+    full_root: bool,
+) {
+    for detection in &mut loaded.license_detections {
+        for detection_match in &mut detection.reference_matches {
+            if let Some(from_file) = detection_match.from_file.as_mut() {
+                if strip_root
+                    && let Some(normalized) =
+                        normalize_loaded_detection_path(from_file, scan_root, true, false)
+                {
+                    *from_file = normalized;
+                }
+                if full_root
+                    && let Some(normalized) =
+                        normalize_loaded_detection_path(from_file, scan_root, false, true)
+                {
+                    *from_file = normalized;
+                }
+            }
+        }
+    }
+}
+
+fn normalize_loaded_detection_path(
+    path: &str,
+    scan_root: &str,
+    strip_root: bool,
+    full_root: bool,
+) -> Option<String> {
+    let current_path = PathBuf::from(path);
+
+    if full_root {
+        let absolute_candidate = if current_path.is_absolute() {
+            current_path.clone()
+        } else {
+            env::current_dir()
+                .map(|cwd| cwd.join(&current_path))
+                .unwrap_or(current_path.clone())
+        };
+        let absolute = absolute_candidate
+            .canonicalize()
+            .unwrap_or(absolute_candidate);
+        return Some(
+            absolute
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_matches('/')
+                .to_string(),
+        );
+    }
+
+    if strip_root {
+        let scan_root_path = Path::new(scan_root);
+        let strip_base = if scan_root_path.is_file() {
+            scan_root_path.parent().unwrap_or_else(|| Path::new(""))
+        } else {
+            scan_root_path
+        };
+
+        if current_path == scan_root_path
+            && let Some(file_name) = scan_root_path.file_name().and_then(|name| name.to_str())
+        {
+            return Some(file_name.to_string());
+        }
+
+        if let Ok(stripped) = current_path.strip_prefix(strip_base)
+            && !stripped.as_os_str().is_empty()
+        {
+            return Some(stripped.to_string_lossy().to_string());
+        }
+    }
+
+    None
 }

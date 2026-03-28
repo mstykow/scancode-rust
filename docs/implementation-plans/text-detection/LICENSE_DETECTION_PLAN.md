@@ -91,6 +91,8 @@ implementation plan again.
   `license_rule_references`
 - ✅ Live native-scan generation of top-level `license_references` and
   `license_rule_references`
+- ✅ Native top-level `license_detections` for identifier-bearing file/resource
+  detections
 - ✅ `--license-references` CLI flag
 - ✅ `--from-json` round-trip preservation of preexisting
   `license_references` / `license_rule_references`
@@ -98,7 +100,8 @@ implementation plan again.
 ### Known Public Parity Gaps
 
 - ❌ Clue-only internal detections are dropped before public serialization
-- ❌ No top-level unique `license_detections`
+- ⚠️ Top-level unique `license_detections` currently exclude package/manifest
+  detections that still lack stable provenance/identifier plumbing
 - ❌ `--filter-clues` is only partially license-aware today: shaping now suppresses
   ignorable clues using public match metadata and rule identifiers, but some
   JSON/public-license-shape edge cases still diverge from upstream
@@ -131,9 +134,10 @@ That leaves Provenant without a public place to preserve:
 ### 2. Top-level unique-detection aggregation is still missing
 
 `license_references` and `license_rule_references` now generate on native scans,
-but Provenant still lacks the Python-style unique-detection aggregation that
-feeds top-level `license_detections` and the remaining provenance-dependent
-license reporting.
+and Provenant now emits top-level unique `license_detections` for
+identifier-bearing file/resource detections. Full Python-style parity still
+depends on the missing provenance plumbing for manifest/package detections and
+other file-region-dependent consumers.
 
 ### 3. Unique-detection aggregation is still unimplemented
 
@@ -180,7 +184,8 @@ The repository still has a mix of:
 
 3. **Phase 2 — Top-level license aggregation parity**
    - Implement unique-detection aggregation
-   - Emit top-level `license_detections`
+   - Extend top-level `license_detections` from file/resource detections to full
+     package/manifest parity
 
 4. **Phase 3 — CLI flag parity**
    - Resolve `--include-text` vs `--license-text`
@@ -212,7 +217,8 @@ whenever work resumes here:
       `license_clues`
 - [ ] License diagnostics are available when the corresponding CLI behavior is
       enabled
-- [ ] Top-level unique `license_detections` are generated on native scans
+- [ ] Top-level unique `license_detections` are generated on native scans with
+      full file + package provenance parity
 - [ ] `license_references` and `license_rule_references` are generated on native
       scans instead of only being preserved from input JSON
 - [ ] The CLI plan accurately reflects the implemented and pending license flags
