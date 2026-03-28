@@ -4,8 +4,6 @@ This guide provides essential information for AI coding agents working on the `P
 
 ## Documentation Map
 
-**Finding Information Quickly:**
-
 - **Architecture & Design Decisions**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - System design, components, principles
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
 - **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Index of accepted design decisions and contributor guidance
@@ -17,13 +15,11 @@ This guide provides essential information for AI coding agents working on the `P
 
 ## Project Context
 
-**Provenant** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+**Provenant** is a Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit/) that aims to be a trustworthy drop-in replacement while fixing bugs and using Rust-specific strengths. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
 
 ### Core Philosophy: Correctness and Feature Parity Above All
 
-**The primary goal is to create a functionally identical replacement for ScanCode Toolkit that users can trust completely.**
-
-When implementing features:
+The primary goal is functional parity users can trust. When implementing features:
 
 - **Maximize correctness and feature parity**: Every feature, edge case, and requirement from the original must be preserved
 - **Effort is irrelevant**: Take whatever time and effort needed to get it right. No shortcuts, no compromises
@@ -33,45 +29,28 @@ When implementing features:
 
 ### Using the Reference Submodule
 
-The `reference/scancode-toolkit/` submodule contains the original Python implementation and serves as:
-
-- **Feature specification**: Understand what the original does, including all edge cases and requirements
-- **Behavioral reference**: Verify expected output formats and results against the original
-- **Bug identification**: Find known issues and technical debt to avoid replicating
-- **Logic inspiration**: Understand the problem domain and solution approaches
-
-⚠️ **Critical: This is a Rewrite, Not a Line-by-Line Port**
-
-You **cannot** and **should not** follow the reference Python implementation line by line. Here's why:
-
-- The original has architectural issues, bugs, and technical debt that must not be replicated
-- Python patterns don't translate directly to idiomatic Rust
-- Rust's type system and ownership model enable fundamentally better designs
-- We must leverage Rust-specific optimizations (zero-copy parsing, compile-time guarantees, etc.)
-- The goal is to achieve the same **outcomes** through better **implementation**
-
-**Use the reference to understand WHAT to build, not HOW to build it.** Implement features using clean, idiomatic Rust that leverages the language's strengths while maintaining complete functional compatibility with the original.
+Use the reference submodule as a behavioral specification: study the original implementation, tests, outputs, and known bugs to understand what must be preserved. Do **not** port it line by line. Use it to learn **what** the Rust implementation must do, not **how** it should be written. For deeper contributor guidance, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md).
 
 ## Quick Start
 
 ```bash
-# Setup (first time only)
-./setup.sh                    # Initialize git submodules (SPDX license data)
-git submodule update --init   # Ensure all submodules are initialized
+# Setup and repository bootstrap
+./setup.sh                    # Initialize submodules and local data dependencies when needed
+git submodule update --init   # Refresh submodules after clone or submodule changes
 
 # Build & Test
 cargo build                   # Development build
 cargo build --release         # Optimized build
-cargo test parsers::npm_test::tests::test_extract_from_testdata  # Prefer exact test paths for local iteration
-cargo test parsers::npm_test::tests::test_is_match               # Keep local verification tightly scoped
-cargo test --release --features golden-tests --lib parsers::golden_test::python_golden_test::golden_tests::test_golden_metadata  # Only when a targeted golden test is required
+cargo test -- --list          # Discover exact test paths before running targeted tests
+cargo test <full-test-path>   # Prefer exact test paths for local iteration
+cargo test --release --features golden-tests --lib <golden-test-path>  # Use only for narrowly targeted golden verification
 
 # Code Quality
 cargo fmt                     # Format code
 cargo clippy                  # Lint and catch mistakes
 cargo clippy --fix            # Auto-fix clippy suggestions
 npm run check:docs            # Markdown lint + formatting check
-npm run validate:urls         # Validate documentation/docstring URLs (can take a few minutes)
+npm run validate:urls         # Validate documentation/docstring URLs
 
 # Run Tool
 cargo run -- --json-pp output.json <dir> --ignore "*.git*" --ignore "target/*"
@@ -85,28 +64,23 @@ cargo run -- --json-pp output.json <dir> --ignore "*.git*" --ignore "target/*"
 
 ## Running Single Tests
 
-Local runs must stay tightly scoped. This repository has thousands of tests and many are slow, so agents should default to the smallest command that proves the change they just made. Prefer exact test paths over substring filters, and prefer a handful of related tests over broad module- or crate-wide sweeps. Let CI handle the full sharded suite after code is pushed.
+Local runs must stay tightly scoped. This repository has many slow and specialized tests, so agents should default to the smallest command that proves the change they just made. Prefer exact test paths over substring filters, and prefer a handful of related tests over broad module- or crate-wide sweeps. Let CI handle the broader matrix after code is pushed.
 
-To run a specific test, use its full path from `cargo test -- --list`:
+To run a specific test, first discover its full path from `cargo test -- --list`, then run the exact path:
 
 ```bash
-cargo test parsers::npm_test::tests::test_extract_from_testdata
-cargo test parsers::npm_test::tests::test_is_match
+cargo test <full-test-path>
 ```
 
 Avoid broad local commands such as `cargo test`, `cargo test --all`, `cargo test --lib`, or unfiltered golden test suites unless the user explicitly asks for them or there is no narrower way to validate a shared infrastructure change.
+
+For test-layer definitions, fixture-maintenance workflows, and broader testing guidance, see [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md).
 
 ## Running Golden Tests
 
 Only run golden tests locally when the change directly affects golden-test-covered behavior, and then run the narrowest possible golden test target. Always use `--release` unless explicitly instructed otherwise. Debug golden test runs are far too slow for normal agent work.
 
-To count failing golden test cases:
-
-```bash
-cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
-```
-
-Running golden tests is expensive, so keep them narrowly targeted and use file-based caching for more complex, incremental analysis.
+Running golden tests is expensive, so keep them narrowly targeted, prefer the dedicated helper scripts in `scripts/` when fixture maintenance is required, and use file-based caching for more complex incremental analysis.
 
 ## Project Architecture
 
@@ -264,64 +238,26 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 
 ## Testing Strategy
 
-Provenant uses a **four-layer testing approach** for comprehensive quality assurance:
-
-1. **Doctests** - API documentation examples that run as tests (verifies public API examples work)
-2. **Unit Tests** - Component-level tests for individual functions and edge cases
-3. **Golden Tests** - Regression tests comparing output against Python ScanCode reference
-4. **Integration Tests** - End-to-end tests validating the full scanner pipeline
-
-**For complete testing philosophy and guidelines**: See [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md)
+Testing philosophy, layer definitions, and when to use each test type are canonical in [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md).
 
 ### Golden Test Expected Files: Change with Care
 
-Golden test expected files (the reference JSON outputs) serve as the ground truth for regression testing. They should **not be modified casually** just to make a failing test pass.
+Do not update golden expected files just to make a failing test pass.
 
-- **Default assumption**: If a golden test fails, the implementation is wrong — fix the code, not the test expectation.
-- **Updating expected files is acceptable** when the scanner output is truly correct or superior to the existing snapshot (e.g., fixing a bug from the Python reference, improved accuracy, or capturing previously missing data). Just make sure the improvement is intentional, not a side effect of a regression elsewhere.
-
-### Quick Testing Reference
-
-**Co-located tests**: Use `#[cfg(test)] mod tests { ... }` in implementation files
-**Separate test files**: For larger suites, use `<module>_test.rs` and `<module>_golden_test.rs`
-**Test data**: Place in `testdata/` directory, organized by ecosystem
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parser_matches_correct_filename() {
-        assert!(MyParser::is_match(&PathBuf::from("package.json")));
-        assert!(!MyParser::is_match(&PathBuf::from("readme.md")));
-    }
-}
-```
+- **Default assumption**: fix the implementation, not the expected output.
+- **Update expectations only** for intentional, correct output improvements, and document why the new output is better.
 
 ## CI/CD
 
-**Pre-commit hooks** (install with `pre-commit install`):
-
-- `cargo fmt --all -- --check` - Verify Rust formatting on Rust changes
-- `cargo clippy --lib --bins --all-features -- -D warnings` - Lint library and binary targets with warnings as errors
-- `./scripts/check_xtask_lockfile_sync.sh` - Verify xtask lockfile sync when related manifests change
-- `cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
-- `markdownlint-cli2 --fix` - Lint and auto-fix changed Markdown files
-- `prettier --write` - Format changed YAML, JSON, and Markdown files
-
-**GitHub Actions** (runs on push to main and PRs):
-
-- Code formatting check: `cargo fmt --all -- --check`
-- Clippy linting: `cargo clippy --all-targets --all-features -- -D warnings`
-- Compilation: `cargo check --all --verbose`
-- Unit/integration/doc tests: `cargo test --all --release --verbose`
-- Golden tests: sharded filtered runs such as `cargo test --lib --features golden-tests "parsers::golden_test::..."`, with some shards using `--release`
-- Additional CI checks: xtask lockfile sync, supported-format generation, unused-dependency checks, Markdown linting, Prettier checks, and URL validation
-
-Agents should treat the full GitHub Actions matrix as CI's job, not the default local workflow. Local iteration should stay focused on the exact tests needed for the files and behavior under change, because CI already shards the expensive broad suites.
+Canonical hook and CI definitions live in [`.pre-commit-config.yaml`](.pre-commit-config.yaml), [`package.json`](package.json), and [`.github/workflows/check.yml`](.github/workflows/check.yml), with helper scripts in [`scripts/`](scripts/). Agents should treat the full CI workflow as CI's job, not the default local workflow. Local iteration should stay focused on the exact tests and checks needed for the files and behavior under change.
 
 **All checks must pass before merging.**
+
+### Opening Pull Requests
+
+- Use [`.github/pull_request_template.md`](.github/pull_request_template.md) for every agent-authored PR. When opening with `gh`, start from it via `gh pr create --template .github/pull_request_template.md`, complete every section, and write `None.` when a section does not apply.
+- Include concrete verification evidence in the PR body, including the exact local commands you ran and their outcomes. If golden or other expected-output fixture files changed, explain which files changed and why the new expected output is correct.
+- Keep PR scope disciplined. For ecosystem/parser work, prefer one ecosystem family per PR and do not hide unrelated refactors inside the same review unit.
 
 ## Performance Considerations
 
@@ -329,95 +265,34 @@ Agents should treat the full GitHub Actions matrix as CI's job, not the default 
 - **Read once**: File contents read once into memory for all analysis operations
 - **Early filtering**: Exclusion patterns applied early during traversal
 - **Atomic progress**: Progress bar updates use atomic operations
-- **Release optimizations**: LTO enabled, single codegen unit, symbols stripped
+- **Release optimizations**: Release builds use additional optimization settings; consult the Cargo configuration and architecture docs for current details
 - **Benchmarking**: Run `./scripts/benchmark.sh` to measure performance on a standardized test repository. Use this after changes that could affect general performance. When committing performance-related changes, include the timing data in the commit message.
 
 ## Common Pitfalls
 
-1. **Taking shortcuts**: Never compromise on correctness for speed of implementation. Take the time to do it right.
-2. **Following Python code line-by-line**: The reference is for understanding requirements, not for copying implementation patterns.
-3. **Skipping edge cases**: The original has edge cases that must be handled. Study the tests thoroughly.
-4. **Missing datasource_id**: Setting `datasource_id: None` in production code paths breaks assembly
-5. **Datasource ID mismatch**: Using wrong `DatasourceId` enum variant for a parser's file format
-6. **License data missing**: Run `./setup.sh` to initialize submodule
-7. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
-8. **Line endings**: Be careful with `\n` vs `\r\n` in tests
-9. **Unwrap in library code**: Use `?` or `match` instead
-10. **Breaking parallel processing**: Ensure modifications maintain thread safety
-11. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
-12. **Modifying golden test expected files**: Don't change expected output files just to make tests pass. Only update them when the scanner output is genuinely improved — and document why. See [Golden Test Expected Files: Change with Care](#golden-test-expected-files-change-with-care).
-13. **Suppressing clippy warnings**: Never use `#[allow(...)]` or `#[expect(...)]` to ignore clippy errors or warnings as a shortcut or temporary workaround. Clippy suppressions are only acceptable when the lint is genuinely a false positive and the suppression is intended to be permanent. Every suppression must include a comment explaining why it is justified. If clippy flags something, fix the code properly.
+1. **Taking shortcuts or porting Python line-by-line**: Preserve behavior, not implementation details. Study the tests and edge cases, then implement the Rust version properly.
+2. **Datasource ID mistakes**: Setting `datasource_id: None`, choosing the wrong `DatasourceId` variant, or missing an error-path assignment breaks assembly. See [Datasource IDs: The Assembly Bridge](#datasource-ids-the-assembly-bridge).
+3. **License data missing**: Run `./setup.sh` to initialize submodule
+4. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
+5. **Line endings**: Be careful with `\n` vs `\r\n` in tests
+6. **Unwrap in library code**: Use `?` or `match` instead
+7. **Breaking parallel processing**: Ensure modifications maintain thread safety
+8. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
+9. **Modifying golden test expected files**: See [Golden Test Expected Files: Change with Care](#golden-test-expected-files-change-with-care).
+10. **Suppressing clippy warnings**: Never use `#[allow(...)]` or `#[expect(...)]` to ignore clippy errors or warnings as a shortcut or temporary workaround. Clippy suppressions are only acceptable when the lint is genuinely a false positive and the suppression is intended to be permanent. Every suppression must include a comment explaining why it is justified. If clippy flags something, fix the code properly.
 
 ## Porting Features from Original ScanCode
 
-When implementing features from the original Python codebase at `reference/scancode-toolkit/`:
+When porting behavior from the Python reference, use it as the spec for requirements, edge cases, outputs, and known bugs — never as a line-by-line implementation template.
 
-### Implementation Principles
+### Porting and Parser Guardrails
 
-1. **Research exhaustively**: Read the original implementation, tests, and documentation to understand:
-   - The complete feature specification and all edge cases
-   - Input formats, output structures, and error conditions
-   - Known bugs, workarounds, and technical debt
-   - User expectations and real-world usage patterns
-
-2. **Achieve feature parity, not code parity**:
-   - Every capability of the original must be preserved
-   - Every edge case must be handled (correctly this time)
-   - Output must be functionally equivalent (same JSON structure, same semantics)
-   - **DO NOT** replicate line-by-line - use the reference to understand requirements, not implementation
-
-3. **Design for correctness**:
-   - Use Rust's type system to make invalid states unrepresentable
-   - Leverage compiler guarantees instead of runtime checks where possible
-   - Implement proper error handling with `Result<T, E>` (no exception-based control flow)
-   - Write code that's self-documenting through strong types and clear interfaces
-
-4. **Never compromise on quality**:
-   - Take the time to implement comprehensive test coverage
-   - Include test cases for bugs present in the original (document what you fixed)
-   - Handle all error conditions explicitly - no silent failures
-   - Don't ship until it's correct, complete, and well-tested
-
-5. **Leverage Rust advantages**:
-   - Use zero-copy parsing where possible (e.g., `&str` instead of `String`)
-   - Apply compile-time optimizations (const evaluation, inlining)
-   - Exploit the ownership system for memory safety without runtime cost
-   - Use iterators and functional patterns for clarity and performance
-
-6. **Document intentional differences**: If the Rust implementation differs behaviorally from the original:
-   - Explain why (usually: fixing a bug or edge case)
-   - Document the original behavior vs new behavior
-   - Add tests demonstrating the improvement
-
-### Example Workflow
-
-```bash
-# STEP 1: Study the original implementation thoroughly
-cd reference/scancode-toolkit/
-grep -r "relevant_function_name" src/
-cat src/packagedcode/npm.py
-
-# Look at tests to understand expected behavior and edge cases
-find tests/ -name "*npm*" -type f
-cat tests/packagedcode/test_npm.py
-
-# Check for known issues
-git log --all --grep="npm" --grep="bug" --oneline
-
-# STEP 2: Return to main project and design the Rust implementation
-cd ../..
-
-# Create comprehensive test cases FIRST (TDD approach)
-# Include edge cases found in original tests + cases for known bugs
-vim src/parsers/npm_test.rs
-
-# STEP 3: Implement in idiomatic Rust with proper error handling
-vim src/parsers/npm.rs
-
-# STEP 4: Verify correctness against original behavior
-cargo test parsers::npm_test::tests::test_extract_from_testdata
-# Run on real-world testdata and compare outputs with original
-```
+1. **Research exhaustively**: read the original implementation, tests, and documentation before designing the Rust version.
+2. **Aim for feature parity, not code parity**: preserve behavior and output semantics while using idiomatic Rust.
+3. **Design for correctness**: use strong types, explicit error handling, and tests that cover edge cases and bug fixes from the original.
+4. **Leverage Rust advantages**: prefer zero-copy parsing, compile-time guarantees, and designs that make invalid states unrepresentable.
+5. **Document intentional differences**: if Rust diverges behaviorally, explain why and add tests that demonstrate the improvement.
+6. **For parser-specific implementation rules**: follow [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md), especially the security-first parsing constraints, declared-license normalization rules, datasource requirements, and assembly setup guidance.
 
 ### Quality Checklist
 
@@ -432,17 +307,6 @@ Before considering a feature complete:
 - [ ] Real-world testdata produces correct output
 - [ ] Golden test expected files are unchanged unless output genuinely improved (documented)
 - [ ] Documentation explains any intentional behavioral differences
-
-## Parser Implementation Guidelines
-
-**Comprehensive step-by-step guide**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md)
-
-### Key Principles
-
-1. **Feature parity**: Every field Python extracts, Rust must extract
-2. **Security first**: AST-only parsing, no code execution (see [ADR 0004](docs/adr/0004-security-first-parsing.md))
-3. **Beyond parity**: Fix bugs, implement TODOs (document in `docs/improvements/`)
-4. **Validation**: Golden tests against Python reference (see [ADR 0003](docs/adr/0003-golden-test-strategy.md))
 
 ## Dependency Scope Conventions
 
@@ -530,153 +394,22 @@ The `scope` field is intentionally **not standardized** across ecosystems. For c
 
 ## Datasource IDs: The Assembly Bridge
 
-**Datasource IDs** uniquely identify the type of package data source (file format) that was parsed. They serve as the critical link between parsers and the assembly system.
+`datasource_id` is the file-format-level bridge between parsers and assembly. It is **not** the same as `package_type`: one package type can map to many datasource IDs.
 
-### What Are Datasource IDs?
+Guardrails:
 
-A **datasource ID** is a type-safe enum variant that answers: "What specific file type did this package data come from?"
+- **Always set `datasource_id`** on every production path, including error and fallback returns.
+- **Use the correct enum variant** for the exact file format being parsed.
+- **Handle multi-datasource parsers explicitly** when one parser supports multiple file formats.
+- **Add new datasource variants and assembly wiring together** so sibling/related files can merge correctly.
+- **Preserve upstream typos with `#[serde(rename)]` when required** (for example `NugetNuspec` → `"nuget_nupsec"`, `RpmSpecfile` → `"rpm_spefile"`).
 
-- **Example**: `DatasourceId::NpmPackageJson` identifies data from a `package.json` file
-- **Example**: `DatasourceId::NpmPackageLockJson` identifies data from a `package-lock.json` file
-- **Example**: `DatasourceId::PypiPyprojectToml` identifies data from a `pyproject.toml` file
-
-### Why Do They Exist?
-
-Datasource IDs enable the **assembly system** to intelligently merge related package files:
-
-1. **Parser emits** `PackageData` with `datasource_id: Some(DatasourceId::NpmPackageJson)`
-2. **Parser emits** `PackageData` with `datasource_id: Some(DatasourceId::NpmPackageLockJson)`
-3. **Assembler sees** both datasource IDs are in the same `AssemblerConfig`
-4. **Assembler merges** them into a single logical package with combined data
-
-Without datasource IDs, the assembler couldn't distinguish between different file types from the same ecosystem.
-
-### How They Differ from `package_type`
-
-| Field           | Purpose                         | Example Values                                                     | Granularity              |
-| --------------- | ------------------------------- | ------------------------------------------------------------------ | ------------------------ |
-| `package_type`  | Ecosystem/registry identifier   | `"npm"`, `"pypi"`, `"cargo"`                                       | Coarse (ecosystem-level) |
-| `datasource_id` | Specific file format identifier | `DatasourceId::NpmPackageJson`, `DatasourceId::NpmPackageLockJson` | Fine (file-type-level)   |
-
-**Key difference**: One `package_type` can have multiple `datasource_id` values.
-
-### Implementation Requirements
-
-Every parser MUST:
-
-1. **Set `datasource_id` in PackageData** for ALL code paths using the `DatasourceId` enum:
-
-   ```rust
-   PackageData {
-       package_type: Some("npm".to_string()),
-       datasource_id: Some(DatasourceId::NpmPackageJson),
-       // ...
-   }
-   ```
-
-2. **Set `datasource_id` even on error/fallback paths**:
-
-   ```rust
-   Err(e) => {
-       warn!("Failed to parse {:?}: {}", path, e);
-       return vec![PackageData {
-           package_type: Some("npm".to_string()),
-           datasource_id: Some(DatasourceId::NpmPackageJson),
-           ..Default::default()
-       }];
-   }
-   ```
-
-### Multi-Datasource Parsers
-
-Some parsers handle multiple file formats and emit different datasource IDs:
-
-```rust
-impl PackageParser for PythonParser {
-    const PACKAGE_TYPE: &'static str = "pypi";
-
-    fn extract_packages(path: &Path) -> Vec<PackageData> {
-        if path.ends_with("pyproject.toml") {
-            vec![PackageData {
-                datasource_id: Some(DatasourceId::PypiPyprojectToml),
-                // ...
-            }]
-        } else if path.ends_with("setup.py") {
-            vec![PackageData {
-                datasource_id: Some(DatasourceId::PypiSetupPy),
-                // ...
-            }]
-        }
-        // ...
-    }
-}
-```
-
-### Uniqueness Enforcement
-
-Datasource IDs are globally unique by design. The `DatasourceId` enum in `src/models/datasource_id.rs` defines all valid IDs as enum variants. The compiler enforces:
-
-- **No duplicates**: Each variant exists exactly once in the enum
-- **No typos**: Invalid IDs are compile-time errors
-- **Exhaustive matching**: `match` statements must handle all variants
-
-This replaces the previous runtime validation approach with compile-time safety.
-
-### Naming Convention
-
-Enum variants use `PascalCase` (Rust convention). They serialize to `snake_case` strings for JSON output:
-
-- `DatasourceId::NpmPackageJson` → serialized as `"npm_package_json"`
-- `DatasourceId::CargoLock` → serialized as `"cargo_lock"`
-
-When Python reference values contain typos, we use correct PascalCase names with `#[serde(rename)]`:
-
-- `DatasourceId::NugetNuspec` → serialized as `"nuget_nupsec"` (Python typo preserved)
-- `DatasourceId::RpmSpecfile` → serialized as `"rpm_spefile"` (Python typo preserved)
-
-### Common Mistakes
-
-1. **Setting `datasource_id: None`** in production code paths
-   - ❌ Wrong: `datasource_id: None`
-   - ✅ Correct: `datasource_id: Some(DatasourceId::NpmPackageJson)`
-
-2. **Using wrong enum variant**
-   - ❌ Wrong: Using `DatasourceId::NpmPackageJson` in a lockfile parser
-   - ✅ Correct: Use the variant matching the actual file format
-
-3. **Forgetting to add new variants** when adding new file format support
-   - ❌ Wrong: Add parser for new format without adding `DatasourceId` variant
-   - ✅ Correct: Add variant to `DatasourceId` enum in `src/models/datasource_id.rs`
-
-4. **Missing error path coverage**
-   - ❌ Wrong: Error paths returning `PackageData::default()` without setting `datasource_id`
-   - ✅ Correct: Always set `datasource_id` even in error/fallback returns
-
-### Relationship to Assembly
-
-Datasource IDs are configured in `src/assembly/assemblers.rs`:
-
-```rust
-AssemblerConfig {
-    datasource_ids: &[DatasourceId::NpmPackageJson, DatasourceId::NpmPackageLockJson],
-    sibling_file_patterns: &["package.json", "package-lock.json"],
-    mode: AssemblyMode::SiblingMerge,
-},
-```
-
-The assembler:
-
-1. Groups packages by directory
-2. Checks if their `datasource_id` values match any `AssemblerConfig`
-3. Merges matching packages into a single logical package
-4. Combines their `datafile_paths` and `datasource_ids` arrays
-
-**See**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md#step-6-add-assembly-support-if-applicable) for detailed assembly setup.
+For the full datasource and assembly workflow, see [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md#step-6-add-assembly-support-if-applicable).
 
 ## Additional Notes
 
-- **Rust toolchain**: Version pinned in `rust-toolchain.toml` (currently 1.93.0)
+- **Rust toolchain**: Version pinned in `rust-toolchain.toml`
 - **Output format**: ScanCode Toolkit-compatible JSON with `OUTPUT_FORMAT_VERSION`
-- **License detection**: Uses SPDX license data, threshold of 0.9 confidence
+- **License detection**: Uses an embedded license index built from the ScanCode rules dataset; see [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](docs/LICENSE_DETECTION_ARCHITECTURE.md) for current detection behavior and maintenance workflow
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
-- **Git submodules**: `reference/scancode-toolkit/` - Full Python codebase for reference (includes license rules/licenses)
+- **Git submodules**: `reference/scancode-toolkit/` remains the behavioral reference and license-data source for parity work, but routine scans use the embedded index

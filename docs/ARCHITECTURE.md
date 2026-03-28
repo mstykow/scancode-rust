@@ -728,8 +728,8 @@ For detailed documentation of the license detection pipeline, matching algorithm
 
 The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:
 
-- **Embedded artifact**: `resources/license_detection/license_index_loader.msgpack.zst`
-- **Format**: MessagePack-serialized, zstd-compressed loader data
+- **Embedded artifact**: `resources/license_detection/license_index.bincode.zst`
+- **Format**: bincode-serialized, zstd-compressed embedded index data
 - **Contents**: Parsed and normalized `LoadedRule` and `LoadedLicense` values from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
@@ -800,10 +800,10 @@ Maintainers can regenerate the embedded license artifact when the ScanCode rules
 ./setup.sh
 
 # Regenerate the artifact
-./scripts/update_license_loader_artifact.sh
+cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
 
 # Commit the updated artifact
-git add resources/license_detection/license_index_loader.msgpack.zst
+git add resources/license_detection/license_index.bincode.zst
 git commit -m "chore: update embedded license data"
 ```
 

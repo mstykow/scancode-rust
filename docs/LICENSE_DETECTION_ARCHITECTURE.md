@@ -56,8 +56,8 @@ Arc<LicenseDetectionEngine> shared across scanner threads
 
 The binary includes a pre-built license index embedded at compile time:
 
-- **Location**: `resources/license_detection/license_index_loader.msgpack.zst`
-- **Format**: MessagePack serialization, zstd compression
+- **Location**: `resources/license_detection/license_index.bincode.zst`
+- **Format**: bincode serialization, zstd compression
 - **Contents**: `LoadedRule` and `LoadedLicense` values parsed from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
@@ -97,10 +97,10 @@ When the ScanCode rules dataset is updated, regenerate the embedded artifact:
 ./setup.sh
 
 # Regenerate the artifact
-./scripts/update_license_loader_artifact.sh
+cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
 
 # Commit the updated artifact
-git add resources/license_detection/license_index_loader.msgpack.zst
+git add resources/license_detection/license_index.bincode.zst
 git commit -m "chore: update embedded license data"
 ```
 

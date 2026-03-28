@@ -69,7 +69,7 @@ On every release attempt, the script:
 1. Checks that the ScanCode reference submodule is present.
 2. Fetches the latest `origin/develop` for `reference/scancode-toolkit`.
 3. Updates the submodule checkout if the upstream commit changed.
-4. Regenerates `resources/license_detection/license_index_loader.msgpack.zst`.
+4. Regenerates `resources/license_detection/license_index.bincode.zst`.
 5. In `--execute` mode, commits that license-data refresh as `chore: update license rules/licenses to latest` when needed.
 6. Runs `cargo release <patch|minor|major>` in dry-run or execute mode.
 
