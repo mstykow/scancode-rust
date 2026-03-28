@@ -239,6 +239,139 @@ mod tests {
     }
 
     #[test]
+    fn test_spdx_writers_emit_real_file_and_package_license_info() {
+        let output = sample_output();
+
+        let mut tv_bytes = Vec::new();
+        writer_for_format(OutputFormat::SpdxTv)
+            .write(
+                &output,
+                &mut tv_bytes,
+                &OutputWriteConfig {
+                    format: OutputFormat::SpdxTv,
+                    custom_template: None,
+                    scanned_path: Some("scan".to_string()),
+                },
+            )
+            .expect("spdx tv write should succeed");
+        let tv_rendered = String::from_utf8(tv_bytes).expect("spdx tv should be utf-8");
+        assert!(tv_rendered.contains("PackageLicenseConcluded: NOASSERTION"));
+        assert!(tv_rendered.contains("PackageLicenseInfoFromFiles: MIT"));
+        assert!(tv_rendered.contains("LicenseConcluded: NOASSERTION"));
+        assert!(tv_rendered.contains("LicenseInfoInFile: MIT"));
+        assert!(tv_rendered.contains("PackageCopyrightText: Copyright (c) Example"));
+
+        let mut rdf_bytes = Vec::new();
+        writer_for_format(OutputFormat::SpdxRdf)
+            .write(
+                &output,
+                &mut rdf_bytes,
+                &OutputWriteConfig {
+                    format: OutputFormat::SpdxRdf,
+                    custom_template: None,
+                    scanned_path: Some("scan".to_string()),
+                },
+            )
+            .expect("spdx rdf write should succeed");
+        let rdf_rendered = String::from_utf8(rdf_bytes).expect("spdx rdf should be utf-8");
+        assert!(rdf_rendered.contains(
+            "<spdx:licenseInfoFromFiles rdf:resource=\"http://spdx.org/licenses/MIT\"/>"
+        ));
+        assert!(
+            rdf_rendered.contains(
+                "<spdx:licenseInfoInFile rdf:resource=\"http://spdx.org/licenses/MIT\"/>"
+            )
+        );
+        assert!(rdf_rendered.contains(
+            "<spdx:licenseConcluded rdf:resource=\"http://spdx.org/rdf/terms#noassertion\"/>"
+        ));
+    }
+
+    #[test]
+    fn test_spdx_writers_emit_license_ref_metadata_and_matched_text() {
+        let mut output = sample_output();
+        output.files[0].license_detections = vec![LicenseDetection {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            matches: vec![Match {
+                license_expression: "unknown-license-reference".to_string(),
+                license_expression_spdx: "LicenseRef-scancode-unknown-license-reference"
+                    .to_string(),
+                from_file: Some("src/main.rs".to_string()),
+                start_line: 1,
+                end_line: 2,
+                matcher: Some("2-aho".to_string()),
+                score: 100.0,
+                matched_length: Some(4),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: Some("unknown-license-reference.RULE".to_string()),
+                rule_url: Some("https://example.com/unknown-license-reference.LICENSE".to_string()),
+                matched_text: Some("Custom license text".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            detection_log: vec![],
+            identifier: Some("unknown-ref-id".to_string()),
+        }];
+        output.license_references = vec![crate::models::LicenseReference {
+            name: "Unknown License Reference".to_string(),
+            short_name: "Unknown License Reference".to_string(),
+            spdx_license_key: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            text: "Unused fallback text".to_string(),
+        }];
+
+        let mut tv_bytes = Vec::new();
+        writer_for_format(OutputFormat::SpdxTv)
+            .write(
+                &output,
+                &mut tv_bytes,
+                &OutputWriteConfig {
+                    format: OutputFormat::SpdxTv,
+                    custom_template: None,
+                    scanned_path: Some("scan".to_string()),
+                },
+            )
+            .expect("spdx tv write should succeed");
+        let tv_rendered = String::from_utf8(tv_bytes).expect("spdx tv should be utf-8");
+        assert!(
+            tv_rendered
+                .contains("LicenseInfoInFile: LicenseRef-scancode-unknown-license-reference")
+        );
+        assert!(tv_rendered.contains(
+            "PackageLicenseInfoFromFiles: LicenseRef-scancode-unknown-license-reference"
+        ));
+        assert!(tv_rendered.contains("LicenseID: LicenseRef-scancode-unknown-license-reference"));
+        assert!(tv_rendered.contains("ExtractedText: <text>Custom license text"));
+        assert!(tv_rendered.contains("LicenseName: Unknown License Reference"));
+        assert!(tv_rendered.contains(
+            "LicenseComment: <text>See details at https://example.com/unknown-license-reference.LICENSE"
+        ));
+
+        let mut rdf_bytes = Vec::new();
+        writer_for_format(OutputFormat::SpdxRdf)
+            .write(
+                &output,
+                &mut rdf_bytes,
+                &OutputWriteConfig {
+                    format: OutputFormat::SpdxRdf,
+                    custom_template: None,
+                    scanned_path: Some("scan".to_string()),
+                },
+            )
+            .expect("spdx rdf write should succeed");
+        let rdf_rendered = String::from_utf8(rdf_bytes).expect("spdx rdf should be utf-8");
+        assert!(rdf_rendered.contains(
+            "<spdx:licenseInfoInFile rdf:resource=\"http://spdx.org/licenses/LicenseRef-scancode-unknown-license-reference\"/>"
+        ));
+        assert!(rdf_rendered.contains(
+            "<spdx:hasExtractedLicensingInfo><spdx:ExtractedLicensingInfo rdf:about=\"#LicenseRef-scancode-unknown-license-reference\">"
+        ));
+        assert!(
+            rdf_rendered.contains("<spdx:extractedText>Custom license text</spdx:extractedText>")
+        );
+    }
+
+    #[test]
     fn test_cyclonedx_json_writer_outputs_bom() {
         let output = sample_output();
         let mut bytes = Vec::new();
