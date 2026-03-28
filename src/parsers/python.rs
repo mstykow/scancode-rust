@@ -4635,7 +4635,7 @@ fn calculate_file_checksums(path: &Path) -> (Option<u64>, Option<String>) {
         }
     }
 
-    let hash = format!("{:x}", hasher.finalize());
+    let hash = hex::encode(hasher.finalize());
     (Some(size), Some(hash))
 }
 
