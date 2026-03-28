@@ -3,9 +3,7 @@ use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
 use regex::Regex;
-use serde::Deserialize;
 use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -18,9 +16,10 @@ use crate::post_processing::{
 };
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scan_result_shaping::{
-    apply_ignore_resource_filter, apply_mark_source, apply_only_findings_filter,
-    apply_path_selection_filter, build_clue_rule_lookup, filter_redundant_clues,
-    filter_redundant_clues_with_rules, normalize_paths, normalize_top_level_output_paths,
+    apply_cli_path_selection_filter, apply_ignore_resource_filter, apply_mark_source,
+    apply_only_findings_filter, apply_user_path_filters_to_collected, filter_redundant_clues,
+    filter_redundant_clues_with_rules, load_and_merge_json_inputs, normalize_paths,
+    normalize_top_level_output_paths, prepare_filter_clue_rule_lookup, resolve_native_scan_inputs,
     trim_preloaded_assembly_to_files,
 };
 use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
@@ -68,7 +67,6 @@ fn run() -> Result<()> {
     validate_scan_option_compatibility(&cli)?;
     let facet_rules = build_facet_rules(&cli.facet)?;
 
-    let include_patterns = compile_include_patterns(&cli.include);
     let ignore_author_patterns = compile_regex_patterns("--ignore-author", &cli.ignore_author)?;
     let ignore_copyright_holder_patterns =
         compile_regex_patterns("--ignore-copyright-holder", &cli.ignore_copyright_holder)?;
@@ -83,61 +81,24 @@ fn run() -> Result<()> {
         preloaded_license_rule_references,
         active_license_engine,
     ) = if cli.from_json {
-        let mut merged: Option<JsonScanInput> = None;
-        for input_path in &cli.dir_path {
-            let mut loaded = load_scan_from_json(input_path)?;
-            if cli.strip_root || cli.full_root {
-                normalize_loaded_json_scan(&mut loaded, cli.strip_root, cli.full_root);
-            }
-            if let Some(acc) = &mut merged {
-                acc.files.append(&mut loaded.files);
-                acc.packages.append(&mut loaded.packages);
-                acc.dependencies.append(&mut loaded.dependencies);
-                acc.license_references
-                    .append(&mut loaded.license_references);
-                acc.license_rule_references
-                    .append(&mut loaded.license_rule_references);
-                acc.excluded_count += loaded.excluded_count;
-            } else {
-                merged = Some(loaded);
-            }
-        }
-
-        let loaded = merged.ok_or_else(|| anyhow!("No input paths provided"))?;
-        let directories_count = loaded
-            .files
-            .iter()
-            .filter(|f| f.file_type == crate::models::FileType::Directory)
-            .count();
-        let files_count = loaded
-            .files
-            .iter()
-            .filter(|f| f.file_type == crate::models::FileType::File)
-            .count();
-        let size_count = loaded
-            .files
-            .iter()
-            .filter(|f| f.file_type == crate::models::FileType::File)
-            .map(|f| f.size)
-            .sum();
+        let loaded = load_and_merge_json_inputs(&cli.dir_path, cli.strip_root, cli.full_root)?;
+        let directories_count = loaded.directory_count();
+        let files_count = loaded.file_count();
+        let size_count = loaded.file_size_count();
         progress.finish_discovery(
             files_count,
             directories_count,
             size_count,
             loaded.excluded_count,
         );
+        let (process_result, assembly_result, license_references, license_rule_references) =
+            loaded.into_parts();
         (
-            scanner::ProcessResult {
-                files: loaded.files,
-                excluded_count: loaded.excluded_count,
-            },
+            process_result,
             directories_count,
-            assembly::AssemblyResult {
-                packages: loaded.packages,
-                dependencies: loaded.dependencies,
-            },
-            loaded.license_references,
-            loaded.license_rule_references,
+            assembly_result,
+            license_references,
+            license_rule_references,
             None,
         )
     } else {
@@ -246,10 +207,8 @@ fn run() -> Result<()> {
         );
     }
 
-    if cli.from_json && (!include_patterns.is_empty() || !cli.exclude.is_empty()) {
-        apply_path_selection_filter(&mut scan_result.files, |file| {
-            is_included_path(&file.path, &cli.include, &cli.exclude)
-        });
+    if cli.from_json && (!cli.include.is_empty() || !cli.exclude.is_empty()) {
+        apply_cli_path_selection_filter(&mut scan_result.files, &cli.include, &cli.exclude);
     }
 
     if cli.only_findings {
@@ -381,154 +340,6 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-fn resolve_native_scan_inputs(inputs: &[String]) -> Result<(String, Vec<String>)> {
-    if inputs.is_empty() {
-        return Err(anyhow!("No directory input path provided"));
-    }
-
-    if inputs.len() == 1 {
-        return Ok((inputs[0].clone(), Vec::new()));
-    }
-
-    if inputs.iter().any(|path| Path::new(path).is_absolute()) {
-        return Err(anyhow!(
-            "Invalid inputs: all input paths must be relative when using multiple inputs"
-        ));
-    }
-
-    let common_prefix = common_path_prefix(inputs)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .to_string_lossy()
-        .to_string();
-    if common_prefix != "." && !Path::new(&common_prefix).is_dir() {
-        return Err(anyhow!(
-            "Invalid inputs: all input paths must share a common single parent directory"
-        ));
-    }
-
-    let synthetic_includes = inputs
-        .iter()
-        .map(|path| path.replace('\\', "/").trim_end_matches('/').to_string())
-        .collect();
-
-    Ok((common_prefix, synthetic_includes))
-}
-
-fn common_path_prefix(inputs: &[String]) -> Option<PathBuf> {
-    let first = inputs.first()?;
-    let mut shared_components: Vec<_> = Path::new(first).components().collect();
-
-    for input in &inputs[1..] {
-        let components: Vec<_> = Path::new(input).components().collect();
-        let shared_len = shared_components
-            .iter()
-            .zip(components.iter())
-            .take_while(|(left, right)| left == right)
-            .count();
-        shared_components.truncate(shared_len);
-        if shared_components.is_empty() {
-            break;
-        }
-    }
-
-    if shared_components.is_empty() {
-        None
-    } else {
-        let mut prefix = PathBuf::new();
-        for component in shared_components {
-            prefix.push(component.as_os_str());
-        }
-        Some(prefix)
-    }
-}
-
-fn normalize_loaded_json_scan(loaded: &mut JsonScanInput, strip_root: bool, full_root: bool) {
-    if let Some(scan_root) = derive_json_scan_root(&loaded.files)
-        && strip_root
-    {
-        normalize_paths(&mut loaded.files, &scan_root, true, false);
-        normalize_top_level_output_paths(
-            &mut loaded.packages,
-            &mut loaded.dependencies,
-            &scan_root,
-            true,
-        );
-    }
-
-    if full_root {
-        trim_loaded_json_full_root_paths(loaded);
-    }
-}
-
-fn derive_json_scan_root(files: &[crate::models::FileInfo]) -> Option<String> {
-    let mut directories: Vec<&str> = files
-        .iter()
-        .filter(|file| file.file_type == crate::models::FileType::Directory)
-        .map(|file| file.path.as_str())
-        .collect();
-    directories.sort_by_key(|path| (path.matches('/').count(), path.len()));
-    if let Some(root_dir) = directories.first() {
-        return Some((*root_dir).to_string());
-    }
-
-    if files.len() == 1 {
-        return files.first().map(|file| file.path.clone());
-    }
-
-    let paths: Vec<String> = files.iter().map(|file| file.path.clone()).collect();
-    common_path_prefix(&paths).map(|path| path.to_string_lossy().to_string())
-}
-
-fn trim_loaded_json_full_root_paths(loaded: &mut JsonScanInput) {
-    for file in &mut loaded.files {
-        trim_full_root_display_value(&mut file.path);
-        for detection_match in &mut file.license_clues {
-            if let Some(from_file) = detection_match.from_file.as_mut() {
-                trim_full_root_display_value(from_file);
-            }
-        }
-        for detection in &mut file.license_detections {
-            for detection_match in &mut detection.matches {
-                if let Some(from_file) = detection_match.from_file.as_mut() {
-                    trim_full_root_display_value(from_file);
-                }
-            }
-        }
-        for package_data in &mut file.package_data {
-            for file_reference in &mut package_data.file_references {
-                trim_full_root_display_value(&mut file_reference.path);
-            }
-            for detection in &mut package_data.license_detections {
-                for detection_match in &mut detection.matches {
-                    if let Some(from_file) = detection_match.from_file.as_mut() {
-                        trim_full_root_display_value(from_file);
-                    }
-                }
-            }
-            for detection in &mut package_data.other_license_detections {
-                for detection_match in &mut detection.matches {
-                    if let Some(from_file) = detection_match.from_file.as_mut() {
-                        trim_full_root_display_value(from_file);
-                    }
-                }
-            }
-        }
-    }
-
-    for package in &mut loaded.packages {
-        for datafile_path in &mut package.datafile_paths {
-            trim_full_root_display_value(datafile_path);
-        }
-    }
-    for dependency in &mut loaded.dependencies {
-        trim_full_root_display_value(&mut dependency.datafile_path);
-    }
-}
-
-fn trim_full_root_display_value(path: &mut String) {
-    *path = path.replace('\\', "/").trim_matches('/').to_string();
-}
-
 fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
     let env_cache_dir = env::var_os(CACHE_DIR_ENV_VAR).map(PathBuf::from);
     let config = CacheConfig::from_overrides(
@@ -564,116 +375,6 @@ fn build_collection_exclude_patterns(scan_root: &Path, cache_config: &CacheConfi
     }
 
     patterns
-}
-
-fn apply_user_path_filters_to_collected(
-    collected: &mut crate::scanner::CollectedPaths,
-    scan_root: &Path,
-    include_patterns: &[String],
-    exclude_patterns: &[String],
-) -> usize {
-    let before_files = collected.files.len();
-    let before_dirs = collected.directories.len();
-    collected.files.retain(|(path, _)| {
-        let relative_path = normalize_scan_relative_path(path, scan_root);
-        is_included_path(&relative_path, include_patterns, exclude_patterns)
-    });
-
-    let kept_file_paths: std::collections::HashSet<_> = collected
-        .files
-        .iter()
-        .map(|(path, _)| path.clone())
-        .collect();
-    collected.directories.retain(|(path, _)| {
-        let relative_path = normalize_scan_relative_path(path, scan_root);
-        is_included_path(&relative_path, include_patterns, exclude_patterns)
-            || kept_file_paths
-                .iter()
-                .any(|file_path| file_path.starts_with(path))
-    });
-
-    (before_files - collected.files.len()) + (before_dirs - collected.directories.len())
-}
-
-fn normalize_scan_relative_path(path: &Path, scan_root: &Path) -> String {
-    path.strip_prefix(scan_root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
-fn is_included_path(path: &str, include_patterns: &[String], exclude_patterns: &[String]) -> bool {
-    if path.trim().is_empty() {
-        return false;
-    }
-
-    let normalized_path = path.replace('\\', "/").to_ascii_lowercase();
-    let stripped_path = normalized_path.trim_start_matches(['/', '0']).to_string();
-
-    if !include_patterns.is_empty()
-        && !include_patterns
-            .iter()
-            .filter(|pattern| !pattern.trim().is_empty())
-            .any(|pattern| path_matches_scancode_pattern(pattern, &normalized_path, &stripped_path))
-    {
-        return false;
-    }
-
-    !exclude_patterns
-        .iter()
-        .filter(|pattern| !pattern.trim().is_empty())
-        .any(|pattern| path_matches_scancode_pattern(pattern, &normalized_path, &stripped_path))
-}
-
-fn path_matches_scancode_pattern(
-    pattern: &str,
-    normalized_path: &str,
-    stripped_path: &str,
-) -> bool {
-    let normalized_pattern = pattern.trim_start_matches('/').to_ascii_lowercase();
-    let Ok(compiled) = Pattern::new(&normalized_pattern) else {
-        return false;
-    };
-
-    if !normalized_pattern.contains('/') {
-        stripped_path
-            .split('/')
-            .filter(|segment| !segment.is_empty())
-            .any(|segment| compiled.matches(segment))
-    } else {
-        matching_path_candidates(normalized_path, stripped_path)
-            .iter()
-            .any(|candidate| compiled.matches(candidate))
-    }
-}
-
-fn matching_path_candidates<'a>(normalized_path: &'a str, stripped_path: &'a str) -> Vec<&'a str> {
-    let mut candidates = Vec::new();
-
-    for path in [normalized_path, stripped_path] {
-        if path.is_empty() {
-            continue;
-        }
-
-        candidates.push(path);
-        let mut current = path;
-        while let Some((parent, _)) = current.rsplit_once('/') {
-            if parent.is_empty() {
-                break;
-            }
-            candidates.push(parent);
-            current = parent;
-        }
-    }
-
-    candidates
-}
-
-fn compile_include_patterns(patterns: &[String]) -> Vec<Pattern> {
-    patterns
-        .iter()
-        .filter_map(|pattern| Pattern::new(pattern).ok())
-        .collect()
 }
 
 fn compile_regex_patterns(option_name: &str, patterns: &[String]) -> Result<Vec<Regex>> {
@@ -743,35 +444,6 @@ where
     pool.install(f)
 }
 
-#[derive(Deserialize)]
-struct JsonScanInput {
-    #[serde(default)]
-    files: Vec<crate::models::FileInfo>,
-    #[serde(default)]
-    packages: Vec<crate::models::Package>,
-    #[serde(default)]
-    dependencies: Vec<crate::models::TopLevelDependency>,
-    #[serde(default)]
-    license_references: Vec<crate::models::LicenseReference>,
-    #[serde(default)]
-    license_rule_references: Vec<crate::models::LicenseRuleReference>,
-    #[serde(default)]
-    excluded_count: usize,
-}
-
-fn load_scan_from_json(path: &str) -> Result<JsonScanInput> {
-    let input_path = Path::new(path);
-    if !input_path.is_file() {
-        return Err(anyhow!("--from-json input must be a valid file: {}", path));
-    }
-
-    let content = fs::read_to_string(input_path)?;
-    let parsed: JsonScanInput = serde_json::from_str(&content)
-        .map_err(|e| anyhow!("Input JSON scan file is not valid JSON: {path}: {e}"))?;
-
-    Ok(parsed)
-}
-
 fn init_license_engine(rules_path: &Option<String>) -> Result<Arc<LicenseDetectionEngine>> {
     match rules_path {
         Some(p) => {
@@ -787,31 +459,6 @@ fn init_license_engine(rules_path: &Option<String>) -> Result<Arc<LicenseDetecti
             Ok(Arc::new(engine))
         }
     }
-}
-
-fn prepare_filter_clue_rule_lookup(
-    files: &[crate::models::FileInfo],
-    active_license_engine: Option<&LicenseDetectionEngine>,
-    rules_path: Option<&str>,
-) -> Result<Option<crate::scan_result_shaping::ClueRuleLookup>> {
-    let needs_rule_lookup = files.iter().any(|file| {
-        file.license_detections
-            .iter()
-            .any(|detection| !detection.matches.is_empty())
-    });
-    if !needs_rule_lookup {
-        return Ok(None);
-    }
-
-    if let Some(active_license_engine) = active_license_engine {
-        return Ok(Some(build_clue_rule_lookup(active_license_engine.index())));
-    }
-
-    let fallback_engine = match rules_path {
-        Some(path) => LicenseDetectionEngine::from_directory(Path::new(path))?,
-        None => LicenseDetectionEngine::from_embedded()?,
-    };
-    Ok(Some(build_clue_rule_lookup(fallback_engine.index())))
 }
 
 fn describe_license_engine_source(

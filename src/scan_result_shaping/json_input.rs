@@ -1,0 +1,207 @@
+use anyhow::{Result, anyhow};
+use serde::Deserialize;
+use std::fs;
+use std::path::Path;
+
+use crate::assembly;
+use crate::models::{
+    FileInfo, FileType, LicenseReference, LicenseRuleReference, Package, TopLevelDependency,
+};
+use crate::scanner::ProcessResult;
+
+use super::{normalize_paths, normalize_top_level_output_paths};
+
+#[derive(Deserialize)]
+pub(crate) struct JsonScanInput {
+    #[serde(default)]
+    pub(crate) files: Vec<FileInfo>,
+    #[serde(default)]
+    pub(crate) packages: Vec<Package>,
+    #[serde(default)]
+    pub(crate) dependencies: Vec<TopLevelDependency>,
+    #[serde(default)]
+    pub(crate) license_references: Vec<LicenseReference>,
+    #[serde(default)]
+    pub(crate) license_rule_references: Vec<LicenseRuleReference>,
+    #[serde(default)]
+    pub(crate) excluded_count: usize,
+}
+
+impl JsonScanInput {
+    pub(crate) fn directory_count(&self) -> usize {
+        self.files
+            .iter()
+            .filter(|file| file.file_type == FileType::Directory)
+            .count()
+    }
+
+    pub(crate) fn file_count(&self) -> usize {
+        self.files
+            .iter()
+            .filter(|file| file.file_type == FileType::File)
+            .count()
+    }
+
+    pub(crate) fn file_size_count(&self) -> u64 {
+        self.files
+            .iter()
+            .filter(|file| file.file_type == FileType::File)
+            .map(|file| file.size)
+            .sum()
+    }
+
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        ProcessResult,
+        assembly::AssemblyResult,
+        Vec<LicenseReference>,
+        Vec<LicenseRuleReference>,
+    ) {
+        (
+            ProcessResult {
+                files: self.files,
+                excluded_count: self.excluded_count,
+            },
+            assembly::AssemblyResult {
+                packages: self.packages,
+                dependencies: self.dependencies,
+            },
+            self.license_references,
+            self.license_rule_references,
+        )
+    }
+}
+
+pub(crate) fn load_and_merge_json_inputs(
+    input_paths: &[String],
+    strip_root: bool,
+    full_root: bool,
+) -> Result<JsonScanInput> {
+    let mut merged: Option<JsonScanInput> = None;
+    for input_path in input_paths {
+        let mut loaded = load_scan_from_json(input_path)?;
+        if strip_root || full_root {
+            normalize_loaded_json_scan(&mut loaded, strip_root, full_root);
+        }
+
+        if let Some(acc) = &mut merged {
+            acc.files.append(&mut loaded.files);
+            acc.packages.append(&mut loaded.packages);
+            acc.dependencies.append(&mut loaded.dependencies);
+            acc.license_references
+                .append(&mut loaded.license_references);
+            acc.license_rule_references
+                .append(&mut loaded.license_rule_references);
+            acc.excluded_count += loaded.excluded_count;
+        } else {
+            merged = Some(loaded);
+        }
+    }
+
+    merged.ok_or_else(|| anyhow!("No input paths provided"))
+}
+
+pub(crate) fn load_scan_from_json(path: &str) -> Result<JsonScanInput> {
+    let input_path = Path::new(path);
+    if !input_path.is_file() {
+        return Err(anyhow!("--from-json input must be a valid file: {}", path));
+    }
+
+    let content = fs::read_to_string(input_path)?;
+    let parsed: JsonScanInput = serde_json::from_str(&content)
+        .map_err(|e| anyhow!("Input JSON scan file is not valid JSON: {path}: {e}"))?;
+
+    Ok(parsed)
+}
+
+pub(crate) fn normalize_loaded_json_scan(
+    loaded: &mut JsonScanInput,
+    strip_root: bool,
+    full_root: bool,
+) {
+    if let Some(scan_root) = derive_json_scan_root(&loaded.files)
+        && strip_root
+    {
+        normalize_paths(&mut loaded.files, &scan_root, true, false);
+        normalize_top_level_output_paths(
+            &mut loaded.packages,
+            &mut loaded.dependencies,
+            &scan_root,
+            true,
+        );
+    }
+
+    if full_root {
+        trim_loaded_json_full_root_paths(loaded);
+    }
+}
+
+fn derive_json_scan_root(files: &[FileInfo]) -> Option<String> {
+    let mut directories: Vec<&str> = files
+        .iter()
+        .filter(|file| file.file_type == FileType::Directory)
+        .map(|file| file.path.as_str())
+        .collect();
+    directories.sort_by_key(|path| (path.matches('/').count(), path.len()));
+    if let Some(root_dir) = directories.first() {
+        return Some((*root_dir).to_string());
+    }
+
+    if files.len() == 1 {
+        return files.first().map(|file| file.path.clone());
+    }
+
+    let paths: Vec<String> = files.iter().map(|file| file.path.clone()).collect();
+    super::selection::common_path_prefix(&paths).map(|path| path.to_string_lossy().to_string())
+}
+
+fn trim_loaded_json_full_root_paths(loaded: &mut JsonScanInput) {
+    for file in &mut loaded.files {
+        trim_full_root_display_value(&mut file.path);
+        for detection_match in &mut file.license_clues {
+            if let Some(from_file) = detection_match.from_file.as_mut() {
+                trim_full_root_display_value(from_file);
+            }
+        }
+        for detection in &mut file.license_detections {
+            for detection_match in &mut detection.matches {
+                if let Some(from_file) = detection_match.from_file.as_mut() {
+                    trim_full_root_display_value(from_file);
+                }
+            }
+        }
+        for package_data in &mut file.package_data {
+            for file_reference in &mut package_data.file_references {
+                trim_full_root_display_value(&mut file_reference.path);
+            }
+            for detection in &mut package_data.license_detections {
+                for detection_match in &mut detection.matches {
+                    if let Some(from_file) = detection_match.from_file.as_mut() {
+                        trim_full_root_display_value(from_file);
+                    }
+                }
+            }
+            for detection in &mut package_data.other_license_detections {
+                for detection_match in &mut detection.matches {
+                    if let Some(from_file) = detection_match.from_file.as_mut() {
+                        trim_full_root_display_value(from_file);
+                    }
+                }
+            }
+        }
+    }
+
+    for package in &mut loaded.packages {
+        for datafile_path in &mut package.datafile_paths {
+            trim_full_root_display_value(datafile_path);
+        }
+    }
+    for dependency in &mut loaded.dependencies {
+        trim_full_root_display_value(&mut dependency.datafile_path);
+    }
+}
+
+fn trim_full_root_display_value(path: &mut String) {
+    *path = path.replace('\\', "/").trim_matches('/').to_string();
+}
