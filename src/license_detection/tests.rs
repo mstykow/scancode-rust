@@ -328,7 +328,10 @@ fn test_engine_automaton_functional() {
                 .flat_map(|t| t.to_le_bytes())
                 .collect();
 
-            let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
+            let matches: Vec<_> = index
+                .rules_automaton
+                .find_overlapping_iter(&pattern)
+                .collect();
             assert!(
                 !matches.is_empty(),
                 "Automaton should find pattern for rule 0"

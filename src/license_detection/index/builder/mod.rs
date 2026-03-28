@@ -6,9 +6,9 @@
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/index.py (lines 381-577)
 
-use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
+use crate::license_detection::automaton::{Automaton, AutomatonBuilder};
 use crate::license_detection::hash_match::compute_hash;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{
@@ -323,17 +323,19 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
     let mut rids_by_high_tid: HashMap<TokenId, HashSet<usize>> = HashMap::new();
 
-    let mut rules_automaton_patterns: Vec<Vec<u8>> = Vec::with_capacity(rules.len());
-    let mut pattern_id_to_rid: Vec<usize> = Vec::with_capacity(rules.len());
+    let mut pattern_to_rids: HashMap<Vec<u8>, Vec<usize>> = HashMap::with_capacity(rules.len());
     let mut unknown_automaton_patterns: Vec<Vec<u8>> = Vec::new();
 
     let mut licenses_by_key: HashMap<String, License> = HashMap::new();
-    for license in licenses {
-        licenses_by_key.insert(license.key.clone(), license);
+    let mut sorted_licenses: Vec<License> = licenses;
+    sorted_licenses.sort_by(|a, b| a.key.cmp(&b.key));
+    for license in &sorted_licenses {
+        licenses_by_key.insert(license.key.clone(), license.clone());
     }
 
-    let license_rules =
-        build_rules_from_licenses(&licenses_by_key.values().cloned().collect::<Vec<_>>());
+    let mut license_rules_vec: Vec<License> = licenses_by_key.values().cloned().collect();
+    license_rules_vec.sort_by(|a, b| a.key.cmp(&b.key));
+    let license_rules = build_rules_from_licenses(&license_rules_vec);
 
     let mut all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
     all_rules.sort();
@@ -375,8 +377,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         // Only add non-empty patterns to the automaton
         // Empty patterns (from non-ASCII text like Japanese) would match everywhere
         if !rule_token_ids.is_empty() {
-            rules_automaton_patterns.push(tokens_to_bytes(&rule_token_ids));
-            pattern_id_to_rid.push(rid);
+            let pattern = tokens_to_bytes(&rule_token_ids);
+            pattern_to_rids.entry(pattern).or_default().push(rid);
         }
 
         if rule.is_false_positive {
@@ -477,22 +479,32 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
     add_deprecated_spdx_aliases(&mut rid_by_spdx_key);
 
-    let rules_automaton = AhoCorasickBuilder::new()
-        .match_kind(aho_corasick::MatchKind::Standard)
-        .build(&rules_automaton_patterns)
-        .expect("Failed to build rules automaton");
+    // Build unique patterns list sorted for deterministic ordering
+    let mut unique_patterns: Vec<&[u8]> = pattern_to_rids.keys().map(|p| p.as_slice()).collect();
+    unique_patterns.sort();
+
+    let mut rules_builder = AutomatonBuilder::new();
+    for pattern in &unique_patterns {
+        rules_builder.add_pattern(pattern);
+    }
+    let rules_automaton = rules_builder.build();
+
+    // Build pattern_id_to_rid mapping from unique patterns
+    let pattern_id_to_rid: Vec<Vec<usize>> = unique_patterns
+        .iter()
+        .map(|pattern| pattern_to_rids.get(*pattern).cloned().unwrap_or_default())
+        .collect();
 
     let unknown_automaton = if unknown_automaton_patterns.is_empty() {
-        AhoCorasickBuilder::new()
-            .match_kind(aho_corasick::MatchKind::Standard)
-            .build(std::iter::empty::<&[u8]>())
-            .expect("Failed to build empty unknown automaton")
+        AutomatonBuilder::new().build()
     } else {
-        let unique_patterns: HashSet<Vec<u8>> = unknown_automaton_patterns.into_iter().collect();
-        AhoCorasickBuilder::new()
-            .match_kind(aho_corasick::MatchKind::Standard)
-            .build(&unique_patterns)
-            .expect("Failed to build unknown automaton")
+        let mut unique_patterns: Vec<Vec<u8>> = unknown_automaton_patterns.into_iter().collect();
+        unique_patterns.sort();
+        let mut builder = AutomatonBuilder::new();
+        for pattern in &unique_patterns {
+            builder.add_pattern(pattern);
+        }
+        builder.build()
     };
 
     LicenseIndex {
@@ -620,6 +632,369 @@ pub fn build_index_from_loaded(
         .collect();
 
     build_index(rules, licenses)
+}
+
+/// Build a `LicenseIndex` from loaded rules and licenses with pre-built automatons.
+///
+/// This is the embedded path that uses build-time serialized automatons,
+/// eliminating the runtime cost of automaton construction.
+///
+/// NOTE: This function is kept for potential future use by the xtask build process
+/// or for tests that need to build indexes dynamically. The main code path now uses
+/// the complete pre-built license index from `license_index.bincode.zst`.
+///
+/// # Arguments
+/// * `loaded_rules` - Rules loaded from the loader stage
+/// * `loaded_licenses` - Licenses loaded from the loader stage
+/// * `with_deprecated` - If false, filter out deprecated entries before building
+/// * `rules_automaton` - Pre-built rules automaton from embedded data
+/// * `unknown_automaton` - Pre-built unknown automaton from embedded data
+/// * `pattern_id_to_rid` - Pre-built pattern ID to rule ID mapping
+///
+/// # Returns
+/// A fully constructed `LicenseIndex`
+#[allow(dead_code)]
+pub fn build_index_from_loaded_with_automatons(
+    loaded_rules: Vec<LoadedRule>,
+    loaded_licenses: Vec<LoadedLicense>,
+    with_deprecated: bool,
+    rules_automaton: Automaton,
+    unknown_automaton: Automaton,
+    pattern_id_to_rid: Vec<Vec<usize>>,
+) -> LicenseIndex {
+    let rules: Vec<Rule> = loaded_rules
+        .into_iter()
+        .filter(|r| with_deprecated || !r.is_deprecated)
+        .map(loaded_rule_to_rule)
+        .collect();
+
+    let licenses: Vec<License> = loaded_licenses
+        .into_iter()
+        .filter(|l| with_deprecated || !l.is_deprecated)
+        .map(loaded_license_to_license)
+        .collect();
+
+    build_index_with_automatons(
+        rules,
+        licenses,
+        rules_automaton,
+        unknown_automaton,
+        pattern_id_to_rid,
+    )
+}
+
+/// Build a `LicenseIndex` with pre-built automatons.
+///
+/// This is the core implementation that builds all index structures except
+/// the automatons, which are provided from embedded data.
+///
+/// IMPORTANT: The rid assignment must match the xtask's build_automatons function.
+/// The xtask assigns rids in order: rules first (sorted by identifier), then
+/// licenses (sorted by key). This function must follow the same ordering for
+/// the pattern_id_to_rid mapping to be correct.
+#[allow(dead_code)]
+fn build_index_with_automatons(
+    rules: Vec<Rule>,
+    licenses: Vec<License>,
+    rules_automaton: Automaton,
+    unknown_automaton: Automaton,
+    pattern_id_to_rid: Vec<Vec<usize>>,
+) -> LicenseIndex {
+    let legalese_words = legalese::get_legalese_words();
+    let mut dictionary = TokenDictionary::new_with_legalese(&legalese_words);
+    let len_legalese = dictionary.legalese_count();
+
+    {
+        let spdx_tokens = collect_spdx_tokens(&licenses);
+        let mut sorted_tokens: Vec<&String> = spdx_tokens.iter().collect();
+        sorted_tokens.sort();
+        for token in sorted_tokens {
+            if dictionary.lookup(token).is_none() {
+                let _ = dictionary.intern(token);
+            }
+        }
+    }
+
+    let license_token_ids: HashSet<TokenId> = LICENSE_TOKEN_STRINGS
+        .iter()
+        .filter_map(|&token| dictionary.lookup(token).map(|token| token.id))
+        .collect();
+
+    let mut rid_by_hash: HashMap<[u8; 20], usize> = HashMap::new();
+    let mut rules_by_rid: Vec<Rule> = Vec::with_capacity(rules.len() + licenses.len());
+    let mut tids_by_rid: Vec<Vec<TokenId>> = Vec::with_capacity(rules.len() + licenses.len());
+    let mut sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
+    let mut msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = HashMap::new();
+    let mut high_sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
+    let mut high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = HashMap::new();
+    let mut false_positive_rids: HashSet<usize> = HashSet::new();
+    let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
+    let mut rids_by_high_tid: HashMap<TokenId, HashSet<usize>> = HashMap::new();
+
+    let mut licenses_by_key: HashMap<String, License> = HashMap::new();
+    let mut sorted_licenses: Vec<License> = licenses;
+    sorted_licenses.sort_by(|a, b| a.key.cmp(&b.key));
+    for license in &sorted_licenses {
+        licenses_by_key.insert(license.key.clone(), license.clone());
+    }
+
+    let mut rid_by_spdx_key: HashMap<String, usize> = HashMap::new();
+    let mut unknown_spdx_rid: Option<usize> = None;
+
+    let mut sorted_rules: Vec<Rule> = rules;
+    sorted_rules.sort_by(|a, b| a.identifier.cmp(&b.identifier));
+
+    let mut rid: usize = 0;
+
+    for mut rule in sorted_rules {
+        rule.required_phrase_spans = parse_required_phrase_spans(&rule.text);
+        let (rule_tokens, stopwords_by_pos) = tokenize_with_stopwords(&rule.text);
+        rule.stopwords_by_pos = stopwords_by_pos;
+        let mut known_rule_tokens: Vec<KnownToken> = Vec::with_capacity(rule_tokens.len());
+        let mut rule_token_ids: Vec<TokenId> = Vec::with_capacity(rule_tokens.len());
+
+        let mut is_weak = true;
+        for rts in &rule_tokens {
+            let known_token = dictionary.intern(rts);
+            if is_weak && known_token.kind == TokenKind::Legalese {
+                is_weak = false;
+            }
+            known_rule_tokens.push(known_token);
+            rule_token_ids.push(known_token.id);
+        }
+
+        let rule_length = rule_token_ids.len();
+        rule.tokens = rule_token_ids.clone();
+
+        rule.starts_with_license = rule_token_ids
+            .first()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
+        rule.ends_with_license = rule_token_ids
+            .last()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
+
+        let rule_hash = compute_hash(&rule_token_ids);
+
+        if rule.is_false_positive {
+            false_positive_rids.insert(rid);
+            rules_by_rid.push(rule);
+            tids_by_rid.push(rule_token_ids);
+            rid += 1;
+            continue;
+        }
+
+        rid_by_hash.insert(rule_hash, rid);
+
+        let is_approx_matchable = compute_is_approx_matchable(&rule);
+
+        if is_approx_matchable && !is_weak {
+            approx_matchable_rids.insert(rid);
+
+            let mut postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+            for (pos, token) in known_rule_tokens.iter().enumerate() {
+                if token.kind == TokenKind::Legalese {
+                    postings.entry(token.id).or_default().push(pos);
+                }
+            }
+            if !postings.is_empty() {
+                high_postings_by_rid.insert(rid, postings);
+            }
+        }
+
+        let (tids_set, mset) = build_set_and_mset(&rule_token_ids);
+
+        sets_by_rid.insert(rid, tids_set.clone());
+        msets_by_rid.insert(rid, mset.clone());
+
+        let tids_set_high = high_tids_set_subset(&tids_set, &dictionary);
+        let mset_high = high_multiset_subset(&mset, &dictionary);
+
+        if !tids_set_high.is_empty() {
+            high_sets_by_rid.insert(rid, tids_set_high.clone());
+        }
+
+        if approx_matchable_rids.contains(&rid) {
+            for &tid in &tids_set_high {
+                rids_by_high_tid.entry(tid).or_default().insert(rid);
+            }
+        }
+
+        rule.length_unique = tids_set_counter(&tids_set);
+        rule.high_length_unique = tids_set_counter(&tids_set_high);
+        rule.high_length = multiset_counter(&mset_high);
+
+        let (updated_coverage, min_matched_length, min_high_matched_length) =
+            compute_thresholds_occurrences(rule.minimum_coverage, rule_length, rule.high_length);
+        if !rule.has_stored_minimum_coverage {
+            rule.minimum_coverage = updated_coverage;
+        }
+        rule.min_matched_length = min_matched_length;
+        rule.min_high_matched_length = min_high_matched_length;
+
+        let (min_matched_length_unique, min_high_matched_length_unique) = compute_thresholds_unique(
+            rule.minimum_coverage,
+            rule_length,
+            rule.length_unique,
+            rule.high_length_unique,
+        );
+        rule.min_matched_length_unique = min_matched_length_unique;
+        rule.min_high_matched_length_unique = min_high_matched_length_unique;
+        rule.is_small = rule_length < SMALL_RULE;
+        rule.is_tiny = rule_length < TINY_RULE;
+
+        if let Some(ref spdx_key) = rule.spdx_license_key {
+            rid_by_spdx_key.insert(spdx_key.to_lowercase(), rid);
+        }
+        for alias in &rule.other_spdx_license_keys {
+            rid_by_spdx_key.insert(alias.to_lowercase(), rid);
+        }
+
+        rules_by_rid.push(rule);
+        tids_by_rid.push(rule_token_ids);
+        rid += 1;
+    }
+
+    for license in sorted_licenses {
+        let Some(mut rule) = build_rule_from_license(&license) else {
+            continue;
+        };
+        rule.required_phrase_spans = parse_required_phrase_spans(&rule.text);
+        let (rule_tokens, stopwords_by_pos) = tokenize_with_stopwords(&rule.text);
+        rule.stopwords_by_pos = stopwords_by_pos;
+        let mut known_rule_tokens: Vec<KnownToken> = Vec::with_capacity(rule_tokens.len());
+        let mut rule_token_ids: Vec<TokenId> = Vec::with_capacity(rule_tokens.len());
+
+        let mut is_weak = true;
+        for rts in &rule_tokens {
+            let known_token = dictionary.intern(rts);
+            if is_weak && known_token.kind == TokenKind::Legalese {
+                is_weak = false;
+            }
+            known_rule_tokens.push(known_token);
+            rule_token_ids.push(known_token.id);
+        }
+
+        let rule_length = rule_token_ids.len();
+        rule.tokens = rule_token_ids.clone();
+
+        rule.starts_with_license = rule_token_ids
+            .first()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
+        rule.ends_with_license = rule_token_ids
+            .last()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
+
+        let rule_hash = compute_hash(&rule_token_ids);
+
+        if rule.is_false_positive {
+            false_positive_rids.insert(rid);
+            rules_by_rid.push(rule);
+            tids_by_rid.push(rule_token_ids);
+            rid += 1;
+            continue;
+        }
+
+        rid_by_hash.insert(rule_hash, rid);
+
+        let is_approx_matchable = compute_is_approx_matchable(&rule);
+
+        if is_approx_matchable && !is_weak {
+            approx_matchable_rids.insert(rid);
+
+            let mut postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+            for (pos, token) in known_rule_tokens.iter().enumerate() {
+                if token.kind == TokenKind::Legalese {
+                    postings.entry(token.id).or_default().push(pos);
+                }
+            }
+            if !postings.is_empty() {
+                high_postings_by_rid.insert(rid, postings);
+            }
+        }
+
+        let (tids_set, mset) = build_set_and_mset(&rule_token_ids);
+
+        sets_by_rid.insert(rid, tids_set.clone());
+        msets_by_rid.insert(rid, mset.clone());
+
+        let tids_set_high = high_tids_set_subset(&tids_set, &dictionary);
+        let mset_high = high_multiset_subset(&mset, &dictionary);
+
+        if !tids_set_high.is_empty() {
+            high_sets_by_rid.insert(rid, tids_set_high.clone());
+        }
+
+        if approx_matchable_rids.contains(&rid) {
+            for &tid in &tids_set_high {
+                rids_by_high_tid.entry(tid).or_default().insert(rid);
+            }
+        }
+
+        rule.length_unique = tids_set_counter(&tids_set);
+        rule.high_length_unique = tids_set_counter(&tids_set_high);
+        rule.high_length = multiset_counter(&mset_high);
+
+        let (updated_coverage, min_matched_length, min_high_matched_length) =
+            compute_thresholds_occurrences(rule.minimum_coverage, rule_length, rule.high_length);
+        if !rule.has_stored_minimum_coverage {
+            rule.minimum_coverage = updated_coverage;
+        }
+        rule.min_matched_length = min_matched_length;
+        rule.min_high_matched_length = min_high_matched_length;
+
+        let (min_matched_length_unique, min_high_matched_length_unique) = compute_thresholds_unique(
+            rule.minimum_coverage,
+            rule_length,
+            rule.length_unique,
+            rule.high_length_unique,
+        );
+        rule.min_matched_length_unique = min_matched_length_unique;
+        rule.min_high_matched_length_unique = min_high_matched_length_unique;
+        rule.is_small = rule_length < SMALL_RULE;
+        rule.is_tiny = rule_length < TINY_RULE;
+
+        if let Some(ref spdx_key) = rule.spdx_license_key {
+            rid_by_spdx_key.insert(spdx_key.to_lowercase(), rid);
+        }
+        for alias in &rule.other_spdx_license_keys {
+            rid_by_spdx_key.insert(alias.to_lowercase(), rid);
+        }
+
+        if rule.license_expression == "unknown-spdx" {
+            unknown_spdx_rid = Some(rid);
+        }
+
+        rules_by_rid.push(rule);
+        tids_by_rid.push(rule_token_ids);
+        rid += 1;
+    }
+
+    add_deprecated_spdx_aliases(&mut rid_by_spdx_key);
+
+    LicenseIndex {
+        dictionary,
+        len_legalese,
+        rid_by_hash,
+        rules_by_rid,
+        tids_by_rid,
+        rules_automaton,
+        unknown_automaton,
+        sets_by_rid,
+        msets_by_rid,
+        high_sets_by_rid,
+        high_postings_by_rid,
+        false_positive_rids,
+        approx_matchable_rids,
+        licenses_by_key,
+        pattern_id_to_rid,
+        rid_by_spdx_key,
+        unknown_spdx_rid,
+        rids_by_high_tid,
+    }
 }
 
 #[cfg(test)]

@@ -12,6 +12,52 @@ const SCANCODE_LICENSE_URL_BASE: &str =
 const SCANCODE_RULE_URL_BASE: &str =
     "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules";
 
+mod range_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::ops::Range;
+
+    pub fn serialize<S>(ranges: &[Range<usize>], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let tuples: Vec<(usize, usize)> = ranges.iter().map(|r| (r.start, r.end)).collect();
+        tuples.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Range<usize>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let tuples: Vec<(usize, usize)> = Vec::deserialize(deserializer)?;
+        Ok(tuples
+            .into_iter()
+            .map(|(start, end)| Range { start, end })
+            .collect())
+    }
+}
+
+mod stopwords_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+
+    pub fn serialize<S>(map: &HashMap<usize, usize>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut entries: Vec<(usize, usize)> = map.iter().map(|(k, v)| (*k, *v)).collect();
+        entries.sort_by_key(|(k, _)| *k);
+        entries.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<usize, usize>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let entries: Vec<(usize, usize)> = Vec::deserialize(deserializer)?;
+        Ok(entries.into_iter().collect())
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
 )]
@@ -101,7 +147,7 @@ impl RuleKind {
 }
 
 /// Rule metadata loaded from .LICENSE and .RULE files.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rule {
     /// Unique identifier for this rule (e.g., "mit.LICENSE", "gpl-2.0_12.RULE")
     /// Used for sorting to match Python's attr.s field order.
@@ -115,6 +161,10 @@ pub struct Rule {
     pub text: String,
 
     /// Token IDs for the text (assigned during indexing)
+    #[serde(
+        serialize_with = "serialize_token_ids",
+        deserialize_with = "deserialize_token_ids"
+    )]
     pub tokens: Vec<TokenId>,
 
     /// Classification of this rule.
@@ -145,10 +195,12 @@ pub struct Rule {
 
     /// Token position spans for required phrases parsed from {{...}} markers.
     /// Each span represents positions in the rule text that MUST be matched.
+    #[serde(with = "range_serde", default)]
     pub required_phrase_spans: Vec<Range<usize>>,
 
     /// Mapping from token position to count of stopwords at that position.
     /// Used for required phrase validation.
+    #[serde(with = "stopwords_serde", default)]
     pub stopwords_by_pos: HashMap<usize, usize>,
 
     /// Filenames where this rule should be considered
@@ -216,6 +268,25 @@ pub struct Rule {
 
     /// Alternative SPDX license identifiers (aliases)
     pub other_spdx_license_keys: Vec<String>,
+}
+
+fn serialize_token_ids<S>(token_ids: &[TokenId], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    token_ids
+        .iter()
+        .map(|id| id.raw())
+        .collect::<Vec<_>>()
+        .serialize(serializer)
+}
+
+fn deserialize_token_ids<'de, D>(deserializer: D) -> Result<Vec<TokenId>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw_ids: Vec<u16> = Vec::deserialize(deserializer)?;
+    Ok(raw_ids.into_iter().map(TokenId::new).collect())
 }
 
 impl PartialOrd for Rule {

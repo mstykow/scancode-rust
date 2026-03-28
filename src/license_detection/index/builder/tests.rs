@@ -448,7 +448,10 @@ mod test_cases {
         let rule_tokens = &index.tids_by_rid[rid];
         let pattern: Vec<u8> = rule_tokens.iter().flat_map(|t| t.to_le_bytes()).collect();
 
-        let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
+        let matches: Vec<_> = index
+            .rules_automaton
+            .find_overlapping_iter(&pattern)
+            .collect();
         assert!(!matches.is_empty(), "Automaton should find the pattern");
     }
 
@@ -595,7 +598,10 @@ mod test_cases {
         let rules = vec![create_test_rule(long_rule_text, false)];
         let index = build_index(rules, vec![]);
 
-        let unknown_matches: Vec<_> = index.unknown_automaton.find_iter(b"test").collect();
+        let unknown_matches: Vec<_> = index
+            .unknown_automaton
+            .find_overlapping_iter(b"test")
+            .collect();
         assert!(
             unknown_matches.is_empty(),
             "Unknown automaton should not match random text"

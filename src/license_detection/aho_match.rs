@@ -87,13 +87,9 @@ pub fn aho_match_with_extra_matchables(
     let automaton = &index.rules_automaton;
 
     for ac_match in automaton.find_overlapping_iter(&encoded_query) {
-        let pattern_id = ac_match.pattern();
-        let byte_start = ac_match.start();
-        let byte_end = ac_match.end();
-
-        if byte_start % 2 != 0 {
-            continue;
-        }
+        let pattern_id = ac_match.pattern;
+        let byte_start = ac_match.start;
+        let byte_end = ac_match.end;
 
         let qstart = qbegin + byte_pos_to_token_pos(byte_start);
         let qend = qbegin + byte_pos_to_token_pos(byte_end);
@@ -108,93 +104,96 @@ pub fn aho_match_with_extra_matchables(
             continue;
         }
 
-        let Some(&rid) = index.pattern_id_to_rid.get(pattern_id.as_usize()) else {
+        let Some(rids) = index.pattern_id_to_rid.get(pattern_id) else {
             continue;
         };
-        if rid >= index.rules_by_rid.len() {
-            continue;
+
+        for &rid in rids {
+            if rid >= index.rules_by_rid.len() {
+                continue;
+            }
+
+            let matched_length = qend - qstart;
+
+            // Skip zero-length matches (empty patterns)
+            if matched_length == 0 {
+                continue;
+            }
+
+            let rule = &index.rules_by_rid[rid];
+            let rule_tids = &index.tids_by_rid[rid];
+            let rule_length = rule.tokens.len();
+
+            let match_coverage = if rule_length > 0 {
+                (matched_length as f32 / rule_length as f32) * 100.0
+            } else {
+                100.0
+            };
+
+            let hispan_count = (0..matched_length)
+                .filter(|&p| {
+                    rule_tids
+                        .get(p)
+                        .is_some_and(|tid| index.dictionary.token_kind(*tid) == TokenKind::Legalese)
+                })
+                .count();
+
+            let start_line = query_run.line_for_pos(qstart).unwrap_or(1);
+
+            let end_line = if qend > qstart {
+                // qend is exclusive, so the last matched token is at qend-1
+                query_run
+                    .line_for_pos(qend.saturating_sub(1))
+                    .unwrap_or(start_line)
+            } else {
+                start_line
+            };
+
+            let score = if rule_length > 0 {
+                matched_length as f32 / rule_length as f32
+            } else {
+                1.0
+            };
+
+            let qspan_positions: Vec<usize> = (qstart..qend).collect();
+            let ispan_positions: Vec<usize> = (0..matched_length).collect();
+            let hispan_positions: Vec<usize> = (0..matched_length)
+                .filter(|&p| index.dictionary.token_kind(rule_tids[p]) == TokenKind::Legalese)
+                .collect();
+
+            let license_match = LicenseMatch {
+                license_expression: rule.license_expression.clone(),
+                license_expression_spdx: None,
+                from_file: None,
+                start_line,
+                end_line,
+                start_token: qstart,
+                end_token: qend,
+                matcher: MATCH_AHO,
+                score,
+                matched_length,
+                rule_length,
+                match_coverage,
+                rule_relevance: rule.relevance,
+                rid,
+                rule_identifier: rule.identifier.clone(),
+                rule_url: String::new(),
+                matched_text: None,
+                referenced_filenames: rule.referenced_filenames.clone(),
+                rule_kind: rule.kind(),
+                is_from_license: rule.is_from_license,
+                matched_token_positions: None,
+                hilen: hispan_count,
+                rule_start_token: 0,
+                qspan_positions: Some(qspan_positions),
+                ispan_positions: Some(ispan_positions),
+                hispan_positions: Some(hispan_positions),
+                candidate_resemblance: 0.0,
+                candidate_containment: 0.0,
+            };
+
+            matches.push(license_match);
         }
-
-        let matched_length = qend - qstart;
-
-        // Skip zero-length matches (empty patterns)
-        if matched_length == 0 {
-            continue;
-        }
-
-        let rule = &index.rules_by_rid[rid];
-        let rule_tids = &index.tids_by_rid[rid];
-        let rule_length = rule.tokens.len();
-
-        let match_coverage = if rule_length > 0 {
-            (matched_length as f32 / rule_length as f32) * 100.0
-        } else {
-            100.0
-        };
-
-        let hispan_count = (0..matched_length)
-            .filter(|&p| {
-                rule_tids
-                    .get(p)
-                    .is_some_and(|tid| index.dictionary.token_kind(*tid) == TokenKind::Legalese)
-            })
-            .count();
-
-        let start_line = query_run.line_for_pos(qstart).unwrap_or(1);
-
-        let end_line = if qend > qstart {
-            // qend is exclusive, so the last matched token is at qend-1
-            query_run
-                .line_for_pos(qend.saturating_sub(1))
-                .unwrap_or(start_line)
-        } else {
-            start_line
-        };
-
-        let score = if rule_length > 0 {
-            matched_length as f32 / rule_length as f32
-        } else {
-            1.0
-        };
-
-        let qspan_positions: Vec<usize> = (qstart..qend).collect();
-        let ispan_positions: Vec<usize> = (0..matched_length).collect();
-        let hispan_positions: Vec<usize> = (0..matched_length)
-            .filter(|&p| index.dictionary.token_kind(rule_tids[p]) == TokenKind::Legalese)
-            .collect();
-
-        let license_match = LicenseMatch {
-            license_expression: rule.license_expression.clone(),
-            license_expression_spdx: None,
-            from_file: None,
-            start_line,
-            end_line,
-            start_token: qstart,
-            end_token: qend,
-            matcher: MATCH_AHO,
-            score,
-            matched_length,
-            rule_length,
-            match_coverage,
-            rule_relevance: rule.relevance,
-            rid,
-            rule_identifier: rule.identifier.clone(),
-            rule_url: rule.rule_url().unwrap_or_default(),
-            matched_text: None,
-            referenced_filenames: rule.referenced_filenames.clone(),
-            rule_kind: rule.kind(),
-            is_from_license: rule.is_from_license,
-            matched_token_positions: None,
-            hilen: hispan_count,
-            rule_start_token: 0,
-            qspan_positions: Some(qspan_positions),
-            ispan_positions: Some(ispan_positions),
-            hispan_positions: Some(hispan_positions),
-            candidate_resemblance: 0.0,
-            candidate_containment: 0.0,
-        };
-
-        matches.push(license_match);
     }
 
     if let Some(extra_matchables) = extra_matchable_positions {
@@ -237,11 +236,11 @@ pub fn aho_match_with_extra_matchables(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::automaton::AutomatonBuilder;
     use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::test_utils::{
         create_mock_query_with_tokens, create_mock_rule, create_test_index_default,
     };
-    use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
     fn tids(values: &[u16]) -> Vec<TokenId> {
         values.iter().copied().map(TokenId::new).collect()
@@ -292,7 +291,7 @@ mod tests {
     #[test]
     fn test_aho_match_no_automaton_patterns() {
         let mut index = create_test_index_default();
-        index.rules_automaton = AhoCorasick::new::<_, &[u8]>([]).unwrap();
+        index.rules_automaton = AutomatonBuilder::new().build();
 
         let query = create_mock_query_with_tokens(&[0, 1, 2], &index);
         let run = query.whole_query_run();
@@ -309,16 +308,16 @@ mod tests {
         let rule_tokens = tids(&[0u16, 1]);
         let pattern_bytes = tokens_to_bytes(&rule_tokens);
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern_bytes.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern_bytes);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1], false, false));
         index.tids_by_rid.push(tids(&[0, 1]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -351,16 +350,16 @@ mod tests {
         let rule_tokens = tids(&[0u16, 1, 2]);
         let pattern_bytes = tokens_to_bytes(&rule_tokens);
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern_bytes.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern_bytes);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("apache-2.0", vec![0, 1, 2], false, false));
         index.tids_by_rid.push(tids(&[0, 1, 2]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -392,9 +391,10 @@ mod tests {
         let pattern1 = tokens_to_bytes(&tids(&[0u16, 1]));
         let pattern2 = tokens_to_bytes(&tids(&[2u16, 3]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build([pattern1.as_slice(), pattern2.as_slice()])
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern1);
+        builder.add_pattern(&pattern2);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
@@ -405,8 +405,8 @@ mod tests {
             .push(create_mock_rule("apache-2.0", vec![2, 3], true, false));
         index.tids_by_rid.push(tids(&[0, 1]));
         index.tids_by_rid.push(tids(&[2, 3]));
-        index.pattern_id_to_rid.push(0);
-        index.pattern_id_to_rid.push(1);
+        index.pattern_id_to_rid.push(vec![0]);
+        index.pattern_id_to_rid.push(vec![1]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -439,16 +439,16 @@ mod tests {
 
         let pattern = tokens_to_bytes(&tids(&[0u16, 1, 2]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1, 2], false, false));
         index.tids_by_rid.push(tids(&[0, 1, 2]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -480,16 +480,16 @@ mod tests {
 
         let pattern = tokens_to_bytes(&tids(&[0u16, 1, 2]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1, 2], false, false));
         index.tids_by_rid.push(tids(&[0, 1, 2]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -527,9 +527,10 @@ mod tests {
         let short_pattern = tokens_to_bytes(&tids(&[0u16, 1]));
         let long_pattern = tokens_to_bytes(&tids(&[0u16, 1, 2]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build([short_pattern.as_slice(), long_pattern.as_slice()])
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&short_pattern);
+        builder.add_pattern(&long_pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
 
@@ -538,14 +539,14 @@ mod tests {
         short_rule.rule_kind = crate::license_detection::models::RuleKind::Reference;
         index.rules_by_rid.push(short_rule);
         index.tids_by_rid.push(tids(&[0, 1]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let mut long_rule = create_mock_rule("cecill-c", vec![0, 1, 2], false, false);
         long_rule.identifier = "cecill-c_3.RULE".to_string();
         long_rule.rule_kind = crate::license_detection::models::RuleKind::Reference;
         index.rules_by_rid.push(long_rule);
         index.tids_by_rid.push(tids(&[0, 1, 2]));
-        index.pattern_id_to_rid.push(1);
+        index.pattern_id_to_rid.push(vec![1]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -580,16 +581,16 @@ mod tests {
 
         let pattern = tokens_to_bytes(&tids(&[0u16, 1]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1], true, false));
         index.tids_by_rid.push(tids(&[0, 1]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -627,9 +628,10 @@ mod tests {
         let pattern1 = tokens_to_bytes(&tids(&[0u16, 1, 2]));
         let pattern2 = tokens_to_bytes(&tids(&[1u16, 2]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build([pattern1.as_slice(), pattern2.as_slice()])
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern1);
+        builder.add_pattern(&pattern2);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
@@ -640,8 +642,8 @@ mod tests {
             .push(create_mock_rule("mit-partial", vec![1, 2], true, false));
         index.tids_by_rid.push(tids(&[0, 1, 2]));
         index.tids_by_rid.push(tids(&[1, 2]));
-        index.pattern_id_to_rid.push(0);
-        index.pattern_id_to_rid.push(1);
+        index.pattern_id_to_rid.push(vec![0]);
+        index.pattern_id_to_rid.push(vec![1]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -670,16 +672,16 @@ mod tests {
 
         let pattern = tokens_to_bytes(&tids(&[0u16]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("single-token", vec![0], false, false));
         index.tids_by_rid.push(tids(&[0]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -711,16 +713,16 @@ mod tests {
 
         let pattern = tokens_to_bytes(&tids(&[0u16, 1]));
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1], true, false));
         index.tids_by_rid.push(tids(&[0, 1]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let tokens: Vec<TokenId> = (0..1000).map(|i| tid((i % 2) as u16)).collect();
         let line_by_pos: Vec<usize> = (0..1000).map(|i| i / 80 + 1).collect();
@@ -756,9 +758,9 @@ mod tests {
         let rule_tokens = tids(&[0u16, 1, 2, 3, 4]);
         let pattern_bytes = tokens_to_bytes(&rule_tokens);
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern_bytes.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern_bytes);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index.rules_by_rid.push(create_mock_rule(
@@ -768,7 +770,7 @@ mod tests {
             false,
         ));
         index.tids_by_rid.push(tids(&[0, 1, 2, 3, 4]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),
@@ -799,16 +801,14 @@ mod tests {
 
     #[test]
     fn test_aho_match_token_boundary_bug() {
-        use aho_corasick::AhoCorasickBuilder;
-
         let mut index = create_test_index_default();
 
         let pattern_tid: u16 = 12575;
         let pattern_bytes = pattern_tid.to_le_bytes().to_vec();
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern_bytes.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern_bytes);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index.rules_by_rid.push(create_mock_rule(
@@ -818,7 +818,7 @@ mod tests {
             false,
         ));
         index.tids_by_rid.push(tids(&[pattern_tid]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let exit_tid: u16 = 8045;
         let next_tid: u16 = 18993;
@@ -855,16 +855,14 @@ mod tests {
 
     #[test]
     fn test_aho_match_single_token_matches_correctly() {
-        use aho_corasick::AhoCorasickBuilder;
-
         let mut index = create_test_index_default();
 
         let pattern_tid: u16 = 12575;
         let pattern_bytes = pattern_tid.to_le_bytes().to_vec();
 
-        let automaton = AhoCorasickBuilder::new()
-            .build(std::iter::once(pattern_bytes.as_slice()))
-            .unwrap();
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&pattern_bytes);
+        let automaton = builder.build();
 
         index.rules_automaton = automaton;
         index.rules_by_rid.push(create_mock_rule(
@@ -874,7 +872,7 @@ mod tests {
             false,
         ));
         index.tids_by_rid.push(tids(&[pattern_tid]));
-        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(vec![0]);
 
         let query = crate::license_detection::query::Query {
             text: String::new(),

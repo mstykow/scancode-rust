@@ -1,7 +1,9 @@
 //! License metadata loaded from .LICENSE files.
 
+use serde::{Deserialize, Serialize};
+
 /// License metadata loaded from .LICENSE files.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct License {
     /// Unique lowercase ASCII identifier for this license
     pub key: String,

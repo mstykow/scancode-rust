@@ -1,6 +1,6 @@
 //! Unknown license detection using ngram matching.
 
-use aho_corasick::AhoCorasick;
+use crate::license_detection::automaton::Automaton;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use sha1::{Digest, Sha1};
@@ -164,7 +164,7 @@ fn get_matched_ngrams(
     tokens: &[TokenId],
     start: usize,
     end: usize,
-    automaton: &AhoCorasick,
+    automaton: &Automaton,
 ) -> Vec<(usize, usize)> {
     if start >= end || end > tokens.len() {
         return Vec::new();
@@ -181,7 +181,7 @@ fn get_matched_ngrams(
     let mut matches = Vec::new();
 
     for m in automaton.find_overlapping_iter(&region_bytes) {
-        let local_qend = m.end() / 2;
+        let local_qend = m.end / 2;
         let qend = start + local_qend;
         let qstart = qend.saturating_sub(offset);
         matches.push((qstart, qend));
@@ -700,9 +700,10 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_empty_automaton() {
+        use crate::license_detection::automaton::AutomatonBuilder;
+
         let tokens = tids(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        let automaton =
-            AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
+        let automaton = AutomatonBuilder::new().build();
 
         let matches = get_matched_ngrams(&tokens, 0, 8, &automaton);
 
@@ -711,10 +712,14 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_with_matches() {
+        use crate::license_detection::automaton::AutomatonBuilder;
+
         let tokens: Vec<TokenId> = (0..30).map(tid).collect();
         let ngram: Vec<u8> = vec![0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0];
-        let automaton = AhoCorasick::new(std::iter::once(ngram.as_slice()))
-            .expect("Failed to create automaton");
+
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&ngram);
+        let automaton = builder.build();
 
         let matches = get_matched_ngrams(&tokens, 0, 30, &automaton);
 
@@ -727,13 +732,17 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_keeps_overlapping_matches() {
+        use crate::license_detection::automaton::AutomatonBuilder;
+
         let tokens = tids(&[1, 2, 3, 1, 2, 3, 1, 2, 3]);
         let overlapping_ngram: Vec<u8> = tokens[..UNKNOWN_NGRAM_LENGTH]
             .iter()
             .flat_map(|tid| tid.to_le_bytes())
             .collect();
-        let automaton = AhoCorasick::new(std::iter::once(overlapping_ngram.as_slice()))
-            .expect("Failed to create automaton");
+
+        let mut builder = AutomatonBuilder::new();
+        builder.add_pattern(&overlapping_ngram);
+        let automaton = builder.build();
 
         let matches = get_matched_ngrams(&tokens, 0, tokens.len(), &automaton);
 
@@ -1032,9 +1041,10 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_out_of_bounds() {
+        use crate::license_detection::automaton::AutomatonBuilder;
+
         let tokens = tids(&[1, 2, 3]);
-        let automaton =
-            AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
+        let automaton = AutomatonBuilder::new().build();
 
         let matches = get_matched_ngrams(&tokens, 5, 10, &automaton);
         assert!(matches.is_empty(), "Out of bounds should return empty");
