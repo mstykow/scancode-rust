@@ -249,7 +249,7 @@ Do not update golden expected files just to make a failing test pass.
 
 ## CI/CD
 
-Canonical hook and CI definitions live in [`.pre-commit-config.yaml`](.pre-commit-config.yaml), [`package.json`](package.json), and [`.github/workflows/check.yml`](.github/workflows/check.yml), with helper scripts in [`scripts/`](scripts/). Agents should treat the full CI workflow as CI's job, not the default local workflow. Local iteration should stay focused on the exact tests and checks needed for the files and behavior under change.
+Canonical hook and CI definitions live in [`lefthook.yml`](lefthook.yml), [`package.json`](package.json), and [`.github/workflows/check.yml`](.github/workflows/check.yml), with helper scripts in [`scripts/`](scripts/). Agents should treat the full CI workflow as CI's job, not the default local workflow. Local iteration should stay focused on the exact tests and checks needed for the files and behavior under change.
 
 **All checks must pass before merging.**
 

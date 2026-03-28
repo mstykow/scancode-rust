@@ -462,13 +462,13 @@ cargo test --lib --features golden-tests golden # Run only golden tests
 
 ### CI/CD
 
-Tests run automatically on:
+Quality gates run automatically on:
 
-- Every commit (via pre-commit hooks: formatting, linting, and docs/file-quality checks)
+- Every commit (via Lefthook pre-commit hooks: formatting, linting, and docs/file-quality checks)
 - Every push to main
 - Every pull request
 
-All tests must pass before merging. CI uses a minimal split so the scanner-wired tests no longer sit
+The full test suites run in CI on pushes and pull requests. All tests must pass before merging. CI uses a minimal split so the scanner-wired tests no longer sit
 on the same critical path as the main Rust quality job, without introducing lots of tiny shards.
 Commands:
 
