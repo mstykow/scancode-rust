@@ -36,20 +36,19 @@
   ],
   "packages": [
     {
-      "datafile_paths": ["lib/apk/db/installed"],
-      "datasource_ids": ["alpine_installed_db"],
+      "type": "alpine",
+      "namespace": "alpine",
+      "name": "busybox",
+      "version": "1.35.0-r17",
       "description": "Size optimized toolbox of many common UNIX utilities",
-      "extra_data": {
-        "build_timestamp": "1655134784",
-        "checksum": "Q1def456=",
-        "compressed_size": "492528",
-        "installed_size": "942080",
-        "missing_file_references": [
-          {
-            "path": "usr/sbin/crond"
-          }
-        ]
-      },
+      "parties": [
+        {
+          "role": "maintainer",
+          "name": "Soren Hansen",
+          "email": "soren@linux2go.dk"
+        }
+      ],
+      "homepage_url": "https://busybox.net/",
       "declared_license_expression": "gpl-2.0-only",
       "declared_license_expression_spdx": "GPL-2.0-only",
       "license_detections": [
@@ -60,6 +59,7 @@
             {
               "license_expression": "gpl-2.0-only",
               "license_expression_spdx": "GPL-2.0-only",
+              "from_file": "lib/apk/db/installed",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -67,43 +67,45 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "GPL-2.0-only"
             }
-          ]
+          ],
+          "identifier": "gpl_2_0_only-920081c7-a6eb-e2f0-a084-26baabd935ef"
         }
       ],
       "extracted_license_statement": "GPL-2.0-only",
-      "homepage_url": "https://busybox.net/",
-      "name": "busybox",
-      "namespace": "alpine",
-      "package_uid": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [
-        {
-          "email": "soren@linux2go.dk",
-          "name": "Soren Hansen",
-          "role": "maintainer"
-        }
-      ],
-      "purl": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64",
       "source_packages": ["pkg:alpine/busybox"],
-      "type": "alpine",
-      "version": "1.35.0-r17"
-    },
-    {
-      "datafile_paths": ["lib/apk/db/installed"],
-      "datasource_ids": ["alpine_installed_db"],
-      "description": "the musl c library (libc) implementation",
       "extra_data": {
-        "build_timestamp": "1649396308",
-        "checksum": "Q1abc123=",
-        "compressed_size": "383304",
-        "installed_size": "622592",
+        "build_timestamp": "1655134784",
+        "installed_size": "942080",
         "missing_file_references": [
           {
-            "path": "lib/ld-musl-x86_64.so.1"
+            "path": "usr/sbin/crond"
           }
-        ]
+        ],
+        "checksum": "Q1def456=",
+        "compressed_size": "492528"
       },
+      "purl": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64",
+      "package_uid": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"]
+    },
+    {
+      "type": "alpine",
+      "namespace": "alpine",
+      "name": "musl",
+      "version": "1.2.3-r0",
+      "description": "the musl c library (libc) implementation",
+      "parties": [
+        {
+          "role": "maintainer",
+          "name": "Timo Teras",
+          "email": "timo.teras@iki.fi"
+        }
+      ],
+      "homepage_url": "https://musl.libc.org/",
       "declared_license_expression": "mit",
       "declared_license_expression_spdx": "MIT",
       "license_detections": [
@@ -114,6 +116,7 @@
             {
               "license_expression": "mit",
               "license_expression_spdx": "MIT",
+              "from_file": "lib/apk/db/installed",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -121,27 +124,30 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "MIT"
             }
-          ]
+          ],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708"
         }
       ],
       "extracted_license_statement": "MIT",
-      "homepage_url": "https://musl.libc.org/",
-      "name": "musl",
-      "namespace": "alpine",
-      "package_uid": "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [
-        {
-          "email": "timo.teras@iki.fi",
-          "name": "Timo Teras",
-          "role": "maintainer"
-        }
-      ],
-      "purl": "pkg:alpine/musl@1.2.3-r0?arch=x86_64",
       "source_packages": ["pkg:alpine/musl"],
-      "type": "alpine",
-      "version": "1.2.3-r0"
+      "extra_data": {
+        "installed_size": "622592",
+        "build_timestamp": "1649396308",
+        "compressed_size": "383304",
+        "checksum": "Q1abc123=",
+        "missing_file_references": [
+          {
+            "path": "lib/ld-musl-x86_64.so.1"
+          }
+        ]
+      },
+      "purl": "pkg:alpine/musl@1.2.3-r0?arch=x86_64",
+      "package_uid": "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"]
     }
   ]
 }

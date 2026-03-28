@@ -24,7 +24,7 @@
             {
               "license_expression": "mit",
               "license_expression_spdx": "MIT",
-              "from_file": null,
+              "from_file": "Contoso.Utility.csproj",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -32,12 +32,11 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
-              "rule_identifier": null,
               "rule_url": null,
               "matched_text": "MIT"
             }
           ],
-          "identifier": null
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708"
         }
       ],
       "extracted_license_statement": "MIT",
