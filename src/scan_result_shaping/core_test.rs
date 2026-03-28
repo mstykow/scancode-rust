@@ -215,6 +215,44 @@ fn filter_redundant_clues_with_rules_suppresses_ignorable_rule_and_cross_clues()
 }
 
 #[test]
+fn filter_redundant_clues_suppresses_cross_clues_without_license_rules() {
+    let mut files = vec![file("project/a.txt")];
+    files[0].copyrights = vec![Copyright {
+        copyright: "Copyright Example <legal@example.com> https://example.com".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+    files[0].holders = vec![crate::models::Holder {
+        holder: "Jane Example".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+    files[0].authors = vec![Author {
+        author: "Jane Example".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+    files[0].emails = vec![OutputEmail {
+        email: "legal@example.com".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+    files[0].urls = vec![OutputURL {
+        url: "https://example.com/".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+
+    filter_redundant_clues(&mut files);
+
+    assert!(files[0].authors.is_empty());
+    assert!(files[0].emails.is_empty());
+    assert!(files[0].urls.is_empty());
+    assert_eq!(files[0].holders.len(), 1);
+    assert_eq!(files[0].copyrights.len(), 1);
+}
+
+#[test]
 fn filter_redundant_clues_with_rules_ignores_low_coverage_matches() {
     let mut files = vec![file("project/a.txt")];
     files[0].license_detections = vec![crate::models::LicenseDetection {
