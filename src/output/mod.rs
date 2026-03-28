@@ -536,6 +536,54 @@ mod tests {
     }
 
     #[test]
+    fn test_json_and_json_lines_writers_include_top_level_license_detections() {
+        let mut output = sample_output();
+        output.license_detections = vec![crate::models::TopLevelLicenseDetection {
+            identifier: "mit-id".to_string(),
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            detection_count: 2,
+            detection_log: vec![],
+            reference_matches: vec![crate::models::Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: Some("src/main.rs".to_string()),
+                start_line: 1,
+                end_line: 3,
+                matcher: Some("1-hash".to_string()),
+                score: 100.0,
+                matched_length: Some(10),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: Some("mit.LICENSE".to_string()),
+                rule_url: None,
+                matched_text: None,
+                matched_text_diagnostics: None,
+            }],
+        }];
+
+        let mut json_bytes = Vec::new();
+        writer_for_format(OutputFormat::Json)
+            .write(&output, &mut json_bytes, &OutputWriteConfig::default())
+            .expect("json write should succeed");
+        let json_value: Value =
+            serde_json::from_slice(&json_bytes).expect("json output should parse");
+        assert_eq!(json_value["license_detections"][0]["identifier"], "mit-id");
+        assert_eq!(json_value["license_detections"][0]["detection_count"], 2);
+
+        let mut jsonl_bytes = Vec::new();
+        writer_for_format(OutputFormat::JsonLines)
+            .write(&output, &mut jsonl_bytes, &OutputWriteConfig::default())
+            .expect("json-lines write should succeed");
+        let rendered = String::from_utf8(jsonl_bytes).expect("json-lines should be utf-8");
+        assert!(
+            rendered
+                .lines()
+                .any(|line| line.contains("\"license_detections\""))
+        );
+    }
+
+    #[test]
     fn test_cyclonedx_xml_writer_outputs_xml() {
         let output = sample_output();
         let mut bytes = Vec::new();
@@ -620,6 +668,7 @@ mod tests {
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
+            license_detections: vec![],
             files: vec![],
             license_references: vec![],
             license_rule_references: vec![],
@@ -651,6 +700,7 @@ mod tests {
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
+            license_detections: vec![],
             files: vec![],
             license_references: vec![],
             license_rule_references: vec![],
@@ -765,6 +815,7 @@ mod tests {
             }],
             packages: vec![],
             dependencies: vec![],
+            license_detections: vec![],
             files: vec![FileInfo::new(
                 "main.rs".to_string(),
                 "main".to_string(),

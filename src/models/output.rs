@@ -1,4 +1,4 @@
-use super::{FileInfo, Package, TopLevelDependency};
+use super::{FileInfo, Match, Package, TopLevelDependency};
 use serde::{Deserialize, Serialize};
 
 pub const OUTPUT_FORMAT_VERSION: &str = "4.0.0";
@@ -17,9 +17,22 @@ pub struct Output {
     pub headers: Vec<Header>,
     pub packages: Vec<Package>,
     pub dependencies: Vec<TopLevelDependency>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub license_detections: Vec<TopLevelLicenseDetection>,
     pub files: Vec<FileInfo>,
     pub license_references: Vec<LicenseReference>,
     pub license_rule_references: Vec<LicenseRuleReference>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct TopLevelLicenseDetection {
+    pub identifier: String,
+    pub license_expression: String,
+    pub license_expression_spdx: String,
+    pub detection_count: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub detection_log: Vec<String>,
+    pub reference_matches: Vec<Match>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

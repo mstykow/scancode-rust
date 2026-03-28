@@ -36,6 +36,13 @@ pub(crate) fn write_json_lines(output: &Output, writer: &mut dyn Write) -> io::R
         write_jsonl_line(writer, &json!({ "dependencies": output.dependencies }))?;
     }
 
+    if !output.license_detections.is_empty() {
+        write_jsonl_line(
+            writer,
+            &json!({ "license_detections": output.license_detections }),
+        )?;
+    }
+
     if !output.license_references.is_empty() {
         write_jsonl_line(
             writer,
