@@ -8,7 +8,7 @@ mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
     use crate::parsers::conan_data::ConanDataParser;
-    use crate::test_utils::compare_package_data_parser_only;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
 
     fn sort_packages_by_version(packages: &mut [PackageData]) {
         packages.sort_by(|left, right| left.version.cmp(&right.version));

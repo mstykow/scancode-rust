@@ -3,11 +3,11 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::podfile::PodfileParser;
     use crate::parsers::podfile_lock::PodfileLockParser;
     use crate::parsers::podspec::PodspecParser;
     use crate::parsers::podspec_json::PodspecJsonParser;
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     #[test]

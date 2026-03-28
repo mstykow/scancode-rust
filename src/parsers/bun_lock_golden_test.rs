@@ -2,8 +2,8 @@
 mod golden_tests {
     use std::path::PathBuf;
 
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::{BunLockParser, PackageParser};
-    use crate::test_utils::compare_package_data_parser_only;
 
     #[test]
     fn test_golden_bun_lock_basic() {

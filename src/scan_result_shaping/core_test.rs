@@ -3,7 +3,7 @@ use crate::models::{
     Author, Copyright, DatasourceId, Dependency, FileReference, OutputEmail, OutputURL, Package,
     PackageData, TopLevelDependency,
 };
-use crate::scan_result_shaping::test_support::{dir, file};
+use crate::scan_result_shaping::test_fixtures::{dir, file};
 use regex::Regex;
 use std::collections::HashSet;
 

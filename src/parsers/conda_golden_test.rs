@@ -3,7 +3,7 @@ mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
     use crate::parsers::conda_meta_json::CondaMetaJsonParser;
-    use crate::test_utils::compare_package_data_parser_only;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     /// Helper function to run golden tests.

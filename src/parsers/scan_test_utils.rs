@@ -31,6 +31,33 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
     (files, assembly_result)
 }
 
+pub(crate) fn scan_and_assemble_with_stripped_root(
+    path: &Path,
+) -> (Vec<FileInfo>, assembly::AssemblyResult) {
+    let (mut files, mut assembly_result) = scan_and_assemble(path);
+    strip_root_paths(&mut files, path);
+    strip_assembly_root_paths(&mut assembly_result, path);
+    (files, assembly_result)
+}
+
+fn strip_assembly_root_paths(assembly_result: &mut assembly::AssemblyResult, root: &Path) {
+    for package in &mut assembly_result.packages {
+        for datafile_path in &mut package.datafile_paths {
+            let current_path = Path::new(datafile_path);
+            if let Some(stripped) = strip_root_prefix(current_path, root) {
+                *datafile_path = stripped.to_string_lossy().to_string();
+            }
+        }
+    }
+
+    for dependency in &mut assembly_result.dependencies {
+        let current_path = Path::new(&dependency.datafile_path);
+        if let Some(stripped) = strip_root_prefix(current_path, root) {
+            dependency.datafile_path = stripped.to_string_lossy().to_string();
+        }
+    }
+}
+
 pub(crate) fn strip_root_paths(files: &mut [FileInfo], scan_root: &Path) {
     for entry in files {
         let current_path = Path::new(&entry.path);
