@@ -2,7 +2,7 @@
 
 pub mod aho_match;
 pub mod automaton;
-mod detection;
+pub(crate) mod detection;
 pub mod embedded;
 
 #[cfg(test)]
@@ -42,7 +42,7 @@ use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
 use crate::license_detection::detection::{
-    empty_detection, populate_detection_from_group_with_spdx,
+    attach_source_path_to_detections, empty_detection, populate_detection_from_group_with_spdx,
 };
 use crate::license_detection::models::MatcherKind;
 
@@ -63,7 +63,7 @@ pub const SCANCODE_LICENSES_LICENSES_PATH: &str =
 #[allow(dead_code)]
 pub const SCANCODE_LICENSES_DATA_PATH: &str = "reference/scancode-toolkit/src/licensedcode/data";
 
-pub use detection::{
+pub(crate) use detection::{
     LicenseDetection, group_matches_by_region, post_process_detections, sort_matches_by_line,
 };
 pub use models::LicenseMatch;
@@ -664,6 +664,18 @@ impl LicenseDetectionEngine {
 
         let detections = post_process_detections(detections, 0.0);
 
+        Ok(detections)
+    }
+
+    pub fn detect_with_kind_and_source(
+        &self,
+        text: &str,
+        unknown_licenses: bool,
+        binary_derived: bool,
+        source_path: &str,
+    ) -> Result<Vec<LicenseDetection>> {
+        let mut detections = self.detect_with_kind(text, unknown_licenses, binary_derived)?;
+        attach_source_path_to_detections(&mut detections, source_path);
         Ok(detections)
     }
 
