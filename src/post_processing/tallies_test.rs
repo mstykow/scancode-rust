@@ -1,6 +1,6 @@
 use super::test_utils::{dir, file};
 use super::*;
-use crate::models::{Author, Copyright, Holder, Match, TallyEntry};
+use crate::models::{Author, Copyright, Holder, Match, PackageData, PackageType, TallyEntry};
 
 #[test]
 fn compute_tallies_counts_file_findings_and_missing_values() {
@@ -185,6 +185,85 @@ fn compute_key_file_tallies_only_counts_key_files_and_drops_missing_values() {
             value: Some("Markdown".to_string()),
             count: 1
         }]
+    );
+}
+
+#[test]
+fn compute_tallies_include_package_other_license_detections() {
+    let mut manifest = file("project/package.json");
+    manifest.package_data = vec![PackageData {
+        package_type: Some(PackageType::Npm),
+        other_license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "gpl-2.0-only".to_string(),
+            license_expression_spdx: "GPL-2.0-only".to_string(),
+            matches: vec![Match {
+                license_expression: "gpl-2.0-only".to_string(),
+                license_expression_spdx: "GPL-2.0-only".to_string(),
+                from_file: Some("project/package.json".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("GPL-2.0-only".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            identifier: Some("gpl-package-id".to_string()),
+            detection_log: vec![],
+        }],
+        ..Default::default()
+    }];
+
+    let tallies = compute_tallies(&[manifest]).expect("tallies exist");
+
+    assert_eq!(tallies.detected_license_expression.len(), 1);
+    assert_eq!(
+        tallies.detected_license_expression[0].value.as_deref(),
+        Some("gpl-2.0-only")
+    );
+    assert_eq!(tallies.detected_license_expression[0].count, 1);
+}
+
+#[test]
+fn compute_key_file_tallies_include_package_other_license_detections() {
+    let mut manifest = file("project/package.json");
+    manifest.is_key_file = true;
+    manifest.package_data = vec![PackageData {
+        package_type: Some(PackageType::Npm),
+        other_license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "gpl-2.0-only".to_string(),
+            license_expression_spdx: "GPL-2.0-only".to_string(),
+            matches: vec![Match {
+                license_expression: "gpl-2.0-only".to_string(),
+                license_expression_spdx: "GPL-2.0-only".to_string(),
+                from_file: Some("project/package.json".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("GPL-2.0-only".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            identifier: Some("gpl-package-id".to_string()),
+            detection_log: vec![],
+        }],
+        ..Default::default()
+    }];
+
+    let tallies = compute_key_file_tallies(&[manifest]).expect("key-file tallies exist");
+
+    assert_eq!(
+        tallies.detected_license_expression[0].value.as_deref(),
+        Some("gpl-2.0-only")
     );
 }
 

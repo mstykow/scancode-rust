@@ -253,6 +253,60 @@ fn filter_redundant_clues_suppresses_cross_clues_without_license_rules() {
 }
 
 #[test]
+fn filter_redundant_clues_with_rules_uses_package_origin_detections() {
+    let mut files = vec![file("project/package.json")];
+    files[0].package_data = vec![PackageData {
+        license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![crate::models::Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: Some("project/package.json".to_string()),
+                start_line: 1,
+                end_line: 5,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(42),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: Some("mit_1.RULE".to_string()),
+                rule_url: None,
+                matched_text: None,
+                matched_text_diagnostics: None,
+            }],
+            identifier: Some("mit-from-package".to_string()),
+            detection_log: vec![],
+        }],
+        ..Default::default()
+    }];
+    files[0].emails = vec![OutputEmail {
+        email: "legal@example.com".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+    files[0].urls = vec![OutputURL {
+        url: "https://example.com/".to_string(),
+        start_line: 2,
+        end_line: 2,
+    }];
+
+    let clue_rule_lookup = HashMap::from([(
+        "mit_1.RULE".to_string(),
+        ClueRuleData {
+            ignorable_urls: vec!["https://example.com".to_string()],
+            ignorable_emails: vec!["legal@example.com".to_string()],
+            ..Default::default()
+        },
+    )]);
+
+    filter_redundant_clues_with_rules(&mut files, Some(&clue_rule_lookup));
+
+    assert!(files[0].emails.is_empty());
+    assert!(files[0].urls.is_empty());
+}
+
+#[test]
 fn filter_redundant_clues_with_rules_ignores_low_coverage_matches() {
     let mut files = vec![file("project/a.txt")];
     files[0].license_detections = vec![crate::models::LicenseDetection {
