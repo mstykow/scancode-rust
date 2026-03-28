@@ -47,13 +47,16 @@
   ],
   "packages": [
     {
-      "api_data_url": "https://registry.npmjs.org/@myorg%2fapp/0.1.0",
-      "datafile_paths": ["packages/app/package.json"],
-      "datasource_ids": ["npm_package_json"],
+      "type": "npm",
+      "namespace": "@myorg",
+      "name": "app",
+      "version": "0.1.0",
+      "primary_language": "JavaScript",
+      "description": "Application package",
+      "parties": [],
+      "download_url": "https://registry.npmjs.org/@myorg/app/-/app-0.1.0.tgz",
       "declared_license_expression": "mit",
       "declared_license_expression_spdx": "MIT",
-      "description": "Application package",
-      "download_url": "https://registry.npmjs.org/@myorg/app/-/app-0.1.0.tgz",
       "license_detections": [
         {
           "license_expression": "mit",
@@ -62,6 +65,7 @@
             {
               "license_expression": "mit",
               "license_expression_spdx": "MIT",
+              "from_file": "packages/app/package.json",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -69,35 +73,32 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "MIT"
             }
-          ]
+          ],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708"
         }
       ],
       "extracted_license_statement": "- MIT\n",
-      "name": "app",
-      "namespace": "@myorg",
-      "package_uid": "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [],
-      "primary_language": "JavaScript",
-      "purl": "pkg:npm/%40myorg/app@0.1.0",
-      "repository_download_url": "https://registry.npmjs.org/@myorg/app/-/app-0.1.0.tgz",
       "repository_homepage_url": "https://www.npmjs.com/package/@myorg/app",
-      "type": "npm",
-      "version": "0.1.0"
+      "repository_download_url": "https://registry.npmjs.org/@myorg/app/-/app-0.1.0.tgz",
+      "api_data_url": "https://registry.npmjs.org/@myorg%2fapp/0.1.0",
+      "purl": "pkg:npm/%40myorg/app@0.1.0",
+      "package_uid": "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["packages/app/package.json"],
+      "datasource_ids": ["npm_package_json"]
     },
     {
-      "api_data_url": "https://registry.npmjs.org/my-pnpm-monorepo/1.0.0",
-      "datafile_paths": ["package.json", "pnpm-workspace.yaml"],
-      "datasource_ids": ["npm_package_json", "pnpm_workspace_yaml"],
+      "type": "npm",
+      "name": "my-pnpm-monorepo",
+      "version": "1.0.0",
+      "primary_language": "JavaScript",
+      "description": "A pnpm monorepo",
+      "parties": [],
+      "download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
       "declared_license_expression": "apache-2.0",
       "declared_license_expression_spdx": "Apache-2.0",
-      "description": "A pnpm monorepo",
-      "download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
-      "extra_data": {
-        "datasource_id": "pnpm_workspace_yaml",
-        "workspaces": ["packages/*"]
-      },
       "license_detections": [
         {
           "license_expression": "apache-2.0",
@@ -106,6 +107,7 @@
             {
               "license_expression": "apache-2.0",
               "license_expression_spdx": "Apache-2.0",
+              "from_file": "package.json",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -113,21 +115,25 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "Apache-2.0"
             }
-          ]
+          ],
+          "identifier": "apache_2_0-b8ac833d-1634-db39-3e2b-365472f52214"
         }
       ],
       "extracted_license_statement": "- Apache-2.0\n",
-      "name": "my-pnpm-monorepo",
-      "package_uid": "pkg:npm/my-pnpm-monorepo@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [],
-      "primary_language": "JavaScript",
-      "purl": "pkg:npm/my-pnpm-monorepo@1.0.0",
-      "repository_download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
+      "extra_data": {
+        "datasource_id": "pnpm_workspace_yaml",
+        "workspaces": ["packages/*"]
+      },
       "repository_homepage_url": "https://www.npmjs.com/package/my-pnpm-monorepo",
-      "type": "npm",
-      "version": "1.0.0"
+      "repository_download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
+      "api_data_url": "https://registry.npmjs.org/my-pnpm-monorepo/1.0.0",
+      "purl": "pkg:npm/my-pnpm-monorepo@1.0.0",
+      "package_uid": "pkg:npm/my-pnpm-monorepo@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["package.json", "pnpm-workspace.yaml"],
+      "datasource_ids": ["npm_package_json", "pnpm_workspace_yaml"]
     }
   ]
 }

@@ -83,13 +83,24 @@
   ],
   "packages": [
     {
-      "api_data_url": "https://registry.npmjs.org/@myorg%2fcore/1.0.0",
-      "datafile_paths": ["packages/core/package.json"],
-      "datasource_ids": ["npm_package_json"],
+      "type": "npm",
+      "namespace": "@myorg",
+      "name": "core",
+      "version": "1.0.0",
+      "primary_language": "JavaScript",
+      "description": "Core utilities",
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "Test Author",
+          "email": "test@example.com"
+        }
+      ],
+      "download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
+      "vcs_url": "git+https://github.com/myorg/monorepo.git",
       "declared_license_expression": "mit",
       "declared_license_expression_spdx": "MIT",
-      "description": "Core utilities",
-      "download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
       "license_detections": [
         {
           "license_expression": "mit",
@@ -98,6 +109,7 @@
             {
               "license_expression": "mit",
               "license_expression_spdx": "MIT",
+              "from_file": "packages/core/package.json",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -105,39 +117,41 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "MIT"
             }
-          ]
+          ],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708"
         }
       ],
       "extracted_license_statement": "- MIT\n",
-      "name": "core",
-      "namespace": "@myorg",
-      "package_uid": "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [
-        {
-          "email": "test@example.com",
-          "name": "Test Author",
-          "role": "author",
-          "type": "person"
-        }
-      ],
-      "primary_language": "JavaScript",
-      "purl": "pkg:npm/%40myorg/core@1.0.0",
-      "repository_download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
       "repository_homepage_url": "https://www.npmjs.com/package/@myorg/core",
-      "type": "npm",
-      "vcs_url": "git+https://github.com/myorg/monorepo.git",
-      "version": "1.0.0"
+      "repository_download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
+      "api_data_url": "https://registry.npmjs.org/@myorg%2fcore/1.0.0",
+      "purl": "pkg:npm/%40myorg/core@1.0.0",
+      "package_uid": "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["packages/core/package.json"],
+      "datasource_ids": ["npm_package_json"]
     },
     {
-      "api_data_url": "https://registry.npmjs.org/@myorg%2futils/2.0.0",
-      "datafile_paths": ["packages/utils/package.json"],
-      "datasource_ids": ["npm_package_json"],
+      "type": "npm",
+      "namespace": "@myorg",
+      "name": "utils",
+      "version": "2.0.0",
+      "primary_language": "JavaScript",
+      "description": "Utility functions",
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "Test Author",
+          "email": "test@example.com"
+        }
+      ],
+      "download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
+      "vcs_url": "git+https://github.com/myorg/monorepo.git",
       "declared_license_expression": "mit",
       "declared_license_expression_spdx": "MIT",
-      "description": "Utility functions",
-      "download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
       "license_detections": [
         {
           "license_expression": "mit",
@@ -146,6 +160,7 @@
             {
               "license_expression": "mit",
               "license_expression_spdx": "MIT",
+              "from_file": "packages/utils/package.json",
               "start_line": 1,
               "end_line": 1,
               "matcher": "parser-declared-license",
@@ -153,30 +168,21 @@
               "matched_length": 1,
               "match_coverage": 100.0,
               "rule_relevance": 100,
+              "rule_url": null,
               "matched_text": "MIT"
             }
-          ]
+          ],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708"
         }
       ],
       "extracted_license_statement": "- MIT\n",
-      "name": "utils",
-      "namespace": "@myorg",
-      "package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [
-        {
-          "email": "test@example.com",
-          "name": "Test Author",
-          "role": "author",
-          "type": "person"
-        }
-      ],
-      "primary_language": "JavaScript",
-      "purl": "pkg:npm/%40myorg/utils@2.0.0",
-      "repository_download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
       "repository_homepage_url": "https://www.npmjs.com/package/@myorg/utils",
-      "type": "npm",
-      "vcs_url": "git+https://github.com/myorg/monorepo.git",
-      "version": "2.0.0"
+      "repository_download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
+      "api_data_url": "https://registry.npmjs.org/@myorg%2futils/2.0.0",
+      "purl": "pkg:npm/%40myorg/utils@2.0.0",
+      "package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["packages/utils/package.json"],
+      "datasource_ids": ["npm_package_json"]
     }
   ]
 }
