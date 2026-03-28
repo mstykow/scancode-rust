@@ -484,6 +484,58 @@ mod tests {
     }
 
     #[test]
+    fn test_json_and_json_lines_writers_include_top_level_license_references() {
+        let mut output = sample_output();
+        output.license_references = vec![crate::models::LicenseReference {
+            name: "MIT License".to_string(),
+            short_name: "MIT".to_string(),
+            spdx_license_key: "MIT".to_string(),
+            text: "MIT text".to_string(),
+        }];
+        output.license_rule_references = vec![crate::models::LicenseRuleReference {
+            identifier: "license-clue_1.RULE".to_string(),
+            license_expression: "unknown-license-reference".to_string(),
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_clue: true,
+            is_license_intro: false,
+        }];
+
+        let mut json_bytes = Vec::new();
+        writer_for_format(OutputFormat::Json)
+            .write(&output, &mut json_bytes, &OutputWriteConfig::default())
+            .expect("json write should succeed");
+        let json_value: Value =
+            serde_json::from_slice(&json_bytes).expect("json output should parse");
+        assert_eq!(
+            json_value["license_references"][0]["spdx_license_key"],
+            "MIT"
+        );
+        assert_eq!(
+            json_value["license_rule_references"][0]["identifier"],
+            "license-clue_1.RULE"
+        );
+
+        let mut jsonl_bytes = Vec::new();
+        writer_for_format(OutputFormat::JsonLines)
+            .write(&output, &mut jsonl_bytes, &OutputWriteConfig::default())
+            .expect("json-lines write should succeed");
+        let rendered = String::from_utf8(jsonl_bytes).expect("json-lines should be utf-8");
+        assert!(
+            rendered
+                .lines()
+                .any(|line| line.contains("\"license_references\""))
+        );
+        assert!(
+            rendered
+                .lines()
+                .any(|line| line.contains("\"license_rule_references\""))
+        );
+    }
+
+    #[test]
     fn test_cyclonedx_xml_writer_outputs_xml() {
         let output = sample_output();
         let mut bytes = Vec::new();
