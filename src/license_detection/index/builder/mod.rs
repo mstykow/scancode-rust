@@ -495,7 +495,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let unknown_automaton = if unknown_automaton_patterns.is_empty() {
         AutomatonBuilder::new().build()
     } else {
-        let unique_patterns: HashSet<Vec<u8>> = unknown_automaton_patterns.into_iter().collect();
+        let mut unique_patterns: Vec<Vec<u8>> = unknown_automaton_patterns.into_iter().collect();
+        unique_patterns.sort();
         let mut builder = AutomatonBuilder::new();
         for pattern in &unique_patterns {
             builder.add_pattern(pattern);
