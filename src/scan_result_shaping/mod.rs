@@ -1,5 +1,9 @@
-mod json_input;
-mod selection;
+#[cfg(test)]
+mod core_test;
+pub(crate) mod json_input;
+pub(crate) mod selection;
+#[cfg(test)]
+mod test_support;
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -16,15 +20,6 @@ pub(crate) use selection::{
     apply_cli_path_selection_filter, apply_user_path_filters_to_collected,
     resolve_native_scan_inputs,
 };
-
-#[cfg(test)]
-pub(crate) use json_input::{JsonScanInput, load_scan_from_json, normalize_loaded_json_scan};
-#[cfg(test)]
-pub(crate) use selection::{is_included_path, normalize_scan_relative_path};
-
-#[cfg(test)]
-#[path = "../scan_result_shaping_test.rs"]
-mod scan_result_shaping_test;
 
 fn retain_matching_files_with_ancestor_dirs<F>(files: &mut Vec<FileInfo>, mut keep_file: F)
 where
