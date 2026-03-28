@@ -144,6 +144,7 @@ mod tests {
             None,
             false,
             &TextDetectionOptions {
+                collect_info: false,
                 detect_generated: true,
                 ..TextDetectionOptions::default()
             },

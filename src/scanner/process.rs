@@ -58,7 +58,7 @@ pub fn process_collected(
         .collect();
 
     for (path, metadata) in &collected.directories {
-        all_files.push(process_directory(path, metadata));
+        all_files.push(process_directory(path, metadata, text_options.collect_info));
     }
 
     ProcessResult {
@@ -124,6 +124,10 @@ fn process_file(
         .scan_errors(scan_errors)
         .build()
         .expect("FileInformationBuild not completely initialized");
+
+    if text_options.collect_info {
+        file_info.is_source = Some(is_source(path));
+    }
 
     if file_info.programming_language.as_deref() == Some("Go")
         && is_go_non_production_source(path).unwrap_or(false)
@@ -678,7 +682,7 @@ fn is_pem_certificate_file(_path: &Path, buffer: &[u8]) -> bool {
     })
 }
 
-fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
+fn process_directory(path: &Path, metadata: &fs::Metadata, collect_info: bool) -> FileInfo {
     let name = path
         .file_name()
         .unwrap_or_default()
@@ -710,7 +714,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         urls: Vec::new(),               // TODO: implement
         for_packages: Vec::new(),
         scan_errors: Vec::new(),
-        is_source: None,
+        is_source: collect_info.then_some(false),
         source_count: None,
         is_legal: false,
         is_manifest: false,

@@ -28,8 +28,9 @@ pub fn collect_paths<P: AsRef<Path>>(
     exclude_patterns: &[Pattern],
 ) -> CollectedPaths {
     let depth_limit = depth_limit_from_cli(max_depth);
+    let root = root.as_ref();
 
-    if is_path_excluded(root.as_ref(), exclude_patterns) {
+    if is_path_excluded(root, exclude_patterns) {
         return CollectedPaths {
             files: Vec::new(),
             directories: Vec::new(),
@@ -39,16 +40,40 @@ pub fn collect_paths<P: AsRef<Path>>(
         };
     }
 
-    collect_all_paths(root.as_ref(), depth_limit, exclude_patterns)
+    let metadata = match fs::metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            return CollectedPaths {
+                files: Vec::new(),
+                directories: Vec::new(),
+                excluded_count: 0,
+                total_file_bytes: 0,
+                collection_errors: vec![(root.to_path_buf(), error.to_string())],
+            };
+        }
+    };
+
+    if metadata.is_file() {
+        return CollectedPaths {
+            total_file_bytes: metadata.len(),
+            files: vec![(root.to_path_buf(), metadata)],
+            directories: Vec::new(),
+            excluded_count: 0,
+            collection_errors: Vec::new(),
+        };
+    }
+
+    collect_all_paths(root, &metadata, depth_limit, exclude_patterns)
 }
 
 fn collect_all_paths(
     root: &Path,
+    root_metadata: &fs::Metadata,
     depth_limit: Option<usize>,
     exclude_patterns: &[Pattern],
 ) -> CollectedPaths {
     let mut files = Vec::new();
-    let mut directories = Vec::new();
+    let mut directories = vec![(root.to_path_buf(), root_metadata.clone())];
     let mut excluded_count = 0;
     let mut total_file_bytes = 0_u64;
     let mut collection_errors = Vec::new();

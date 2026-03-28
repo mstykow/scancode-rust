@@ -12,6 +12,7 @@ pub struct ProcessResult {
 
 #[derive(Debug, Clone)]
 pub struct TextDetectionOptions {
+    pub collect_info: bool,
     pub detect_packages: bool,
     pub detect_copyrights: bool,
     pub detect_generated: bool,
@@ -26,6 +27,7 @@ pub struct TextDetectionOptions {
 impl Default for TextDetectionOptions {
     fn default() -> Self {
         Self {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
@@ -87,6 +89,7 @@ mod tests {
     #[test]
     fn scanner_reports_repeated_email_occurrences() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: false,
             detect_generated: false,
@@ -124,6 +127,7 @@ mod tests {
     #[test]
     fn scanner_skips_pem_certificate_text_detection() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
@@ -180,6 +184,7 @@ mod tests {
     #[test]
     fn scanner_detects_structured_credits_authors() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
@@ -218,6 +223,7 @@ mod tests {
     #[test]
     fn scanner_sets_generated_flag_when_enabled() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: false,
             detect_generated: true,
@@ -240,6 +246,7 @@ mod tests {
     #[test]
     fn scanner_leaves_generated_flag_unset_when_disabled() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: false,
             detect_generated: false,
@@ -262,6 +269,7 @@ mod tests {
     #[test]
     fn scanner_skips_package_parsing_when_disabled() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: false,
             detect_copyrights: false,
             detect_generated: false,
@@ -288,6 +296,7 @@ mod tests {
     #[test]
     fn scanner_parses_package_manifests_when_enabled() {
         let options = TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             detect_copyrights: false,
             detect_generated: false,
@@ -310,5 +319,61 @@ mod tests {
             "package_data: {:#?}",
             scanned.package_data
         );
+    }
+
+    #[test]
+    fn scanner_sets_is_source_only_when_info_enabled() {
+        let without_info = TextDetectionOptions {
+            collect_info: false,
+            detect_packages: false,
+            detect_copyrights: false,
+            detect_generated: false,
+            detect_emails: false,
+            detect_urls: false,
+            max_emails: 50,
+            max_urls: 50,
+            timeout_seconds: 120.0,
+            scan_cache_dir: None,
+        };
+        let with_info = TextDetectionOptions {
+            collect_info: true,
+            ..without_info.clone()
+        };
+
+        let scanned_without_info = scan_single_file("main.rs", "fn main() {}\n", &without_info);
+        let scanned_with_info = scan_single_file("main.rs", "fn main() {}\n", &with_info);
+
+        assert_eq!(scanned_without_info.is_source, None);
+        assert_eq!(scanned_with_info.is_source, Some(true));
+    }
+
+    #[test]
+    fn collect_paths_includes_root_directory_entry() {
+        let temp_dir = TempDir::new().expect("create temp dir");
+        fs::create_dir_all(temp_dir.path().join("src")).expect("create nested dir");
+        fs::write(temp_dir.path().join("src").join("main.rs"), "fn main() {}")
+            .expect("write nested file");
+
+        let collected = collect_paths(temp_dir.path(), 0, &[]);
+
+        assert!(
+            collected
+                .directories
+                .iter()
+                .any(|(path, _)| path == temp_dir.path())
+        );
+    }
+
+    #[test]
+    fn collect_paths_supports_single_file_input() {
+        let temp_dir = TempDir::new().expect("create temp dir");
+        let file_path = temp_dir.path().join("main.rs");
+        fs::write(&file_path, "fn main() {}\n").expect("write file");
+
+        let collected = collect_paths(&file_path, 0, &[]);
+
+        assert_eq!(collected.files.len(), 1);
+        assert!(collected.directories.is_empty());
+        assert_eq!(collected.files[0].0, file_path);
     }
 }
