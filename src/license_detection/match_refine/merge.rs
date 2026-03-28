@@ -114,30 +114,40 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
             rule_matches.iter().map(|m| (*m).clone()).collect();
         let mut i = 0;
 
+        let mut current_qspan_set: HashSet<usize> = HashSet::with_capacity(64);
+        let mut next_qspan_set: HashSet<usize> = HashSet::with_capacity(64);
+        let mut current_ispan_set: HashSet<usize> = HashSet::with_capacity(64);
+        let mut next_ispan_set: HashSet<usize> = HashSet::with_capacity(64);
+
         while i < rule_matches.len().saturating_sub(1) {
             let mut j = i + 1;
 
             while j < rule_matches.len() {
-                let current = rule_matches[i].clone();
-                let next = rule_matches[j].clone();
+                let current = &rule_matches[i];
+                let next = &rule_matches[j];
 
-                if current.qdistance_to(&next) > max_rule_side_dist
-                    || current.idistance_to(&next) > max_rule_side_dist
+                if current.qdistance_to(next) > max_rule_side_dist
+                    || current.idistance_to(next) > max_rule_side_dist
                 {
                     break;
                 }
 
-                let current_qspan: HashSet<usize> = current.qspan().into_iter().collect();
-                let next_qspan: HashSet<usize> = next.qspan().into_iter().collect();
-                let current_ispan: HashSet<usize> = current.ispan().into_iter().collect();
-                let next_ispan: HashSet<usize> = next.ispan().into_iter().collect();
+                current_qspan_set.clear();
+                next_qspan_set.clear();
+                current_ispan_set.clear();
+                next_ispan_set.clear();
 
-                if current_qspan == next_qspan && current_ispan == next_ispan {
+                current_qspan_set.extend(current.qspan_iter());
+                next_qspan_set.extend(next.qspan_iter());
+                current_ispan_set.extend(current.ispan_iter());
+                next_ispan_set.extend(next.ispan_iter());
+
+                if current_qspan_set == next_qspan_set && current_ispan_set == next_ispan_set {
                     rule_matches.remove(j);
                     continue;
                 }
 
-                if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
+                if current.ispan() == next.ispan() && current.qoverlap(next) > 0 {
                     let current_mag = current.qspan_magnitude();
                     let next_mag = next.qspan_magnitude();
                     if current_mag <= next_mag {
@@ -150,26 +160,26 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     }
                 }
 
-                if current.qcontains(&next) {
+                if current.qcontains(next) {
                     rule_matches.remove(j);
                     continue;
                 }
-                if next.qcontains(&current) {
+                if next.qcontains(current) {
                     rule_matches.remove(i);
                     i = i.saturating_sub(1);
                     break;
                 }
 
-                if current.surround(&next) {
-                    let combined = combine_matches(&current, &next);
+                if current.surround(next) {
+                    let combined = combine_matches(current, next);
                     if combined.qspan().len() == combined.ispan().len() {
                         rule_matches[i] = combined;
                         rule_matches.remove(j);
                         continue;
                     }
                 }
-                if next.surround(&current) {
-                    let combined = combine_matches(&current, &next);
+                if next.surround(current) {
+                    let combined = combine_matches(current, next);
                     if combined.qspan().len() == combined.ispan().len() {
                         rule_matches[j] = combined;
                         rule_matches.remove(i);
@@ -178,8 +188,8 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     }
                 }
 
-                if next.is_after(&current) {
-                    rule_matches[i] = combine_matches(&current, &next);
+                if next.is_after(current) {
+                    rule_matches[i] = combine_matches(current, next);
                     rule_matches.remove(j);
                     continue;
                 }
@@ -194,11 +204,11 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     && cur_istart <= next_istart
                     && cur_iend <= next_iend
                 {
-                    let qoverlap = current.qoverlap(&next);
+                    let qoverlap = current.qoverlap(next);
                     if qoverlap > 0 {
-                        let ioverlap = current.ispan_overlap(&next);
+                        let ioverlap = current.ispan_overlap(next);
                         if qoverlap == ioverlap {
-                            rule_matches[i] = combine_matches(&current, &next);
+                            rule_matches[i] = combine_matches(current, next);
                             rule_matches.remove(j);
                             continue;
                         }
