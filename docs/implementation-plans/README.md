@@ -25,7 +25,7 @@ implementation-plans/
 ### Post-Processing (`post-processing/`)
 
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
-  - Status: ✅ Complete — summary/tally/classify/generated parity and Phase 11 performance hardening are implemented, including package-preferred summary origin, localized fixture coverage, facet-rule optimization, and scanner-owned generated flags
+  - Status: ✅ Complete — summary/tally/classify/generated parity and Phase 11 performance hardening are implemented, including package-preferred summary origin, package-origin other-license tallies/summary consumption, localized fixture coverage, facet-rule optimization, and scanner-owned generated flags
 
 ### Infrastructure (`infrastructure/`)
 

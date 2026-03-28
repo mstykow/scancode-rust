@@ -171,6 +171,46 @@ fn manifest_declared_license_survives_into_package_and_summary() {
 }
 
 #[test]
+fn compute_summary_includes_package_other_license_detections_as_other_expressions() {
+    let mut manifest = file("project/package.json");
+    manifest.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Npm),
+        other_license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "gpl-2.0-only".to_string(),
+            license_expression_spdx: "GPL-2.0-only".to_string(),
+            matches: vec![Match {
+                license_expression: "gpl-2.0-only".to_string(),
+                license_expression_spdx: "GPL-2.0-only".to_string(),
+                from_file: Some("project/package.json".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("GPL-2.0-only".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            identifier: Some("gpl-package-id".to_string()),
+            detection_log: vec![],
+        }],
+        ..Default::default()
+    }];
+
+    let summary = compute_summary(&[manifest], &[]).expect("summary exists");
+
+    assert!(summary.declared_license_expression.is_none());
+    assert_eq!(summary.other_license_expressions.len(), 1);
+    assert_eq!(
+        summary.other_license_expressions[0].value.as_deref(),
+        Some("gpl-2.0-only")
+    );
+}
+
+#[test]
 fn compute_summary_uses_root_prefixed_top_level_key_files() {
     let mut files = vec![dir("project"), file("project/LICENSE")];
     files[1].license_expression = Some("mit".to_string());
