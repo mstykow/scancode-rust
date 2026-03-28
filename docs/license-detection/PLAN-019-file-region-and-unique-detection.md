@@ -41,9 +41,8 @@ parity work tracked in
 [`../implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](../implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md),
 especially:
 
-- full top-level unique `license_detections` parity across file and package
-  detections,
-- live `license_references` / `license_rule_references`, and
+- the remaining top-level unique `license_detections` edge cases that still
+  depend on true file-region metadata,
 - other post-scan consumers that need detection-to-file provenance.
 
 ## Likely Reintroduction Path
