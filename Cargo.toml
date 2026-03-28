@@ -43,7 +43,7 @@ members = ["xtask"]
 
 [workspace.dependencies]
 anyhow = "1.0.102"
-bincode = { version = "2.0.1", features = ["serde"] }
+bincode = { version = "3.0.0", features = ["serde"] }
 clap = { version = "4.6.0", features = ["derive"] }
 inventory = "0.3.22"
 lazy_static = "1.5.0"
