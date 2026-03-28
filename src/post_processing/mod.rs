@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -11,9 +11,12 @@ use crate::license_detection::expression::{
     LicenseExpression, combine_expressions_and, expression_to_string, parse_expression,
     simplify_expression,
 };
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::spdx_mapping::build_spdx_mapping;
 use crate::models::{
-    DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
-    OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
+    DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore,
+    LicenseDetection, LicenseReference, LicenseRuleReference, Match, OUTPUT_FORMAT_VERSION, Output,
+    Package, PackageData, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::scanner;
 #[cfg(test)]
@@ -208,6 +211,163 @@ pub(crate) fn create_output(
         files,
         license_references: context.license_references,
         license_rule_references: context.license_rule_references,
+    }
+}
+
+pub(crate) fn collect_top_level_license_references(
+    files: &[FileInfo],
+    packages: &[Package],
+    license_index: &LicenseIndex,
+) -> (Vec<LicenseReference>, Vec<LicenseRuleReference>) {
+    let licenses: Vec<_> = license_index.licenses_by_key.values().cloned().collect();
+    let spdx_mapping = build_spdx_mapping(&licenses);
+    let mut license_keys = BTreeSet::new();
+    let mut rule_identifiers = BTreeSet::new();
+
+    for file in files {
+        collect_license_keys_from_expression(file.license_expression.as_deref(), &mut license_keys);
+        collect_rule_identifiers_from_detections(&file.license_detections, &mut rule_identifiers);
+        collect_rule_identifiers_from_matches(&file.license_clues, &mut rule_identifiers);
+
+        for package_data in &file.package_data {
+            collect_license_keys_from_package_data(package_data, &mut license_keys);
+        }
+    }
+
+    for package in packages {
+        collect_license_keys_from_expression(
+            package.declared_license_expression.as_deref(),
+            &mut license_keys,
+        );
+        collect_license_keys_from_expression(
+            package.other_license_expression.as_deref(),
+            &mut license_keys,
+        );
+        collect_license_keys_from_detections(&package.license_detections, &mut license_keys);
+        collect_license_keys_from_detections(&package.other_license_detections, &mut license_keys);
+        collect_rule_identifiers_from_detections(
+            &package.license_detections,
+            &mut rule_identifiers,
+        );
+        collect_rule_identifiers_from_detections(
+            &package.other_license_detections,
+            &mut rule_identifiers,
+        );
+    }
+
+    let rules_by_identifier: HashMap<&str, &crate::license_detection::models::Rule> = license_index
+        .rules_by_rid
+        .iter()
+        .map(|rule| (rule.identifier.as_str(), rule))
+        .collect();
+
+    for identifier in &rule_identifiers {
+        if let Some(rule) = rules_by_identifier.get(identifier.as_str()) {
+            collect_license_keys_from_expression(Some(&rule.license_expression), &mut license_keys);
+        }
+    }
+
+    let license_references = license_keys
+        .into_iter()
+        .filter_map(|key| {
+            license_index.licenses_by_key.get(&key).map(|license| {
+                let spdx_license_key = spdx_mapping.scancode_to_spdx(&key).unwrap_or_default();
+                let short_name = if spdx_license_key.is_empty()
+                    || spdx_license_key.starts_with("LicenseRef-scancode-")
+                {
+                    license.name.clone()
+                } else {
+                    spdx_license_key.clone()
+                };
+
+                LicenseReference {
+                    name: license.name.clone(),
+                    short_name,
+                    spdx_license_key,
+                    text: license.text.clone(),
+                }
+            })
+        })
+        .collect();
+
+    let license_rule_references = rule_identifiers
+        .into_iter()
+        .filter_map(|identifier| {
+            rules_by_identifier
+                .get(identifier.as_str())
+                .map(|rule| LicenseRuleReference {
+                    identifier: rule.identifier.clone(),
+                    license_expression: rule.license_expression.clone(),
+                    is_license_text: rule.is_license_text(),
+                    is_license_notice: rule.is_license_notice(),
+                    is_license_reference: rule.is_license_reference(),
+                    is_license_tag: rule.is_license_tag(),
+                    is_license_clue: rule.is_license_clue(),
+                    is_license_intro: rule.is_license_intro(),
+                })
+        })
+        .collect();
+
+    (license_references, license_rule_references)
+}
+
+fn collect_license_keys_from_package_data(
+    package_data: &PackageData,
+    license_keys: &mut BTreeSet<String>,
+) {
+    collect_license_keys_from_expression(
+        package_data.declared_license_expression.as_deref(),
+        license_keys,
+    );
+    collect_license_keys_from_expression(
+        package_data.other_license_expression.as_deref(),
+        license_keys,
+    );
+    collect_license_keys_from_detections(&package_data.license_detections, license_keys);
+    collect_license_keys_from_detections(&package_data.other_license_detections, license_keys);
+}
+
+fn collect_license_keys_from_detections(
+    detections: &[LicenseDetection],
+    license_keys: &mut BTreeSet<String>,
+) {
+    for detection in detections {
+        collect_license_keys_from_expression(Some(&detection.license_expression), license_keys);
+    }
+}
+
+fn collect_license_keys_from_expression(
+    expression: Option<&str>,
+    license_keys: &mut BTreeSet<String>,
+) {
+    let Some(expression) = expression else {
+        return;
+    };
+
+    if let Ok(parsed) = parse_expression(expression) {
+        for key in parsed.license_keys() {
+            license_keys.insert(key);
+        }
+    }
+}
+
+fn collect_rule_identifiers_from_detections(
+    detections: &[LicenseDetection],
+    rule_identifiers: &mut BTreeSet<String>,
+) {
+    for detection in detections {
+        collect_rule_identifiers_from_matches(&detection.matches, rule_identifiers);
+    }
+}
+
+fn collect_rule_identifiers_from_matches(
+    matches: &[Match],
+    rule_identifiers: &mut BTreeSet<String>,
+) {
+    for license_match in matches {
+        if let Some(rule_identifier) = license_match.rule_identifier.as_ref() {
+            rule_identifiers.insert(rule_identifier.clone());
+        }
     }
 }
 

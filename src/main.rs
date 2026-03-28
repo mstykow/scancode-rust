@@ -11,7 +11,8 @@ use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::post_processing::{
-    CreateOutputContext, CreateOutputOptions, build_facet_rules, create_output,
+    CreateOutputContext, CreateOutputOptions, build_facet_rules,
+    collect_top_level_license_references, create_output,
 };
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scan_result_shaping::{
@@ -273,6 +274,25 @@ fn run() -> Result<()> {
 
     let end_time = Utc::now();
 
+    let (license_references, license_rule_references) = if cli.from_json {
+        (
+            preloaded_license_references,
+            preloaded_license_rule_references,
+        )
+    } else if cli.license_references {
+        if let Some(engine) = active_license_engine.as_deref() {
+            collect_top_level_license_references(
+                &scan_result.files,
+                &assembly_result.packages,
+                engine.index(),
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        }
+    } else {
+        (Vec::new(), Vec::new())
+    };
+
     let output = create_output(
         start_time,
         end_time,
@@ -280,8 +300,8 @@ fn run() -> Result<()> {
         CreateOutputContext {
             total_dirs,
             assembly_result,
-            license_references: preloaded_license_references,
-            license_rule_references: preloaded_license_rule_references,
+            license_references,
+            license_rule_references,
             options: CreateOutputOptions {
                 facet_rules: &facet_rules,
                 include_classify: cli.classify,

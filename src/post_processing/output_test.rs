@@ -1,11 +1,241 @@
 use chrono::Utc;
+use std::collections::HashMap;
 
 use super::test_utils::{dir, file};
 use super::*;
 use crate::assembly;
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::{License as RuntimeLicense, Rule, RuleKind};
 use crate::models::{Copyright, Holder, Match, Package, PackageData, PackageType, Tallies};
 use crate::scan_result_shaping::normalize_paths;
 use serde_json::json;
+
+fn sample_runtime_license(key: &str, name: &str, spdx_license_key: Option<&str>) -> RuntimeLicense {
+    RuntimeLicense {
+        key: key.to_string(),
+        name: name.to_string(),
+        spdx_license_key: spdx_license_key.map(str::to_string),
+        other_spdx_license_keys: vec![],
+        category: None,
+        text: format!("{name} text"),
+        reference_urls: vec![],
+        notes: None,
+        is_deprecated: false,
+        replaced_by: vec![],
+        minimum_coverage: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+    }
+}
+
+fn sample_rule(identifier: &str, expression: &str, rule_kind: RuleKind) -> Rule {
+    Rule {
+        identifier: identifier.to_string(),
+        license_expression: expression.to_string(),
+        text: format!("{identifier} text"),
+        tokens: vec![],
+        rule_kind,
+        is_false_positive: false,
+        is_required_phrase: false,
+        is_from_license: false,
+        relevance: 100,
+        minimum_coverage: None,
+        has_stored_minimum_coverage: false,
+        is_continuous: true,
+        required_phrase_spans: vec![],
+        stopwords_by_pos: HashMap::new(),
+        referenced_filenames: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        language: None,
+        notes: None,
+        length_unique: 0,
+        high_length_unique: 0,
+        high_length: 0,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small: false,
+        is_tiny: false,
+        starts_with_license: false,
+        ends_with_license: false,
+        is_deprecated: false,
+        spdx_license_key: None,
+        other_spdx_license_keys: vec![],
+    }
+}
+
+#[test]
+fn collect_top_level_license_references_includes_clues_packages_and_sorted_deduped_refs() {
+    let licenses = vec![
+        sample_runtime_license("apache-2.0", "Apache License 2.0", Some("Apache-2.0")),
+        sample_runtime_license("bsd-simplified", "BSD 2-Clause", Some("BSD-2-Clause")),
+        sample_runtime_license("mit", "MIT License", Some("MIT")),
+        sample_runtime_license(
+            "unknown-license-reference",
+            "Unknown License Reference",
+            None,
+        ),
+    ];
+    let mut license_index = LicenseIndex::default();
+    for license in &licenses {
+        license_index
+            .licenses_by_key
+            .insert(license.key.clone(), license.clone());
+    }
+    license_index.rules_by_rid = vec![
+        sample_rule("apache-2.0_1.RULE", "apache-2.0", RuleKind::Text),
+        sample_rule(
+            "license-clue_1.RULE",
+            "unknown-license-reference",
+            RuleKind::Clue,
+        ),
+    ];
+    let mut source = file("project/src/lib.rs");
+    source.license_expression = Some("mit".to_string());
+    source.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/src/lib.rs".to_string()),
+            start_line: 1,
+            end_line: 2,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(10),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("apache-2.0_1.RULE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            matched_text_diagnostics: None,
+        }],
+        identifier: None,
+        detection_log: vec![],
+    }];
+    source.license_clues = vec![Match {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        from_file: Some("project/NOTICE".to_string()),
+        start_line: 1,
+        end_line: 1,
+        matcher: Some("2-aho".to_string()),
+        score: 100.0,
+        matched_length: Some(4),
+        match_coverage: Some(100.0),
+        rule_relevance: Some(100),
+        rule_identifier: Some("license-clue_1.RULE".to_string()),
+        rule_url: None,
+        matched_text: None,
+        matched_text_diagnostics: None,
+    }];
+    source.package_data = vec![PackageData {
+        package_type: Some(PackageType::Npm),
+        declared_license_expression: Some("bsd-simplified".to_string()),
+        ..PackageData::default()
+    }];
+
+    let mut package = super::test_utils::package("pkg:npm/demo?uuid=test", "project/package.json");
+    package.package_type = Some(PackageType::Npm);
+    package.declared_license_expression = Some("apache-2.0".to_string());
+
+    let (license_references, license_rule_references) =
+        collect_top_level_license_references(&[dir("project"), source], &[package], &license_index);
+
+    assert_eq!(
+        license_references
+            .iter()
+            .map(|reference| reference.spdx_license_key.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "Apache-2.0",
+            "BSD-2-Clause",
+            "MIT",
+            "LicenseRef-scancode-unknown-license-reference",
+        ]
+    );
+    assert_eq!(
+        license_rule_references
+            .iter()
+            .map(|reference| reference.identifier.as_str())
+            .collect::<Vec<_>>(),
+        vec!["apache-2.0_1.RULE", "license-clue_1.RULE"]
+    );
+    assert!(license_rule_references[1].is_license_clue);
+}
+
+#[test]
+fn collect_top_level_license_references_returns_empty_for_empty_inputs() {
+    let license_index = LicenseIndex::default();
+
+    let (license_references, license_rule_references) =
+        collect_top_level_license_references(&[], &[], &license_index);
+
+    assert!(license_references.is_empty());
+    assert!(license_rule_references.is_empty());
+}
+
+#[test]
+fn create_output_preserves_top_level_license_references_from_context() {
+    let start = Utc::now();
+    let end = start;
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project")],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![crate::models::LicenseReference {
+                name: "MIT License".to_string(),
+                short_name: "MIT".to_string(),
+                spdx_license_key: "MIT".to_string(),
+                text: "MIT text".to_string(),
+            }],
+            license_rule_references: vec![crate::models::LicenseRuleReference {
+                identifier: "mit_1.RULE".to_string(),
+                license_expression: "mit".to_string(),
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_clue: false,
+                is_license_intro: false,
+            }],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_classify: false,
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+            },
+        },
+    );
+
+    assert_eq!(output.license_references.len(), 1);
+    assert_eq!(output.license_rule_references.len(), 1);
+    assert_eq!(output.license_references[0].spdx_license_key, "MIT");
+    assert_eq!(output.license_rule_references[0].identifier, "mit_1.RULE");
+}
 
 #[test]
 fn create_output_gates_summary_tallies_and_generated_sections() {

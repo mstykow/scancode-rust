@@ -89,6 +89,9 @@ implementation plan again.
 - ✅ Public file-level `percentage_of_license_text`
 - ✅ Top-level output model fields for `license_references` and
   `license_rule_references`
+- ✅ Live native-scan generation of top-level `license_references` and
+  `license_rule_references`
+- ✅ `--license-references` CLI flag
 - ✅ `--from-json` round-trip preservation of preexisting
   `license_references` / `license_rule_references`
 
@@ -96,8 +99,6 @@ implementation plan again.
 
 - ❌ Clue-only internal detections are dropped before public serialization
 - ❌ No top-level unique `license_detections`
-- ❌ No live generation of top-level `license_references`
-- ❌ No live generation of top-level `license_rule_references`
 - ❌ `--filter-clues` is only partially license-aware today: shaping now suppresses
   ignorable clues using public match metadata and rule identifiers, but some
   JSON/public-license-shape edge cases still diverge from upstream
@@ -107,7 +108,6 @@ implementation plan again.
 ### Known CLI Parity Gaps
 
 - ❌ No `--license-score`
-- ❌ No `--license-references`
 - ❌ No `--license-url-template`
 - ⚠️ Legacy `--include-text` remains as a compatibility alias; the upstream
   public flag is now `--license-text`
@@ -128,13 +128,12 @@ That leaves Provenant without a public place to preserve:
 - diagnostic classifications
 - file-region-dependent aggregation metadata
 
-### 2. Top-level license sections are modeled but not produced
+### 2. Top-level unique-detection aggregation is still missing
 
-`license_references` and `license_rule_references` already exist in the top-level
-output schema, but live scans do not populate them yet.
-
-Today they are effectively pass-through data for `--from-json`, not generated
-native-scan output.
+`license_references` and `license_rule_references` now generate on native scans,
+but Provenant still lacks the Python-style unique-detection aggregation that
+feeds top-level `license_detections` and the remaining provenance-dependent
+license reporting.
 
 ### 3. Unique-detection aggregation is still unimplemented
 
@@ -182,7 +181,6 @@ The repository still has a mix of:
 3. **Phase 2 — Top-level license aggregation parity**
    - Implement unique-detection aggregation
    - Emit top-level `license_detections`
-   - Generate live `license_references` and `license_rule_references`
 
 4. **Phase 3 — CLI flag parity**
    - Resolve `--include-text` vs `--license-text`
