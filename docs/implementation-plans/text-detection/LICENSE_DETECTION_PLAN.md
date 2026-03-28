@@ -131,20 +131,21 @@ That leaves Provenant without a public place to preserve:
 - diagnostic classifications
 - file-region-dependent aggregation metadata
 
-### 2. Top-level unique-detection aggregation still has provenance edge cases
+### 2. Top-level unique-detection aggregation still has consumer edge cases
 
 `license_references` and `license_rule_references` now generate on native scans,
 and Provenant now emits top-level unique `license_detections` for
 identifier-bearing file/resource detections plus package/manifest-origin public
-detections after provenance backfill. Full Python-style parity still depends on
-the remaining file-region-dependent consumers and clue/reference-following edge
-cases.
+detections after provenance backfill. The internal aggregation substrate now has
+real file-region metadata, but full Python-style parity still depends on the
+remaining file-region-consuming clue/reference-following cases.
 
-### 3. Unique-detection aggregation is still unimplemented
+### 3. Detection-path consumers are still unimplemented
 
-The engine and post-processing layers do not yet have the Python-style file
-region and unique-detection aggregation step that feeds top-level license output
-and reference-following behavior. The focused sub-plan for that work is
+The engine and post-processing layers now have file-region-aware unique
+aggregation, but Provenant still lacks the downstream consumers that use those
+paths for reference-following and other post-scan behaviors. The focused
+sub-plan for that work is
 [PLAN-019-file-region-and-unique-detection.md](../../license-detection/PLAN-019-file-region-and-unique-detection.md).
 
 ### 4. CLI parity drift accumulated after the engine landed
@@ -184,9 +185,8 @@ The repository still has a mix of:
    - Add `percentage_of_license_text`
 
 3. **Phase 2 — Top-level license aggregation parity**
-   - Implement unique-detection aggregation
-   - Close the remaining file-region/provenance edge cases around clue and
-     reference-following consumers
+   - Consume file-region-aware unique aggregation in the remaining clue and
+     reference-following flows
 
 4. **Phase 3 — CLI flag parity**
    - Resolve `--include-text` vs `--license-text`

@@ -27,14 +27,15 @@ Important observations from the reference:
 So this is not a core per-file output feature, but it is real detection metadata
 that supports other Python behaviors we do not implement yet.
 
-## Missing Rust Features
+## Remaining Rust Features
 
-Rust is still missing the Python features that justify `FileRegion`:
+Rust now has detection-level file-region construction with a real source path and
+uses that internal metadata to aggregate unique detections across repeated
+regions. The remaining missing Python features are:
 
-1. detection-level file-region construction with a real source path,
-2. unique-detection aggregation with per-file region metadata,
-3. later post-processing that consumes detection file paths,
-4. any output surface equivalent to Python's todo / ambiguous-detection flow.
+1. later post-processing that consumes detection file paths,
+2. richer reference-following behavior built on those paths,
+3. any output surface equivalent to Python's todo / ambiguous-detection flow.
 
 These missing pieces still block the remaining provenance-sensitive license-output
 parity work tracked in
@@ -42,7 +43,8 @@ parity work tracked in
 especially:
 
 - the remaining top-level unique `license_detections` edge cases that still
-  depend on true file-region metadata,
+  depend on true file-region consumers rather than just region-aware
+  aggregation,
 - other post-scan consumers that need detection-to-file provenance.
 
 ## Likely Reintroduction Path
@@ -52,12 +54,12 @@ detection assembly boundary instead of in low-level matchers.
 
 Most likely work items:
 
-1. Thread source path from `src/scanner/process.rs` into license-detection
+1. ✅ Thread source path from `src/scanner/process.rs` into license-detection
    entrypoints.
-2. Reintroduce a detection-level file-region type in
+2. ✅ Reintroduce a detection-level file-region type in
    `src/license_detection/detection/` with real `path`, `start_line`, and
    `end_line` values.
-3. Implement the Python-style unique-detection / file-region aggregation step.
+3. ✅ Implement the Python-style unique-detection / file-region aggregation step.
 4. Add whichever consumer actually needs the metadata before exposing it again.
 
 ## Relevant Reference Points
