@@ -197,7 +197,8 @@ The repository still has a mix of:
    - Close the remaining `--filter-clues` license-edge cases where appropriate
    - Feed SPDX writers with real license-info-from-files / extracted-license
      data while preserving upstream `NOASSERTION` conclusions
-   - Audit summary/tally consumers of package `other_license_detections`
+   - Close any remaining downstream consumers that still miss package-origin
+     license evidence
 
 ## Verify-First Gap List
 
