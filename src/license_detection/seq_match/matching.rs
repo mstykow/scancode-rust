@@ -211,7 +211,7 @@ pub(super) fn match_blocks(
 pub fn seq_match_with_candidates(
     index: &LicenseIndex,
     query_run: &QueryRun,
-    candidates: &[Candidate],
+    candidates: &[Candidate<'_>],
 ) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
