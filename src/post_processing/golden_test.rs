@@ -9,7 +9,8 @@ mod tests {
         FixtureOutputOptions, assert_classify_fixture_matches_expected,
         assert_facet_fixture_matches_expected, assert_package_fixture_matches_expected,
         assert_summary_fixture_matches_expected, assert_tally_fixture_matches_expected,
-        compare_scan_json_values, dir, normalize_paths_for_test, normalize_scan_json,
+        compare_scan_json_values, fixture_exclude_patterns, normalize_paths_for_test,
+        normalize_scan_json,
     };
     use crate::progress::{ProgressMode, ScanProgress};
     use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
@@ -137,7 +138,7 @@ mod tests {
         let generated_root = Path::new("testdata/summarycode-golden/generated");
         let fixture_root = generated_root.join("simple");
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let collected = collect_paths(&fixture_root, 0, &[]);
+        let collected = collect_paths(&fixture_root, 0, &fixture_exclude_patterns());
         let mut files = process_collected(
             &collected,
             progress,
@@ -151,7 +152,6 @@ mod tests {
         )
         .files;
 
-        files.push(dir("simple"));
         normalize_paths_for_test(
             &mut files,
             generated_root

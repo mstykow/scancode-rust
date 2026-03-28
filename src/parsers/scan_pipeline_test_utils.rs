@@ -1,14 +1,17 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use glob::Pattern;
+
 use crate::assembly;
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::models::{DatasourceId, FileInfo, TopLevelDependency};
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
 pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(path, 0, &[]);
+    let collected = collect_paths(path, 0, &fixture_exclude_patterns());
     let result = process_collected(
         &collected,
         progress,
@@ -26,9 +29,29 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
     (files, assembly_result)
 }
 
+fn fixture_exclude_patterns() -> Vec<Pattern> {
+    [
+        DEFAULT_CACHE_DIR_NAME.to_string(),
+        format!("{DEFAULT_CACHE_DIR_NAME}/*"),
+        format!("**/{DEFAULT_CACHE_DIR_NAME}"),
+        format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
+    ]
+    .into_iter()
+    .map(|pattern| Pattern::new(&pattern).expect("fixture exclude pattern should be valid"))
+    .collect()
+}
+
 pub(crate) fn strip_root_paths(files: &mut [FileInfo], scan_root: &Path) {
     for entry in files {
         let current_path = Path::new(&entry.path);
+
+        if current_path == scan_root
+            || current_path.canonicalize().ok().as_deref()
+                == scan_root.canonicalize().ok().as_deref()
+        {
+            entry.path.clear();
+            continue;
+        }
 
         if let Some(stripped) = strip_root_prefix(current_path, scan_root) {
             entry.path = stripped.to_string_lossy().to_string();

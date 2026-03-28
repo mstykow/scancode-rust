@@ -31,6 +31,7 @@ fn scanner_matches_structured_credits_fixture() {
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let options = TextDetectionOptions {
+        collect_info: false,
         detect_packages: false,
         detect_copyrights: true,
         detect_generated: false,
