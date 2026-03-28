@@ -223,10 +223,20 @@ pub(crate) fn collect_top_level_license_detections(
     let mut detections_by_identifier: HashMap<String, TopLevelLicenseDetection> = HashMap::new();
 
     for file in files {
-        for detection in &file.license_detections {
+        let mut file_detections = file.license_detections.iter().collect::<Vec<_>>();
+        for package_data in &file.package_data {
+            file_detections.extend(package_data.license_detections.iter());
+            file_detections.extend(package_data.other_license_detections.iter());
+        }
+
+        let mut seen_in_file = HashSet::new();
+        for detection in file_detections {
             let Some(identifier) = detection.identifier.as_ref() else {
                 continue;
             };
+            if !seen_in_file.insert(identifier.clone()) {
+                continue;
+            }
 
             let entry = detections_by_identifier
                 .entry(identifier.clone())

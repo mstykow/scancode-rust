@@ -4,8 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+use sha1::{Digest, Sha1};
+
 use super::DatasourceId;
 use super::PackageType;
+use crate::license_detection::tokenize::tokenize_without_stopwords;
 use crate::models::output::Tallies;
 use crate::utils::spdx::combine_license_expressions;
 
@@ -162,6 +165,11 @@ impl FileInfo {
         for_packages: Vec<String>,
         scan_errors: Vec<String>,
     ) -> Self {
+        let mut package_data = package_data;
+        for package in &mut package_data {
+            enrich_package_data_license_provenance(package, &path);
+        }
+
         // Combine license expressions from package data if license_expression is None
         license_expression = license_expression.or_else(|| {
             let expressions = package_data
@@ -185,7 +193,7 @@ impl FileInfo {
             license_expression = combine_license_expressions(expressions);
         }
 
-        FileInfo {
+        let mut file_info = FileInfo {
             name,
             base_name,
             extension,
@@ -221,8 +229,134 @@ impl FileInfo {
             is_community: false,
             facets: vec![],
             tallies: None,
+        };
+        file_info.backfill_license_provenance();
+        file_info
+    }
+
+    pub fn backfill_license_provenance(&mut self) {
+        for detection in &mut self.license_detections {
+            enrich_license_detection_provenance(detection, &self.path);
+        }
+
+        for package in &mut self.package_data {
+            enrich_package_data_license_provenance(package, &self.path);
         }
     }
+}
+
+fn enrich_package_data_license_provenance(package_data: &mut PackageData, path: &str) {
+    for detection in &mut package_data.license_detections {
+        enrich_license_detection_provenance(detection, path);
+    }
+    for detection in &mut package_data.other_license_detections {
+        enrich_license_detection_provenance(detection, path);
+    }
+}
+
+fn enrich_license_detection_provenance(detection: &mut LicenseDetection, path: &str) {
+    for detection_match in &mut detection.matches {
+        if detection_match.from_file.is_none() {
+            detection_match.from_file = Some(path.to_string());
+        }
+    }
+
+    if detection.identifier.is_none() {
+        detection.identifier = Some(compute_public_detection_identifier(detection));
+    }
+}
+
+fn compute_public_detection_identifier(detection: &LicenseDetection) -> String {
+    let expression = python_safe_name(&detection.license_expression);
+    let mut hasher = Sha1::new();
+    hasher.update(format_public_detection_content(detection).as_bytes());
+    let hex_str = hex::encode(hasher.finalize());
+    let uuid_hex = &hex_str[..32];
+    let content_uuid = uuid::Uuid::parse_str(uuid_hex)
+        .map(|uuid| uuid.to_string())
+        .unwrap_or_else(|_| uuid_hex.to_string());
+
+    format!("{}-{}", expression, content_uuid)
+}
+
+fn format_public_detection_content(detection: &LicenseDetection) -> String {
+    let mut result = String::from("(");
+
+    for (index, detection_match) in detection.matches.iter().enumerate() {
+        if index > 0 {
+            result.push_str(", ");
+        }
+        result.push_str(&format!(
+            "({}, {}, {})",
+            python_str_repr(
+                detection_match
+                    .rule_identifier
+                    .as_deref()
+                    .or(detection_match.matcher.as_deref())
+                    .unwrap_or("parser-declared-license")
+            ),
+            detection_match.score as f32,
+            python_token_tuple_repr(&tokenize_without_stopwords(
+                detection_match.matched_text.as_deref().unwrap_or_default(),
+            )),
+        ));
+    }
+
+    if detection.matches.len() == 1 {
+        result.push(',');
+    }
+    result.push(')');
+    result
+}
+
+fn python_safe_name(value: &str) -> String {
+    let mut result = String::new();
+    let mut prev_underscore = false;
+
+    for character in value.chars() {
+        if character.is_alphanumeric() {
+            result.push(character);
+            prev_underscore = false;
+        } else if !prev_underscore {
+            result.push('_');
+            prev_underscore = true;
+        }
+    }
+
+    let trimmed = result.trim_matches('_');
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn python_str_repr(value: &str) -> String {
+    if value.contains('\'') && !value.contains('"') {
+        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\\'"))
+    }
+}
+
+fn python_token_tuple_repr(tokens: &[String]) -> String {
+    if tokens.is_empty() {
+        return String::from("()");
+    }
+
+    let mut result = String::from("(");
+    for (index, token) in tokens.iter().enumerate() {
+        if index > 0 {
+            result.push_str(", ");
+        }
+        result.push_str(&python_str_repr(token));
+    }
+
+    if tokens.len() == 1 {
+        result.push(',');
+    }
+    result.push(')');
+    result
 }
 
 /// Package metadata extracted from manifest files.
@@ -607,6 +741,9 @@ impl Package {
     /// Generates a unique `package_uid` by appending a UUID qualifier to the PURL.
     /// If the `PackageData` has no PURL, the package_uid will be an empty string.
     pub fn from_package_data(package_data: &PackageData, datafile_path: String) -> Self {
+        let mut package_data = package_data.clone();
+        enrich_package_data_license_provenance(&mut package_data, &datafile_path);
+
         let package_uid = package_data
             .purl
             .as_ref()
@@ -669,6 +806,9 @@ impl Package {
     /// Existing non-empty values are preserved; empty fields are filled from
     /// the new data. Lists (parties, license_detections) are merged.
     pub fn update(&mut self, package_data: &PackageData, datafile_path: String) {
+        let mut package_data = package_data.clone();
+        enrich_package_data_license_provenance(&mut package_data, &datafile_path);
+
         if let Some(dsid) = package_data.datasource_id {
             self.datasource_ids.push(dsid);
         }
@@ -764,6 +904,19 @@ impl Package {
         self.refresh_identity();
     }
 
+    pub fn backfill_license_provenance(&mut self) {
+        let Some(datafile_path) = self.datafile_paths.first().cloned() else {
+            return;
+        };
+
+        for detection in &mut self.license_detections {
+            enrich_license_detection_provenance(detection, &datafile_path);
+        }
+        for detection in &mut self.other_license_detections {
+            enrich_license_detection_provenance(detection, &datafile_path);
+        }
+    }
+
     fn refresh_identity(&mut self) {
         let Some(next_purl) = self.build_current_purl() else {
             return;
@@ -837,6 +990,127 @@ impl Package {
         }
 
         Some(purl.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_info_new_backfills_package_detection_provenance() {
+        let package_data = PackageData {
+            package_type: Some(PackageType::Npm),
+            license_detections: vec![LicenseDetection {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                matches: vec![Match {
+                    license_expression: "mit".to_string(),
+                    license_expression_spdx: "MIT".to_string(),
+                    from_file: None,
+                    start_line: 1,
+                    end_line: 1,
+                    matcher: Some("parser-declared-license".to_string()),
+                    score: 100.0,
+                    matched_length: Some(1),
+                    match_coverage: Some(100.0),
+                    rule_relevance: Some(100),
+                    rule_identifier: None,
+                    rule_url: None,
+                    matched_text: Some("MIT".to_string()),
+                    matched_text_diagnostics: None,
+                }],
+                detection_log: vec![],
+                identifier: None,
+            }],
+            ..PackageData::default()
+        };
+
+        let file_info = FileInfo::new(
+            "package.json".to_string(),
+            "package".to_string(),
+            ".json".to_string(),
+            "project/package.json".to_string(),
+            FileType::File,
+            None,
+            1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            vec![package_data],
+            None,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+
+        assert_eq!(file_info.license_detections.len(), 1);
+        assert_eq!(
+            file_info.license_detections[0].matches[0]
+                .from_file
+                .as_deref(),
+            Some("project/package.json")
+        );
+        assert!(file_info.license_detections[0].identifier.is_some());
+        assert_eq!(
+            file_info.package_data[0].license_detections[0].matches[0]
+                .from_file
+                .as_deref(),
+            Some("project/package.json")
+        );
+        assert!(
+            file_info.package_data[0].license_detections[0]
+                .identifier
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn package_from_package_data_backfills_detection_provenance() {
+        let package_data = PackageData {
+            package_type: Some(PackageType::Npm),
+            license_detections: vec![LicenseDetection {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                matches: vec![Match {
+                    license_expression: "mit".to_string(),
+                    license_expression_spdx: "MIT".to_string(),
+                    from_file: None,
+                    start_line: 1,
+                    end_line: 1,
+                    matcher: Some("parser-declared-license".to_string()),
+                    score: 100.0,
+                    matched_length: Some(1),
+                    match_coverage: Some(100.0),
+                    rule_relevance: Some(100),
+                    rule_identifier: None,
+                    rule_url: None,
+                    matched_text: Some("MIT".to_string()),
+                    matched_text_diagnostics: None,
+                }],
+                detection_log: vec![],
+                identifier: None,
+            }],
+            ..PackageData::default()
+        };
+
+        let package = Package::from_package_data(&package_data, "project/package.json".to_string());
+
+        assert_eq!(
+            package.license_detections[0].matches[0]
+                .from_file
+                .as_deref(),
+            Some("project/package.json")
+        );
+        assert!(package.license_detections[0].identifier.is_some());
     }
 }
 

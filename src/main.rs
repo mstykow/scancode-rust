@@ -77,7 +77,7 @@ fn run() -> Result<()> {
         preloaded_license_detections,
         preloaded_license_references,
         preloaded_license_rule_references,
-        active_license_engine,
+        mut active_license_engine,
     ) = if cli.from_json {
         let loaded = load_and_merge_json_inputs(&cli.dir_path, cli.strip_root, cli.full_root)?;
         let directories_count = loaded.directory_count();
@@ -230,6 +230,10 @@ fn run() -> Result<()> {
         apply_mark_source(&mut scan_result.files);
     }
 
+    for file in &mut scan_result.files {
+        file.backfill_license_provenance();
+    }
+
     if cli.from_json {
         trim_preloaded_assembly_to_files(
             &scan_result.files,
@@ -280,32 +284,55 @@ fn run() -> Result<()> {
         );
     }
 
+    for package in &mut assembly_result.packages {
+        package.backfill_license_provenance();
+    }
+
     let end_time = Utc::now();
 
-    let license_detections = if cli.from_json {
+    let recompute_shaped_top_level_license_sections = cli.from_json
+        && (cli.filter_clues
+            || !cli.include.is_empty()
+            || !cli.exclude.is_empty()
+            || cli.only_findings
+            || cli.strip_root
+            || cli.full_root);
+
+    let license_detections = if cli.from_json && !recompute_shaped_top_level_license_sections {
         preloaded_license_detections
     } else {
         collect_top_level_license_detections(&scan_result.files)
     };
 
-    let (license_references, license_rule_references) = if cli.from_json {
-        (
-            preloaded_license_references,
-            preloaded_license_rule_references,
-        )
-    } else if cli.license_references {
-        if let Some(engine) = active_license_engine.as_deref() {
-            collect_top_level_license_references(
-                &scan_result.files,
-                &assembly_result.packages,
-                engine.index(),
+    let should_recompute_license_references = cli.from_json
+        && recompute_shaped_top_level_license_sections
+        && (!preloaded_license_references.is_empty()
+            || !preloaded_license_rule_references.is_empty()
+            || cli.license_references);
+
+    if should_recompute_license_references && active_license_engine.is_none() {
+        active_license_engine = Some(init_license_engine(&cli.license_rules_path)?);
+    }
+
+    let (license_references, license_rule_references) =
+        if cli.from_json && !should_recompute_license_references {
+            (
+                preloaded_license_references,
+                preloaded_license_rule_references,
             )
+        } else if cli.license_references || should_recompute_license_references {
+            if let Some(engine) = active_license_engine.as_deref() {
+                collect_top_level_license_references(
+                    &scan_result.files,
+                    &assembly_result.packages,
+                    engine.index(),
+                )
+            } else {
+                (Vec::new(), Vec::new())
+            }
         } else {
             (Vec::new(), Vec::new())
-        }
-    } else {
-        (Vec::new(), Vec::new())
-    };
+        };
 
     let output = create_output(
         start_time,
