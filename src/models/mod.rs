@@ -1,5 +1,5 @@
 mod datasource_id;
-mod file_info;
+pub(crate) mod file_info;
 mod output;
 mod package_type;
 

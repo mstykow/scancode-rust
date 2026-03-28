@@ -132,9 +132,35 @@ pub struct SystemEnvironment {
 #[derive(Serialize, Deserialize, Debug)]
 /// Reference entry for a detected license.
 pub struct LicenseReference {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
     pub name: String,
     pub short_name: String,
     pub spdx_license_key: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_spdx_license_keys: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum_coverage: Option<u8>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_copyrights: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_holders: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_authors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_urls: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_emails: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scancode_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub licensedb_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spdx_url: Option<String>,
     pub text: String,
 }
 
@@ -149,4 +175,34 @@ pub struct LicenseRuleReference {
     pub is_license_tag: bool,
     pub is_license_clue: bool,
     pub is_license_intro: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_url: Option<String>,
+    #[serde(default)]
+    pub is_required_phrase: bool,
+    #[serde(default)]
+    pub is_continuous: bool,
+    #[serde(default)]
+    pub is_from_license: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relevance: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum_coverage: Option<u8>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub referenced_filenames: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_copyrights: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_holders: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_authors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_urls: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignorable_emails: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
