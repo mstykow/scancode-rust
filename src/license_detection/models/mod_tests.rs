@@ -586,6 +586,7 @@ mod tests {
             rule_identifier: Some("spdx-license-identifier-mit-deadbeef".to_string()),
             rule_url: None,
             matched_text: Some("MIT".to_string()),
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         };
 
