@@ -153,6 +153,7 @@ fn from_json_with_no_assemble_preserves_preloaded_package_sections() {
                 "datasource_id": "npm_package_json"
             }
         ],
+        "license_detections": [],
         "license_references": [],
         "license_rule_references": []
     });
@@ -212,6 +213,7 @@ fn from_json_skips_final_native_projection_block() {
         )],
         packages: vec![],
         dependencies: vec![],
+        license_detections: vec![],
         license_references: vec![],
         license_rule_references: vec![],
         excluded_count: 0,

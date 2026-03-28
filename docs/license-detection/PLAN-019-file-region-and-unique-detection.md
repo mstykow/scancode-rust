@@ -36,11 +36,13 @@ Rust is still missing the Python features that justify `FileRegion`:
 3. later post-processing that consumes detection file paths,
 4. any output surface equivalent to Python's todo / ambiguous-detection flow.
 
-These missing pieces also block the broader license-output parity work tracked in
+These missing pieces still block the remaining provenance-sensitive license-output
+parity work tracked in
 [`../implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](../implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md),
 especially:
 
-- top-level unique `license_detections`,
+- full top-level unique `license_detections` parity across file and package
+  detections,
 - live `license_references` / `license_rule_references`, and
 - other post-scan consumers that need detection-to-file provenance.
 

@@ -185,6 +185,132 @@ fn collect_top_level_license_references_returns_empty_for_empty_inputs() {
 }
 
 #[test]
+fn collect_top_level_license_detections_groups_file_detections_and_preserves_paths() {
+    let mut first = file("project/src/lib.rs");
+    first.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/src/lib.rs".to_string()),
+            start_line: 1,
+            end_line: 3,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(10),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("mit.LICENSE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec!["imperfect-match-coverage".to_string()],
+        identifier: Some("mit-shared-id".to_string()),
+    }];
+
+    let mut second = file("project/src/other.rs");
+    second.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/src/other.rs".to_string()),
+            start_line: 4,
+            end_line: 6,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(10),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("mit.LICENSE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("mit-shared-id".to_string()),
+    }];
+
+    let mut third = file("project/src/apache.rs");
+    third.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some("project/src/apache.rs".to_string()),
+            start_line: 1,
+            end_line: 12,
+            matcher: Some("2-aho".to_string()),
+            score: 100.0,
+            matched_length: Some(120),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("apache-2.0_2.RULE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("apache-2.0-id".to_string()),
+    }];
+
+    let detections = collect_top_level_license_detections(&[first, second, third]);
+
+    assert_eq!(detections.len(), 2);
+    assert_eq!(detections[0].license_expression, "apache-2.0");
+    assert_eq!(detections[0].detection_count, 1);
+    assert_eq!(detections[1].identifier, "mit-shared-id");
+    assert_eq!(detections[1].detection_count, 2);
+    assert_eq!(
+        detections[1].reference_matches[0].from_file.as_deref(),
+        Some("project/src/lib.rs")
+    );
+    assert_eq!(
+        detections[1].detection_log,
+        vec!["imperfect-match-coverage".to_string()]
+    );
+}
+
+#[test]
+fn collect_top_level_license_detections_skips_package_only_detections_without_identifier() {
+    let mut manifest = file("project/package.json");
+    manifest.package_data = vec![PackageData {
+        package_type: Some(PackageType::Npm),
+        license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: None,
+                start_line: 1,
+                end_line: 1,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("MIT".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            detection_log: vec![],
+            identifier: None,
+        }],
+        ..PackageData::default()
+    }];
+
+    let detections = collect_top_level_license_detections(&[manifest]);
+
+    assert!(detections.is_empty());
+}
+
+#[test]
 fn create_output_preserves_top_level_license_references_from_context() {
     let start = Utc::now();
     let end = start;
@@ -201,6 +327,7 @@ fn create_output_preserves_top_level_license_references_from_context() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![crate::models::LicenseReference {
                 name: "MIT License".to_string(),
                 short_name: "MIT".to_string(),
@@ -238,6 +365,67 @@ fn create_output_preserves_top_level_license_references_from_context() {
 }
 
 #[test]
+fn create_output_preserves_top_level_license_detections_from_context() {
+    let start = Utc::now();
+    let end = start;
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project")],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_detections: vec![crate::models::TopLevelLicenseDetection {
+                identifier: "mit-id".to_string(),
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                detection_count: 2,
+                detection_log: vec![],
+                reference_matches: vec![Match {
+                    license_expression: "mit".to_string(),
+                    license_expression_spdx: "MIT".to_string(),
+                    from_file: Some("project/LICENSE".to_string()),
+                    start_line: 1,
+                    end_line: 20,
+                    matcher: Some("1-hash".to_string()),
+                    score: 100.0,
+                    matched_length: Some(20),
+                    match_coverage: Some(100.0),
+                    rule_relevance: Some(100),
+                    rule_identifier: Some("mit.LICENSE".to_string()),
+                    rule_url: None,
+                    matched_text: None,
+                    matched_text_diagnostics: None,
+                }],
+            }],
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_classify: false,
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+            },
+        },
+    );
+
+    assert_eq!(output.license_detections.len(), 1);
+    assert_eq!(output.license_detections[0].identifier, "mit-id");
+    assert_eq!(output.license_detections[0].detection_count, 2);
+}
+
+#[test]
 fn create_output_gates_summary_tallies_and_generated_sections() {
     let license_rel = "project/LICENSE".to_string();
     let mut disabled_license = file(&license_rel);
@@ -259,6 +447,7 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -323,6 +512,7 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -377,6 +567,7 @@ fn create_output_preserves_scanner_generated_flags_without_scan_root() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -452,6 +643,7 @@ fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -515,6 +707,7 @@ fn create_output_preserves_file_level_license_clues_in_json_shape() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -576,6 +769,7 @@ fn create_output_preserves_empty_package_data_license_and_dependency_arrays() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -629,6 +823,7 @@ fn create_output_tallies_by_facet_does_not_leak_resource_tallies() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -685,6 +880,7 @@ fn create_output_promotes_package_metadata_without_summary_flags() {
                 packages: vec![package],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -764,6 +960,7 @@ fn create_output_summary_still_resolves_after_strip_root_normalization() {
         CreateOutputContext {
             total_dirs: 1,
             assembly_result,
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
@@ -806,6 +1003,7 @@ fn create_output_classify_only_sets_key_file_flags() {
                 packages: vec![],
                 dependencies: vec![],
             },
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {

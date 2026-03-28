@@ -500,6 +500,7 @@ pub(crate) fn compute_fixture_output(
         CreateOutputContext {
             total_dirs: collected.directories.len(),
             assembly_result,
+            license_detections: vec![],
             license_references: vec![],
             license_rule_references: vec![],
             options: CreateOutputOptions {
