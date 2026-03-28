@@ -308,15 +308,29 @@ mod tests {
                 rule_identifier: Some("unknown-license-reference.RULE".to_string()),
                 rule_url: Some("https://example.com/unknown-license-reference.LICENSE".to_string()),
                 matched_text: Some("Custom license text".to_string()),
+                referenced_filenames: Some(vec!["LICENSE".to_string()]),
                 matched_text_diagnostics: None,
             }],
             detection_log: vec![],
             identifier: Some("unknown-ref-id".to_string()),
         }];
         output.license_references = vec![crate::models::LicenseReference {
+            key: Some("unknown-license-reference".to_string()),
             name: "Unknown License Reference".to_string(),
             short_name: "Unknown License Reference".to_string(),
             spdx_license_key: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            other_spdx_license_keys: vec![],
+            category: None,
+            notes: None,
+            minimum_coverage: None,
+            ignorable_copyrights: vec![],
+            ignorable_holders: vec![],
+            ignorable_authors: vec![],
+            ignorable_urls: vec![],
+            ignorable_emails: vec![],
+            scancode_url: None,
+            licensedb_url: None,
+            spdx_url: None,
             text: "Unused fallback text".to_string(),
         }];
 
@@ -620,9 +634,22 @@ mod tests {
     fn test_json_and_json_lines_writers_include_top_level_license_references() {
         let mut output = sample_output();
         output.license_references = vec![crate::models::LicenseReference {
+            key: Some("mit".to_string()),
             name: "MIT License".to_string(),
             short_name: "MIT".to_string(),
             spdx_license_key: "MIT".to_string(),
+            other_spdx_license_keys: vec![],
+            category: None,
+            notes: None,
+            minimum_coverage: None,
+            ignorable_copyrights: vec![],
+            ignorable_holders: vec![],
+            ignorable_authors: vec![],
+            ignorable_urls: vec![],
+            ignorable_emails: vec![],
+            scancode_url: None,
+            licensedb_url: None,
+            spdx_url: None,
             text: "MIT text".to_string(),
         }];
         output.license_rule_references = vec![crate::models::LicenseRuleReference {
@@ -634,6 +661,21 @@ mod tests {
             is_license_tag: false,
             is_license_clue: true,
             is_license_intro: false,
+            language: None,
+            rule_url: None,
+            is_required_phrase: false,
+            is_continuous: false,
+            is_from_license: false,
+            relevance: None,
+            minimum_coverage: None,
+            referenced_filenames: vec![],
+            notes: None,
+            ignorable_copyrights: vec![],
+            ignorable_holders: vec![],
+            ignorable_authors: vec![],
+            ignorable_urls: vec![],
+            ignorable_emails: vec![],
+            text: None,
         }];
 
         let mut json_bytes = Vec::new();
@@ -646,9 +688,14 @@ mod tests {
             json_value["license_references"][0]["spdx_license_key"],
             "MIT"
         );
+        assert_eq!(json_value["license_references"][0]["key"], "mit");
         assert_eq!(
             json_value["license_rule_references"][0]["identifier"],
             "license-clue_1.RULE"
+        );
+        assert_eq!(
+            json_value["license_rule_references"][0]["relevance"],
+            Value::Null
         );
 
         let mut jsonl_bytes = Vec::new();
@@ -691,6 +738,7 @@ mod tests {
                 rule_identifier: Some("mit.LICENSE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
         }];
@@ -981,6 +1029,7 @@ mod tests {
                         rule_identifier: Some("mit_rule".to_string()),
                         rule_url: None,
                         matched_text: None,
+                        referenced_filenames: None,
                         matched_text_diagnostics: None,
                     }],
                     detection_log: vec![],

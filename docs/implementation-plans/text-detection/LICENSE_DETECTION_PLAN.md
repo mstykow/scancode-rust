@@ -138,13 +138,15 @@ and Provenant now emits top-level unique `license_detections` for
 identifier-bearing file/resource detections plus package/manifest-origin public
 detections after provenance backfill. The internal aggregation substrate now has
 real file-region metadata, but full Python-style parity still depends on the
-remaining file-region-consuming clue/reference-following cases.
+remaining package/file reference-following edge cases and any later
+file-region-consuming consumers.
 
 ### 3. Detection-path consumers are still unimplemented
 
 The engine and post-processing layers now have file-region-aware unique
 aggregation, but Provenant still lacks the downstream consumers that use those
-paths for reference-following and other post-scan behaviors. The focused
+paths for fuller package/file reference-following and other post-scan
+behaviors. The focused
 sub-plan for that work is
 [PLAN-019-file-region-and-unique-detection.md](../../license-detection/PLAN-019-file-region-and-unique-detection.md).
 
@@ -187,6 +189,8 @@ The repository still has a mix of:
 3. **Phase 2 — Top-level license aggregation parity**
    - Consume file-region-aware unique aggregation in the remaining clue and
      reference-following flows
+   - Enrich top-level `license_references` / `license_rule_references` with the
+     runtime metadata already available after reference-following
 
 4. **Phase 3 — CLI flag parity**
    - Resolve `--include-text` vs `--license-text`
