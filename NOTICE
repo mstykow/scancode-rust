@@ -1,6 +1,8 @@
 Provenant Notices
 =====================
 
+Copyright (c) 2026 Provenant contributors.
+
 Provenant is an independent Rust rewrite of ScanCode Toolkit.
 
 This file preserves attribution notices for upstream ScanCode Toolkit material

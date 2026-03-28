@@ -168,4 +168,6 @@ If you use the repository's documentation and hook tooling, install the versions
 
 ## License
 
+Copyright (c) 2026 Provenant contributors.
+
 The Provenant project code is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [`NOTICE`](NOTICE) for preserved upstream attribution notices for included ScanCode Toolkit materials.
