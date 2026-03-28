@@ -296,6 +296,7 @@ fn extract_information_from_content(
     extract_license_information(
         file_info_builder,
         scan_errors,
+        path,
         text_content_for_license_detection,
         license_engine,
         license_options,
@@ -551,6 +552,7 @@ fn extract_email_url_information(
 fn extract_license_information(
     file_info_builder: &mut FileInfoBuilder,
     scan_errors: &mut Vec<String>,
+    path: &Path,
     text_content: String,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     license_options: LicenseScanOptions,
@@ -560,10 +562,11 @@ fn extract_license_information(
         return Ok(());
     };
 
-    match engine.detect_with_kind(
+    match engine.detect_with_kind_and_source(
         &text_content,
         license_options.unknown_licenses,
         from_binary_strings,
+        &path.to_string_lossy(),
     ) {
         Ok(detections) => {
             let query =
@@ -895,6 +898,7 @@ mod tests {
             matches: vec![make_internal_match(rule_url)],
             detection_log: vec![],
             identifier: Some("mit-test".to_string()),
+            file_regions: Vec::new(),
         }
     }
 
