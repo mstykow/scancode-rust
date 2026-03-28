@@ -255,8 +255,8 @@ Canonical hook and CI definitions live in [`lefthook.yml`](lefthook.yml), [`pack
 
 ### Opening Pull Requests
 
-- Use [`.github/pull_request_template.md`](.github/pull_request_template.md) for every agent-authored PR. When opening with `gh`, start from it via `gh pr create --template .github/pull_request_template.md`, complete the applicable sections, and omit sections that do not apply.
-- Include concrete verification evidence in the PR body, including the exact local commands you ran and their outcomes. If golden or other expected-output fixture files changed, explain which files changed and why the new expected output is correct.
+- Use [`.github/pull_request_template.md`](.github/pull_request_template.md) for every agent-authored PR. The final PR body should follow its section structure, complete the applicable sections, and omit sections that do not apply.
+- With `gh`, use `--template .github/pull_request_template.md` only for interactive/editor-driven PR creation. When supplying `--body` or `--body-file`, do **not** combine them with `--template`; instead, render the template structure manually into the provided body.
 - Keep PR scope disciplined. For ecosystem/parser work, prefer one ecosystem family per PR and do not hide unrelated refactors inside the same review unit.
 
 ## Performance Considerations
