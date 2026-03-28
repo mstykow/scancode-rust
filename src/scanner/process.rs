@@ -696,6 +696,7 @@ fn convert_match_to_model(
         rule_identifier: Some(m.rule_identifier.clone()),
         rule_url,
         matched_text,
+        referenced_filenames: m.referenced_filenames.clone(),
         matched_text_diagnostics,
     }
 }

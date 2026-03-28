@@ -33,9 +33,9 @@ Rust now has detection-level file-region construction with a real source path an
 uses that internal metadata to aggregate unique detections across repeated
 regions. The remaining missing Python features are:
 
-1. later post-processing that consumes detection file paths,
-2. richer reference-following behavior built on those paths,
-3. any output surface equivalent to Python's todo / ambiguous-detection flow.
+1. fuller package/file reference-following beyond the currently implemented
+   local-file resolution paths,
+2. any output surface equivalent to Python's todo / ambiguous-detection flow.
 
 These missing pieces still block the remaining provenance-sensitive license-output
 parity work tracked in
@@ -60,7 +60,8 @@ Most likely work items:
    `src/license_detection/detection/` with real `path`, `start_line`, and
    `end_line` values.
 3. ✅ Implement the Python-style unique-detection / file-region aggregation step.
-4. Add whichever consumer actually needs the metadata before exposing it again.
+4. ✅ Add the first real consumer for file-resource local-file reference-following.
+5. Add whichever additional consumer still needs the metadata before exposing it again.
 
 ## Relevant Reference Points
 
