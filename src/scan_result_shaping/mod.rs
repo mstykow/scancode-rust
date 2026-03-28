@@ -1,13 +1,29 @@
+mod json_input;
+mod selection;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 
+use crate::license_detection::LicenseDetectionEngine;
 use crate::license_detection::index::LicenseIndex;
 use crate::models::{FileInfo, Match, Package, TopLevelDependency};
+use anyhow::Result;
+
+pub(crate) use json_input::load_and_merge_json_inputs;
+pub(crate) use selection::{
+    apply_cli_path_selection_filter, apply_user_path_filters_to_collected,
+    resolve_native_scan_inputs,
+};
 
 #[cfg(test)]
-#[path = "scan_result_shaping_test.rs"]
+pub(crate) use json_input::{JsonScanInput, load_scan_from_json, normalize_loaded_json_scan};
+#[cfg(test)]
+pub(crate) use selection::{is_included_path, normalize_scan_relative_path};
+
+#[cfg(test)]
+#[path = "../scan_result_shaping_test.rs"]
 mod scan_result_shaping_test;
 
 fn retain_matching_files_with_ancestor_dirs<F>(files: &mut Vec<FileInfo>, mut keep_file: F)
@@ -131,6 +147,31 @@ pub(crate) fn build_clue_rule_lookup(index: &LicenseIndex) -> ClueRuleLookup {
             )
         })
         .collect()
+}
+
+pub(crate) fn prepare_filter_clue_rule_lookup(
+    files: &[crate::models::FileInfo],
+    active_license_engine: Option<&LicenseDetectionEngine>,
+    rules_path: Option<&str>,
+) -> Result<Option<ClueRuleLookup>> {
+    let needs_rule_lookup = files.iter().any(|file| {
+        file.license_detections
+            .iter()
+            .any(|detection| !detection.matches.is_empty())
+    });
+    if !needs_rule_lookup {
+        return Ok(None);
+    }
+
+    if let Some(active_license_engine) = active_license_engine {
+        return Ok(Some(build_clue_rule_lookup(active_license_engine.index())));
+    }
+
+    let fallback_engine = match rules_path {
+        Some(path) => LicenseDetectionEngine::from_directory(Path::new(path))?,
+        None => LicenseDetectionEngine::from_embedded()?,
+    };
+    Ok(Some(build_clue_rule_lookup(fallback_engine.index())))
 }
 
 pub(crate) fn filter_redundant_clues(files: &mut [FileInfo]) {

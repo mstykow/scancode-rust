@@ -5,6 +5,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::scan_result_shaping::{
+    JsonScanInput, apply_user_path_filters_to_collected, is_included_path, load_scan_from_json,
+    normalize_loaded_json_scan, normalize_scan_relative_path, resolve_native_scan_inputs,
+};
 use crate::scanner::collect_paths;
 
 #[test]
