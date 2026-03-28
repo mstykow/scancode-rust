@@ -8,7 +8,9 @@ use glob::Pattern;
 
 use crate::assembly;
 use crate::license_detection::detection::{
-    FileRegion as InternalFileRegion, get_unique_detections,
+    DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE, FileRegion as InternalFileRegion,
+    determine_license_expression, determine_spdx_expression, get_unique_detections,
+    select_matches_for_expression,
 };
 use crate::license_detection::expression::{
     LicenseExpression, combine_expressions_and, expression_to_string, parse_expression,
@@ -22,6 +24,11 @@ use crate::models::{
     Package, PackageData, Summary, SystemEnvironment, Tallies, TallyEntry,
     TopLevelLicenseDetection,
 };
+
+const SCANCODE_LICENSE_URL_BASE: &str =
+    "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses";
+const LICENSEDB_URL_BASE: &str = "https://scancode-licensedb.aboutcode.org";
+const SPDX_LICENSE_URL_BASE: &str = "https://spdx.org/licenses";
 use crate::scanner;
 #[cfg(test)]
 use crate::utils::generated::generated_code_hints;
@@ -63,6 +70,12 @@ pub(crate) struct CreateOutputContext<'a> {
     pub(crate) license_references: Vec<crate::models::LicenseReference>,
     pub(crate) license_rule_references: Vec<crate::models::LicenseRuleReference>,
     pub(crate) options: CreateOutputOptions<'a>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedReferenceTarget {
+    path: String,
+    detections: Vec<LicenseDetection>,
 }
 
 struct ClassificationContext {
@@ -314,6 +327,313 @@ pub(crate) fn collect_top_level_license_detections(
     unique_detections
 }
 
+pub(crate) fn apply_local_file_reference_following(files: &mut [FileInfo], packages: &[Package]) {
+    for _ in 0..5 {
+        let snapshot = build_reference_follow_snapshot(files, packages);
+        let mut modified = false;
+
+        for file in files
+            .iter_mut()
+            .filter(|file| file.file_type == FileType::File)
+        {
+            if follow_references_for_file(file, &snapshot) {
+                modified = true;
+            }
+        }
+
+        if !modified {
+            break;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReferenceFollowSnapshot {
+    files_by_path: HashMap<String, ResolvedReferenceTarget>,
+    package_manifest_dirs_by_uid: HashMap<String, Vec<String>>,
+    root_paths: Vec<String>,
+}
+
+fn build_reference_follow_snapshot(
+    files: &[FileInfo],
+    packages: &[Package],
+) -> ReferenceFollowSnapshot {
+    let files_by_path = files
+        .iter()
+        .filter(|file| file.file_type == FileType::File)
+        .map(|file| {
+            (
+                file.path.clone(),
+                ResolvedReferenceTarget {
+                    path: file.path.clone(),
+                    detections: file.license_detections.clone(),
+                },
+            )
+        })
+        .collect();
+
+    let package_manifest_dirs_by_uid = packages
+        .iter()
+        .map(|package| {
+            let dirs = package
+                .datafile_paths
+                .iter()
+                .filter_map(|path| Path::new(path).parent())
+                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            (package.package_uid.clone(), dirs)
+        })
+        .collect();
+
+    ReferenceFollowSnapshot {
+        files_by_path,
+        package_manifest_dirs_by_uid,
+        root_paths: top_level_root_paths(files),
+    }
+}
+
+fn top_level_root_paths(files: &[FileInfo]) -> Vec<String> {
+    let directories: HashSet<String> = files
+        .iter()
+        .filter(|file| file.file_type == FileType::Directory)
+        .map(|file| file.path.clone())
+        .collect();
+
+    let mut roots: Vec<String> = directories
+        .iter()
+        .filter(|path| {
+            Path::new(path)
+                .parent()
+                .and_then(|parent| {
+                    let parent = parent.to_string_lossy().replace('\\', "/");
+                    (!parent.is_empty()).then_some(parent)
+                })
+                .is_none_or(|parent| !directories.contains(&parent))
+        })
+        .cloned()
+        .collect();
+
+    if roots.is_empty()
+        && files
+            .iter()
+            .any(|file| file.file_type == FileType::File && !file.path.contains('/'))
+    {
+        roots.push(String::new());
+    }
+
+    roots.sort();
+    roots
+}
+
+fn follow_references_for_file(file: &mut FileInfo, snapshot: &ReferenceFollowSnapshot) -> bool {
+    let mut modified = false;
+    let current_path = file.path.clone();
+    let package_uids = file.for_packages.clone();
+
+    for detection in &mut file.license_detections {
+        if apply_reference_following_to_detection(detection, &current_path, &package_uids, snapshot)
+        {
+            modified = true;
+        }
+    }
+
+    if modified {
+        file.license_expression = combine_license_expressions(
+            file.license_detections
+                .iter()
+                .map(|detection| detection.license_expression.clone()),
+        );
+    }
+
+    modified
+}
+
+fn apply_reference_following_to_detection(
+    detection: &mut LicenseDetection,
+    current_path: &str,
+    package_uids: &[String],
+    snapshot: &ReferenceFollowSnapshot,
+) -> bool {
+    let referenced_filenames = referenced_filenames_from_detection(detection);
+    if referenced_filenames.is_empty() || has_resolved_referenced_file(detection, current_path) {
+        return false;
+    }
+
+    let referenced_targets: Vec<_> = referenced_filenames
+        .iter()
+        .filter_map(|referenced_filename| {
+            resolve_referenced_resource(referenced_filename, current_path, package_uids, snapshot)
+        })
+        .collect();
+    if referenced_targets.is_empty() {
+        return false;
+    }
+
+    let referenced_license_expression =
+        combine_license_expressions(referenced_targets.iter().flat_map(|target| {
+            target
+                .detections
+                .iter()
+                .map(|detection| detection.license_expression.clone())
+        }));
+    if !use_referenced_license_expression(referenced_license_expression.as_deref(), detection) {
+        return false;
+    }
+
+    let mut internal_detection = public_detection_to_internal(detection);
+    for target in &referenced_targets {
+        for referenced_detection in &target.detections {
+            let mut internal = public_detection_to_internal(referenced_detection);
+            for match_item in &mut internal.matches {
+                match_item.from_file = Some(target.path.clone());
+            }
+            internal_detection.matches.extend(internal.matches);
+        }
+    }
+    let matches_for_expression = select_matches_for_expression(
+        &internal_detection.matches,
+        DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE,
+    );
+    internal_detection.license_expression =
+        determine_license_expression(&matches_for_expression).ok();
+    internal_detection.license_expression_spdx =
+        determine_spdx_expression(&matches_for_expression).ok();
+    internal_detection.detection_log =
+        vec![DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE.to_string()];
+    let mut public_detection = internal_detection_to_public(internal_detection);
+    public_detection.identifier = None;
+    crate::models::file_info::enrich_license_detection_provenance(
+        &mut public_detection,
+        current_path,
+    );
+    *detection = public_detection;
+    true
+}
+
+fn referenced_filenames_from_detection(detection: &LicenseDetection) -> Vec<String> {
+    detection
+        .matches
+        .iter()
+        .flat_map(|detection_match| {
+            detection_match
+                .referenced_filenames
+                .clone()
+                .unwrap_or_default()
+        })
+        .map(|name| normalize_referenced_filename(&name))
+        .filter(|name| !name.is_empty())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn has_resolved_referenced_file(detection: &LicenseDetection, current_path: &str) -> bool {
+    detection.matches.iter().any(|detection_match| {
+        detection_match
+            .from_file
+            .as_deref()
+            .is_some_and(|path| path != current_path)
+    })
+}
+
+fn normalize_referenced_filename(name: &str) -> String {
+    name.trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_matches('/')
+        .to_string()
+}
+
+fn resolve_referenced_resource(
+    referenced_filename: &str,
+    current_path: &str,
+    package_uids: &[String],
+    snapshot: &ReferenceFollowSnapshot,
+) -> Option<ResolvedReferenceTarget> {
+    let referenced_filename = normalize_referenced_filename(referenced_filename);
+    if referenced_filename.is_empty() {
+        return None;
+    }
+
+    let mut candidates = Vec::new();
+    if let Some(parent) = Path::new(current_path).parent() {
+        let parent = parent.to_string_lossy();
+        candidates.push(join_reference_candidate(
+            parent.as_ref(),
+            &referenced_filename,
+        ));
+    }
+
+    for package_uid in package_uids {
+        if let Some(dirs) = snapshot.package_manifest_dirs_by_uid.get(package_uid) {
+            for dir in dirs {
+                candidates.push(join_reference_candidate(dir, &referenced_filename));
+            }
+        }
+    }
+
+    for root in &snapshot.root_paths {
+        candidates.push(join_reference_candidate(root, &referenced_filename));
+    }
+
+    candidates
+        .into_iter()
+        .find_map(|candidate| snapshot.files_by_path.get(&candidate).cloned())
+}
+
+fn join_reference_candidate(base: &str, referenced_filename: &str) -> String {
+    if base.is_empty() {
+        referenced_filename.to_string()
+    } else {
+        Path::new(base)
+            .join(referenced_filename)
+            .to_string_lossy()
+            .replace('\\', "/")
+    }
+}
+
+fn use_referenced_license_expression(
+    referenced_license_expression: Option<&str>,
+    detection: &LicenseDetection,
+) -> bool {
+    let Some(referenced_license_expression) = referenced_license_expression else {
+        return false;
+    };
+
+    if detection.license_expression == "unknown-license-reference" {
+        return true;
+    }
+
+    if referenced_license_expression == detection.license_expression {
+        return true;
+    }
+
+    let current_keys = parse_expression(&detection.license_expression)
+        .ok()
+        .map(|expr| expr.license_keys())
+        .unwrap_or_default();
+    let referenced_keys = parse_expression(referenced_license_expression)
+        .ok()
+        .map(|expr| expr.license_keys())
+        .unwrap_or_default();
+
+    if current_keys == referenced_keys
+        && detection.license_expression != referenced_license_expression
+    {
+        return false;
+    }
+
+    if referenced_keys.len() > 5 {
+        return false;
+    }
+
+    true
+}
+
 fn public_detection_to_internal(
     detection: &LicenseDetection,
 ) -> crate::license_detection::LicenseDetection {
@@ -346,6 +666,22 @@ fn public_detection_to_internal(
     }
 }
 
+fn internal_detection_to_public(
+    detection: crate::license_detection::LicenseDetection,
+) -> LicenseDetection {
+    LicenseDetection {
+        license_expression: detection.license_expression.unwrap_or_default(),
+        license_expression_spdx: detection.license_expression_spdx.unwrap_or_default(),
+        matches: detection
+            .matches
+            .into_iter()
+            .map(internal_match_to_public)
+            .collect(),
+        detection_log: detection.detection_log,
+        identifier: detection.identifier,
+    }
+}
+
 fn public_match_to_internal(
     detection_match: &Match,
 ) -> crate::license_detection::models::LicenseMatch {
@@ -372,7 +708,7 @@ fn public_match_to_internal(
         rule_identifier: detection_match.rule_identifier.clone().unwrap_or_default(),
         rule_url: detection_match.rule_url.clone().unwrap_or_default(),
         matched_text: detection_match.matched_text.clone(),
-        referenced_filenames: None,
+        referenced_filenames: detection_match.referenced_filenames.clone(),
         rule_kind: crate::license_detection::models::RuleKind::None,
         is_from_license: false,
         matched_token_positions: None,
@@ -403,6 +739,7 @@ fn internal_match_to_public(
         rule_identifier: Some(detection_match.rule_identifier),
         rule_url: (!detection_match.rule_url.is_empty()).then_some(detection_match.rule_url),
         matched_text: detection_match.matched_text,
+        referenced_filenames: detection_match.referenced_filenames,
         matched_text_diagnostics: None,
     }
 }
@@ -474,9 +811,27 @@ pub(crate) fn collect_top_level_license_references(
                 };
 
                 LicenseReference {
+                    key: Some(license.key.clone()),
                     name: license.name.clone(),
                     short_name,
-                    spdx_license_key,
+                    spdx_license_key: spdx_license_key.clone(),
+                    other_spdx_license_keys: license.other_spdx_license_keys.clone(),
+                    category: license.category.clone(),
+                    notes: license.notes.clone(),
+                    minimum_coverage: license.minimum_coverage,
+                    ignorable_copyrights: license.ignorable_copyrights.clone().unwrap_or_default(),
+                    ignorable_holders: license.ignorable_holders.clone().unwrap_or_default(),
+                    ignorable_authors: license.ignorable_authors.clone().unwrap_or_default(),
+                    ignorable_urls: license.ignorable_urls.clone().unwrap_or_default(),
+                    ignorable_emails: license.ignorable_emails.clone().unwrap_or_default(),
+                    scancode_url: Some(format!(
+                        "{SCANCODE_LICENSE_URL_BASE}/{}.LICENSE",
+                        license.key
+                    )),
+                    licensedb_url: Some(format!("{LICENSEDB_URL_BASE}/{}", license.key)),
+                    spdx_url: (!spdx_license_key.is_empty()
+                        && !spdx_license_key.starts_with("LicenseRef-scancode-"))
+                    .then(|| format!("{SPDX_LICENSE_URL_BASE}/{}", spdx_license_key)),
                     text: license.text.clone(),
                 }
             })
@@ -497,6 +852,21 @@ pub(crate) fn collect_top_level_license_references(
                     is_license_tag: rule.is_license_tag(),
                     is_license_clue: rule.is_license_clue(),
                     is_license_intro: rule.is_license_intro(),
+                    language: rule.language.clone(),
+                    rule_url: rule.rule_url(),
+                    is_required_phrase: rule.is_required_phrase,
+                    is_continuous: rule.is_continuous,
+                    is_from_license: rule.is_from_license,
+                    relevance: Some(rule.relevance),
+                    minimum_coverage: rule.minimum_coverage,
+                    referenced_filenames: rule.referenced_filenames.clone().unwrap_or_default(),
+                    notes: rule.notes.clone(),
+                    ignorable_copyrights: rule.ignorable_copyrights.clone().unwrap_or_default(),
+                    ignorable_holders: rule.ignorable_holders.clone().unwrap_or_default(),
+                    ignorable_authors: rule.ignorable_authors.clone().unwrap_or_default(),
+                    ignorable_urls: rule.ignorable_urls.clone().unwrap_or_default(),
+                    ignorable_emails: rule.ignorable_emails.clone().unwrap_or_default(),
+                    text: Some(rule.text.clone()),
                 })
         })
         .collect();
