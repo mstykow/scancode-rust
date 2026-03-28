@@ -56,10 +56,18 @@ jobs:
         run: ./scripts/check_unused_deps.sh
 
   rust-scan-integration-tests:
-    name: Scan and Integration Tests
+    name: Scan and Integration Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: scanner-integration
+            shared_key: rust-scan-integration-tests-release-scanner-integration
+          - shard: scan-contract-and-output
+            shared_key: rust-scan-integration-tests-release-scan-contract-and-output
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
@@ -72,21 +80,26 @@ jobs:
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-scan-integration-tests-release
+          shared-key: ${{ matrix.shared_key }}
 
       - name: Run parser-local scanner/assembly contract tests
+        if: matrix.shard == 'scan-contract-and-output'
         run: "cargo test --lib --release --verbose _scan_test::"
 
       - name: Run scanner integration suite
+        if: matrix.shard == 'scanner-integration'
         run: cargo test --test scanner_integration --release --verbose
 
       - name: Run scanner copyright/credits integration suite
+        if: matrix.shard == 'scan-contract-and-output'
         run: cargo test --test scanner_copyright_credits --release --verbose
 
       - name: Run progress CLI integration suite
+        if: matrix.shard == 'scan-contract-and-output'
         run: cargo test --test progress_cli_integration --release --verbose
 
       - name: Run output contract fixture suite
+        if: matrix.shard == 'scan-contract-and-output'
         run: cargo test --test output_format_golden --release --verbose
 
   golden-tests:
