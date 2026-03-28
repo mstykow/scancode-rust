@@ -210,6 +210,9 @@ pub struct Cli {
     #[arg(long = "license-clarity-score", requires = "classify")]
     pub license_clarity_score: bool,
 
+    #[arg(long = "license-references", requires = "license")]
+    pub license_references: bool,
+
     #[arg(long)]
     pub tallies: bool,
 
@@ -740,6 +743,34 @@ mod tests {
         assert!(parsed.license_text_diagnostics);
         assert!(parsed.license_diagnostics);
         assert!(parsed.unknown_licenses);
+    }
+
+    #[test]
+    fn test_license_references_requires_license() {
+        let result = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license-references",
+            "samples",
+        ]);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parses_license_references_flag() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license",
+            "--license-references",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.license_references);
     }
 
     #[test]
