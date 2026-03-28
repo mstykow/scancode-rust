@@ -27,9 +27,6 @@ implementation-plans/
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
   - Status: ✅ Complete — summary/tally/classify/generated parity and Phase 11 performance hardening are implemented, including package-preferred summary origin, localized fixture coverage, facet-rule optimization, and scanner-owned generated flags
 
-- **[SCAN_RESULT_SHAPING_PLAN.md](post-processing/SCAN_RESULT_SHAPING_PLAN.md)** - Include/filter/root/source output shaping
-  - Status: 🟡 Active — the core shaping pipeline is implemented in `src/scan_result_shaping.rs`; the plan now records scope, ordering, and remaining compatibility/performance watch items
-
 ### Infrastructure (`infrastructure/`)
 
 - **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
@@ -63,6 +60,11 @@ These topics are implemented. Some remain as completed historical plans, while o
 
 - **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
   - Status: 🟢 Complete — scanner/runtime ingestion now covers decoded non-UTF text, PDF text, and binary printable strings; Rust also adds supported-image EXIF/XMP metadata as a beyond-parity clue source, and intentional divergences are tracked in the plan
+
+### Post-Processing (`post-processing/`)
+
+- **[SCAN_RESULT_SHAPING_PLAN.md](post-processing/SCAN_RESULT_SHAPING_PLAN.md)** - Include/filter/root/source output shaping
+  - Status: 🟢 Complete — shaping-specific CLI behavior now lives in `src/scan_result_shaping/`, scanner path selection, and the main orchestration pipeline; remaining non-shaping parity follow-up is tracked in adjacent plans
 
 ### Infrastructure (`infrastructure/`)
 

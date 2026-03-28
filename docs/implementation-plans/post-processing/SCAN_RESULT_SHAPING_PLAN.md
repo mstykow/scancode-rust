@@ -1,6 +1,6 @@
 # Scan Result Shaping Implementation Plan
 
-> **Status**: 🟢 Done — shaping-specific CLI behavior now lives end-to-end in `src/scan_result_shaping.rs`, `src/main.rs`, and scanner path selection; remaining parity work is owned by adjacent plans for broader `--info` surface parity and public license-output shape
+> **Status**: 🟢 Done — shaping-specific CLI behavior now lives end-to-end in `src/scan_result_shaping/`, `src/main.rs`, and scanner path selection; remaining parity work is owned by adjacent plans for broader `--info` surface parity and public license-output shape
 > **Priority**: P2 - Medium (important user-facing output semantics, but downstream of core scan correctness)
 > **Dependencies**: [CLI_PLAN.md](../infrastructure/CLI_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md), [SUMMARIZATION_PLAN.md](SUMMARIZATION_PLAN.md), [LICENSE_DETECTION_PLAN.md](../text-detection/LICENSE_DETECTION_PLAN.md)
 
@@ -17,7 +17,7 @@ This plan covers the **output-shaping** steps that happen after scanning and bef
 - `--full-root`
 - `--mark-source`
 
-On the current branch these behaviors live in [`src/scan_result_shaping.rs`](../../../src/scan_result_shaping.rs) and are orchestrated from [`src/main.rs`](../../../src/main.rs) before assembly and summary/tally output construction.
+On the current branch these behaviors live in [`src/scan_result_shaping/`](../../../src/scan_result_shaping/) and are orchestrated from [`src/main.rs`](../../../src/main.rs) before assembly and summary/tally output construction.
 
 ## Why This Needs Its Own Plan
 
@@ -50,7 +50,7 @@ Keeping them in a separate plan prevents `SUMMARIZATION_PLAN.md` from becoming a
 
 ## Current Rust Design
 
-**Location**: [`src/scan_result_shaping.rs`](../../../src/scan_result_shaping.rs)
+**Location**: [`src/scan_result_shaping/`](../../../src/scan_result_shaping/)
 
 Current shaping steps:
 
