@@ -16,7 +16,7 @@ fn sample_runtime_license(key: &str, name: &str, spdx_license_key: Option<&str>)
         name: name.to_string(),
         spdx_license_key: spdx_license_key.map(str::to_string),
         other_spdx_license_keys: vec![],
-        category: None,
+        category: Some("Permissive".to_string()),
         text: format!("{name} text"),
         reference_urls: vec![],
         notes: None,
@@ -117,6 +117,7 @@ fn collect_top_level_license_references_includes_clues_packages_and_sorted_dedup
             rule_identifier: Some("apache-2.0_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -136,6 +137,7 @@ fn collect_top_level_license_references_includes_clues_packages_and_sorted_dedup
         rule_identifier: Some("license-clue_1.RULE".to_string()),
         rule_url: None,
         matched_text: None,
+        referenced_filenames: None,
         matched_text_diagnostics: None,
     }];
     source.package_data = vec![PackageData {
@@ -171,6 +173,13 @@ fn collect_top_level_license_references_includes_clues_packages_and_sorted_dedup
         vec!["apache-2.0_1.RULE", "license-clue_1.RULE"]
     );
     assert!(license_rule_references[1].is_license_clue);
+    assert_eq!(license_references[0].key.as_deref(), Some("apache-2.0"));
+    assert_eq!(
+        license_references[0].category.as_deref(),
+        Some("Permissive")
+    );
+    assert!(license_references[0].scancode_url.is_some());
+    assert_eq!(license_rule_references[0].relevance, Some(100));
 }
 
 #[test]
@@ -182,6 +191,220 @@ fn collect_top_level_license_references_returns_empty_for_empty_inputs() {
 
     assert!(license_references.is_empty());
     assert!(license_rule_references.is_empty());
+}
+
+#[test]
+fn apply_local_file_reference_following_resolves_root_license_file() {
+    let mut license = file("project/LICENSE");
+    license.license_expression = Some("mit".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 20,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(100),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("mit.LICENSE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            referenced_filenames: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("mit-license".to_string()),
+    }];
+
+    let mut notice = file("project/src/notice.js");
+    notice.license_expression = Some("unknown-license-reference".to_string());
+    notice.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        matches: vec![Match {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            from_file: Some("project/src/notice.js".to_string()),
+            start_line: 2,
+            end_line: 2,
+            matcher: Some("2-aho".to_string()),
+            score: 100.0,
+            matched_length: Some(2),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("unknown-license-reference_see-license_1.RULE".to_string()),
+            rule_url: None,
+            matched_text: Some("See LICENSE".to_string()),
+            referenced_filenames: Some(vec!["LICENSE".to_string()]),
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("unknown-ref".to_string()),
+    }];
+
+    let mut files = vec![dir("project"), license, notice];
+    apply_local_file_reference_following(&mut files, &[]);
+
+    let notice = files
+        .iter()
+        .find(|file| file.path == "project/src/notice.js")
+        .expect("notice file should exist");
+    assert_eq!(notice.license_expression.as_deref(), Some("mit"));
+    assert_eq!(
+        notice.license_detections[0].detection_log,
+        vec!["unknown-reference-to-local-file"]
+    );
+    assert_eq!(notice.license_detections[0].matches.len(), 2);
+    assert_eq!(
+        notice.license_detections[0].matches[1].from_file.as_deref(),
+        Some("project/LICENSE")
+    );
+}
+
+#[test]
+fn apply_local_file_reference_following_requires_exact_filename_match() {
+    let mut license = file("project/LICENSE");
+    license.license_expression = Some("mit".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 20,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(100),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("mit.LICENSE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            referenced_filenames: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("mit-license".to_string()),
+    }];
+
+    let mut notice = file("project/src/notice.js");
+    notice.license_expression = Some("unknown-license-reference".to_string());
+    notice.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        matches: vec![Match {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            from_file: Some("project/src/notice.js".to_string()),
+            start_line: 2,
+            end_line: 2,
+            matcher: Some("2-aho".to_string()),
+            score: 100.0,
+            matched_length: Some(2),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("unknown-license-reference_see-license_1.RULE".to_string()),
+            rule_url: None,
+            matched_text: Some("See LICENSE.txt".to_string()),
+            referenced_filenames: Some(vec!["LICENSE.txt".to_string()]),
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("unknown-ref".to_string()),
+    }];
+
+    let mut files = vec![dir("project"), license, notice];
+    apply_local_file_reference_following(&mut files, &[]);
+
+    let notice = files
+        .iter()
+        .find(|file| file.path == "project/src/notice.js")
+        .expect("notice file should exist");
+    assert_eq!(
+        notice.license_expression.as_deref(),
+        Some("unknown-license-reference")
+    );
+    assert_eq!(notice.license_detections[0].matches.len(), 1);
+}
+
+#[test]
+fn apply_local_file_reference_following_resolves_files_beside_manifest() {
+    let package_uid = "pkg:pypi/demo?uuid=test".to_string();
+    let mut package = super::test_utils::package(&package_uid, "project/demo.dist-info/METADATA");
+    package.datafile_paths = vec!["project/demo.dist-info/METADATA".to_string()];
+
+    let mut license = file("project/demo.dist-info/LICENSE");
+    license.license_expression = Some("mit".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/demo.dist-info/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 20,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(100),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("mit.LICENSE".to_string()),
+            rule_url: None,
+            matched_text: None,
+            referenced_filenames: None,
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("mit-license".to_string()),
+    }];
+
+    let mut source = file("project/demo/__init__.py");
+    source.for_packages = vec![package_uid.clone()];
+    source.license_expression = Some("unknown-license-reference".to_string());
+    source.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "unknown-license-reference".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+        matches: vec![Match {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            from_file: Some("project/demo/__init__.py".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("2-aho".to_string()),
+            score: 100.0,
+            matched_length: Some(2),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: Some("unknown-license-reference_see-license_1.RULE".to_string()),
+            rule_url: None,
+            matched_text: Some("See LICENSE".to_string()),
+            referenced_filenames: Some(vec!["LICENSE".to_string()]),
+            matched_text_diagnostics: None,
+        }],
+        detection_log: vec![],
+        identifier: Some("unknown-ref".to_string()),
+    }];
+
+    let mut files = vec![dir("project"), license, source];
+    apply_local_file_reference_following(&mut files, &[package]);
+
+    let source = files
+        .iter()
+        .find(|file| file.path == "project/demo/__init__.py")
+        .expect("source file should exist");
+    assert_eq!(source.license_expression.as_deref(), Some("mit"));
+    assert_eq!(
+        source.license_detections[0].matches[1].from_file.as_deref(),
+        Some("project/demo.dist-info/LICENSE")
+    );
 }
 
 #[test]
@@ -204,6 +427,7 @@ fn collect_top_level_license_detections_groups_file_detections_and_preserves_pat
             rule_identifier: Some("mit.LICENSE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         detection_log: vec!["imperfect-match-coverage".to_string()],
@@ -228,6 +452,7 @@ fn collect_top_level_license_detections_groups_file_detections_and_preserves_pat
             rule_identifier: Some("mit.LICENSE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         detection_log: vec![],
@@ -252,6 +477,7 @@ fn collect_top_level_license_detections_groups_file_detections_and_preserves_pat
             rule_identifier: Some("apache-2.0_2.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         detection_log: vec![],
@@ -297,6 +523,7 @@ fn collect_top_level_license_detections_counts_same_identifier_regions_in_one_fi
                 rule_identifier: Some("mit.LICENSE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             detection_log: vec![],
@@ -319,6 +546,7 @@ fn collect_top_level_license_detections_counts_same_identifier_regions_in_one_fi
                 rule_identifier: Some("mit_3.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             detection_log: vec![],
@@ -355,6 +583,7 @@ fn collect_top_level_license_detections_includes_package_origin_detections() {
                 rule_identifier: None,
                 rule_url: None,
                 matched_text: Some("MIT".to_string()),
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             detection_log: vec![],
@@ -377,6 +606,7 @@ fn collect_top_level_license_detections_includes_package_origin_detections() {
                 rule_identifier: None,
                 rule_url: None,
                 matched_text: Some("Apache-2.0".to_string()),
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             detection_log: vec![],
@@ -416,9 +646,22 @@ fn create_output_preserves_top_level_license_references_from_context() {
             },
             license_detections: vec![],
             license_references: vec![crate::models::LicenseReference {
+                key: Some("mit".to_string()),
                 name: "MIT License".to_string(),
                 short_name: "MIT".to_string(),
                 spdx_license_key: "MIT".to_string(),
+                other_spdx_license_keys: vec![],
+                category: None,
+                notes: None,
+                minimum_coverage: None,
+                ignorable_copyrights: vec![],
+                ignorable_holders: vec![],
+                ignorable_authors: vec![],
+                ignorable_urls: vec![],
+                ignorable_emails: vec![],
+                scancode_url: None,
+                licensedb_url: None,
+                spdx_url: None,
                 text: "MIT text".to_string(),
             }],
             license_rule_references: vec![crate::models::LicenseRuleReference {
@@ -430,6 +673,21 @@ fn create_output_preserves_top_level_license_references_from_context() {
                 is_license_tag: false,
                 is_license_clue: false,
                 is_license_intro: false,
+                language: None,
+                rule_url: None,
+                is_required_phrase: false,
+                is_continuous: false,
+                is_from_license: false,
+                relevance: None,
+                minimum_coverage: None,
+                referenced_filenames: vec![],
+                notes: None,
+                ignorable_copyrights: vec![],
+                ignorable_holders: vec![],
+                ignorable_authors: vec![],
+                ignorable_urls: vec![],
+                ignorable_emails: vec![],
+                text: None,
             }],
             options: CreateOutputOptions {
                 facet_rules: &[],
@@ -488,6 +746,7 @@ fn create_output_preserves_top_level_license_detections_from_context() {
                     rule_identifier: Some("mit.LICENSE".to_string()),
                     rule_url: None,
                     matched_text: None,
+                    referenced_filenames: None,
                     matched_text_diagnostics: None,
                 }],
             }],
@@ -580,6 +839,7 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -711,6 +971,7 @@ fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -778,6 +1039,7 @@ fn create_output_preserves_file_level_license_clues_in_json_shape() {
         matched_text: Some(
             "This product currently only contains code developed by authors".to_string(),
         ),
+        referenced_filenames: None,
         matched_text_diagnostics: None,
     }];
 
@@ -1027,6 +1289,7 @@ fn create_output_summary_still_resolves_after_strip_root_normalization() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,

@@ -17,10 +17,11 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::license_detection::expression::parse_expression;
 use analysis::{
-    analyze_detection, classify_detection, compute_detection_score, determine_license_expression,
-    determine_spdx_expression, determine_spdx_expression_from_scancode, filter_license_intros,
+    analyze_detection, classify_detection, compute_detection_score,
+    determine_spdx_expression_from_scancode, filter_license_intros,
     filter_license_intros_and_references, has_correct_license_clue_matches,
 };
+pub(crate) use analysis::{determine_license_expression, determine_spdx_expression};
 #[cfg(test)]
 use identifier::compute_detection_identifier;
 use identifier::{compute_content_identifier, compute_detection_coverage, python_safe_name};
@@ -281,7 +282,7 @@ fn attach_aggregated_file_regions(detections: &mut [LicenseDetection]) {
     }
 }
 
-fn select_matches_for_expression(
+pub(crate) fn select_matches_for_expression(
     matches: &[crate::license_detection::models::LicenseMatch],
     log_category: &str,
 ) -> Vec<crate::license_detection::models::LicenseMatch> {

@@ -254,7 +254,7 @@ fn enrich_package_data_license_provenance(package_data: &mut PackageData, path: 
     }
 }
 
-fn enrich_license_detection_provenance(detection: &mut LicenseDetection, path: &str) {
+pub(crate) fn enrich_license_detection_provenance(detection: &mut LicenseDetection, path: &str) {
     for detection_match in &mut detection.matches {
         if detection_match.from_file.is_none() {
             detection_match.from_file = Some(path.to_string());
@@ -511,6 +511,8 @@ pub struct Match {
     pub rule_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub referenced_filenames: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text_diagnostics: Option<String>,
 }
@@ -1018,6 +1020,7 @@ mod tests {
                     rule_identifier: None,
                     rule_url: None,
                     matched_text: Some("MIT".to_string()),
+                    referenced_filenames: None,
                     matched_text_diagnostics: None,
                 }],
                 detection_log: vec![],
@@ -1094,6 +1097,7 @@ mod tests {
                     rule_identifier: None,
                     rule_url: None,
                     matched_text: Some("MIT".to_string()),
+                    referenced_filenames: None,
                     matched_text_diagnostics: None,
                 }],
                 detection_log: vec![],

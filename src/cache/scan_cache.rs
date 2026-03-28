@@ -170,6 +170,7 @@ mod tests {
                 matched_text: Some(
                     "This product currently only contains code developed by authors".to_string(),
                 ),
+                referenced_filenames: None,
                 matched_text_diagnostics: Some(
                     "This product currently only contains code developed by [authors]".to_string(),
                 ),
