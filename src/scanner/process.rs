@@ -16,13 +16,15 @@ use crate::copyright::{
     self, AuthorDetection, CopyrightDetection, CopyrightDetectionOptions, HolderDetection,
 };
 use crate::finder::{self, DetectionConfig};
+use crate::license_detection::models::LicenseMatch as InternalLicenseMatch;
+use crate::license_detection::query::Query;
 use crate::models::{
     Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
     OutputEmail, OutputURL,
 };
 use crate::progress::ScanProgress;
 use crate::scanner::collect::CollectedPaths;
-use crate::scanner::{ProcessResult, TextDetectionOptions};
+use crate::scanner::{LicenseScanOptions, ProcessResult, TextDetectionOptions};
 use crate::utils::file::{ExtractedTextKind, extract_text_for_detection, get_creation_date};
 use crate::utils::generated::generated_code_hints_from_bytes;
 
@@ -38,7 +40,7 @@ pub fn process_collected(
     collected: &CollectedPaths,
     progress: Arc<ScanProgress>,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
+    license_options: LicenseScanOptions,
     text_options: &TextDetectionOptions,
 ) -> ProcessResult {
     let mut all_files: Vec<FileInfo> = collected
@@ -49,7 +51,7 @@ pub fn process_collected(
                 path,
                 metadata,
                 license_engine.clone(),
-                include_text,
+                license_options,
                 text_options,
             );
             progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
@@ -58,7 +60,12 @@ pub fn process_collected(
         .collect();
 
     for (path, metadata) in &collected.directories {
-        all_files.push(process_directory(path, metadata, text_options.collect_info));
+        all_files.push(process_directory(
+            path,
+            metadata,
+            text_options.collect_info,
+            license_engine.is_some(),
+        ));
     }
 
     ProcessResult {
@@ -71,11 +78,12 @@ fn process_file(
     path: &Path,
     metadata: &fs::Metadata,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
+    license_options: LicenseScanOptions,
     text_options: &TextDetectionOptions,
 ) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
+    let license_enabled = license_engine.is_some();
 
     let started = Instant::now();
 
@@ -85,7 +93,7 @@ fn process_file(
         &mut scan_errors,
         path,
         license_engine,
-        include_text,
+        license_options,
         text_options,
     ) {
         Ok(is_generated) => generated_flag = is_generated,
@@ -139,13 +147,18 @@ fn process_file(
         file_info.is_generated = Some(generated_flag.unwrap_or(false));
     }
 
+    if file_info.percentage_of_license_text.is_none() && license_enabled {
+        file_info.percentage_of_license_text = Some(0.0);
+    }
+
     if let (Some(scan_results_dir), Some(sha256)) = (
         text_options.scan_cache_dir.as_deref(),
         file_info.sha256.as_deref(),
     ) && file_info.scan_errors.is_empty()
     {
         let findings = CachedScanFindings::from_file_info(&file_info);
-        let options_fingerprint = scan_cache_fingerprint(text_options);
+        let options_fingerprint =
+            scan_cache_fingerprint(text_options, license_options, license_enabled);
         if let Err(err) =
             write_cached_findings(scan_results_dir, sha256, &options_fingerprint, &findings)
         {
@@ -163,11 +176,12 @@ fn extract_information_from_content(
     scan_errors: &mut Vec<String>,
     path: &Path,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
+    license_options: LicenseScanOptions,
     text_options: &TextDetectionOptions,
 ) -> Result<Option<bool>, Error> {
     let started = Instant::now();
     let buffer = fs::read(path)?;
+    let license_enabled = license_engine.is_some();
 
     if is_timeout_exceeded(started, text_options.timeout_seconds) {
         return Err(Error::msg(format!(
@@ -192,7 +206,8 @@ fn extract_information_from_content(
     }
 
     if let Some(scan_results_dir) = text_options.scan_cache_dir.as_deref() {
-        let options_fingerprint = scan_cache_fingerprint(text_options);
+        let options_fingerprint =
+            scan_cache_fingerprint(text_options, license_options, license_enabled);
         match read_cached_findings(scan_results_dir, &sha256, &options_fingerprint) {
             Ok(Some(findings)) => {
                 file_info_builder
@@ -200,6 +215,7 @@ fn extract_information_from_content(
                     .license_expression(findings.license_expression)
                     .license_detections(findings.license_detections)
                     .license_clues(findings.license_clues)
+                    .percentage_of_license_text(findings.percentage_of_license_text)
                     .copyrights(findings.copyrights)
                     .holders(findings.holders)
                     .authors(findings.authors)
@@ -282,7 +298,7 @@ fn extract_information_from_content(
         scan_errors,
         text_content_for_license_detection,
         license_engine,
-        include_text,
+        license_options,
         from_binary_strings,
     )?;
 
@@ -295,9 +311,13 @@ fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
         && started.elapsed().as_secs_f64() > timeout_seconds
 }
 
-fn scan_cache_fingerprint(text_options: &TextDetectionOptions) -> String {
+fn scan_cache_fingerprint(
+    text_options: &TextDetectionOptions,
+    license_options: LicenseScanOptions,
+    license_enabled: bool,
+) -> String {
     format!(
-        "packages={};copyrights={};emails={};urls={};max_emails={};max_urls={};timeout={:.6}",
+        "packages={};copyrights={};emails={};urls={};max_emails={};max_urls={};timeout={:.6};license_enabled={};license_text={};license_text_diagnostics={};license_diagnostics={};unknown_licenses={}",
         text_options.detect_packages,
         text_options.detect_copyrights,
         text_options.detect_emails,
@@ -305,6 +325,11 @@ fn scan_cache_fingerprint(text_options: &TextDetectionOptions) -> String {
         text_options.max_emails,
         text_options.max_urls,
         text_options.timeout_seconds,
+        license_enabled,
+        license_options.include_text,
+        license_options.include_text_diagnostics,
+        license_options.include_diagnostics,
+        license_options.unknown_licenses,
     )
 }
 
@@ -528,21 +553,31 @@ fn extract_license_information(
     scan_errors: &mut Vec<String>,
     text_content: String,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
+    license_options: LicenseScanOptions,
     from_binary_strings: bool,
 ) -> Result<(), Error> {
     let Some(engine) = license_engine else {
         return Ok(());
     };
 
-    match engine.detect_with_kind(&text_content, false, from_binary_strings) {
+    match engine.detect_with_kind(
+        &text_content,
+        license_options.unknown_licenses,
+        from_binary_strings,
+    ) {
         Ok(detections) => {
+            let query =
+                Query::from_extracted_text(&text_content, engine.index(), from_binary_strings).ok();
             let mut model_detections = Vec::new();
             let mut model_clues = Vec::new();
 
-            for detection in detections {
-                let (public_detection, clue_matches) =
-                    convert_detection_to_model(detection, include_text, &text_content);
+            for detection in &detections {
+                let (public_detection, clue_matches) = convert_detection_to_model(
+                    detection,
+                    license_options,
+                    &text_content,
+                    query.as_ref(),
+                );
 
                 if let Some(public_detection) = public_detection {
                     model_detections.push(public_detection);
@@ -568,6 +603,11 @@ fn extract_license_information(
 
             file_info_builder.license_detections(model_detections);
             file_info_builder.license_clues(model_clues);
+            file_info_builder.percentage_of_license_text(
+                query
+                    .as_ref()
+                    .map(|query| compute_percentage_of_license_text(query, &detections)),
+            );
         }
         Err(e) => {
             scan_errors.push(format!("License detection failed: {}", e));
@@ -578,23 +618,32 @@ fn extract_license_information(
 }
 
 fn convert_detection_to_model(
-    detection: crate::license_detection::LicenseDetection,
-    include_text: bool,
+    detection: &crate::license_detection::LicenseDetection,
+    license_options: LicenseScanOptions,
     text_content: &str,
+    query: Option<&Query<'_>>,
 ) -> (Option<LicenseDetection>, Vec<Match>) {
     let matches: Vec<Match> = detection
         .matches
-        .into_iter()
-        .map(|m| convert_match_to_model(m, include_text, text_content))
+        .iter()
+        .map(|m| convert_match_to_model(m, license_options, text_content, query))
         .collect();
 
-    if let Some(license_expression) = detection.license_expression {
+    if let Some(license_expression) = detection.license_expression.clone() {
         (
             Some(LicenseDetection {
                 license_expression,
-                license_expression_spdx: detection.license_expression_spdx.unwrap_or_default(),
+                license_expression_spdx: detection
+                    .license_expression_spdx
+                    .clone()
+                    .unwrap_or_default(),
                 matches,
-                identifier: detection.identifier,
+                detection_log: if license_options.include_diagnostics {
+                    detection.detection_log.clone()
+                } else {
+                    Vec::new()
+                },
+                identifier: detection.identifier.clone(),
             }),
             Vec::new(),
         )
@@ -604,17 +653,18 @@ fn convert_detection_to_model(
 }
 
 fn convert_match_to_model(
-    m: crate::license_detection::models::LicenseMatch,
-    include_text: bool,
+    m: &crate::license_detection::models::LicenseMatch,
+    license_options: LicenseScanOptions,
     text_content: &str,
+    query: Option<&Query<'_>>,
 ) -> Match {
     let rule_url = if m.rule_url.is_empty() {
         None
     } else {
-        Some(m.rule_url)
+        Some(m.rule_url.clone())
     };
-    let matched_text = if include_text {
-        m.matched_text.or_else(|| {
+    let matched_text = if license_options.include_text {
+        m.matched_text.clone().or_else(|| {
             Some(crate::license_detection::query::matched_text_from_text(
                 text_content,
                 m.start_line,
@@ -624,10 +674,15 @@ fn convert_match_to_model(
     } else {
         None
     };
+    let matched_text_diagnostics = if license_options.include_text_diagnostics {
+        query.map(|query| matched_text_diagnostics_from_match(query, m))
+    } else {
+        None
+    };
     Match {
-        license_expression: m.license_expression,
-        license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
-        from_file: m.from_file,
+        license_expression: m.license_expression.clone(),
+        license_expression_spdx: m.license_expression_spdx.clone().unwrap_or_default(),
+        from_file: m.from_file.clone(),
         start_line: m.start_line,
         end_line: m.end_line,
         matcher: Some(m.matcher.to_string()),
@@ -635,10 +690,62 @@ fn convert_match_to_model(
         matched_length: Some(m.matched_length),
         match_coverage: Some(m.match_coverage as f64),
         rule_relevance: Some(m.rule_relevance as usize),
-        rule_identifier: Some(m.rule_identifier),
+        rule_identifier: Some(m.rule_identifier.clone()),
         rule_url,
         matched_text,
+        matched_text_diagnostics,
     }
+}
+
+fn compute_percentage_of_license_text(
+    query: &Query<'_>,
+    detections: &[crate::license_detection::LicenseDetection],
+) -> f64 {
+    let matched_positions: std::collections::HashSet<usize> = detections
+        .iter()
+        .flat_map(|detection| detection.matches.iter())
+        .flat_map(InternalLicenseMatch::qspan)
+        .collect();
+
+    let query_tokens_length = query.tokens.len() + query.unknowns_by_pos.values().sum::<usize>();
+    if query_tokens_length == 0 {
+        return 0.0;
+    }
+
+    let percentage = (matched_positions.len() as f64 / query_tokens_length as f64) * 100.0;
+    (percentage * 100.0).round() / 100.0
+}
+
+fn matched_text_diagnostics_from_match(
+    query: &Query<'_>,
+    license_match: &InternalLicenseMatch,
+) -> String {
+    let matched_positions: std::collections::HashSet<usize> =
+        license_match.qspan().into_iter().collect();
+    let Some(start_pos) = matched_positions.iter().min().copied() else {
+        return crate::license_detection::query::matched_text_from_text(
+            &query.text,
+            license_match.start_line,
+            license_match.end_line,
+        );
+    };
+    let Some(end_pos) = matched_positions.iter().max().copied() else {
+        return crate::license_detection::query::matched_text_from_text(
+            &query.text,
+            license_match.start_line,
+            license_match.end_line,
+        );
+    };
+
+    crate::license_detection::query::matched_text_diagnostics_from_text(
+        &query.text,
+        query,
+        &matched_positions,
+        start_pos,
+        end_pos,
+        license_match.start_line,
+        license_match.end_line,
+    )
 }
 
 fn should_skip_text_detection(path: &Path, buffer: &[u8]) -> bool {
@@ -682,7 +789,12 @@ fn is_pem_certificate_file(_path: &Path, buffer: &[u8]) -> bool {
     })
 }
 
-fn process_directory(path: &Path, metadata: &fs::Metadata, collect_info: bool) -> FileInfo {
+fn process_directory(
+    path: &Path,
+    metadata: &fs::Metadata,
+    collect_info: bool,
+    license_enabled: bool,
+) -> FileInfo {
     let name = path
         .file_name()
         .unwrap_or_default()
@@ -707,11 +819,12 @@ fn process_directory(path: &Path, metadata: &fs::Metadata, collect_info: bool) -
         license_expression: None,
         license_detections: Vec::new(), // TODO: implement
         license_clues: Vec::new(),      // TODO: implement
-        copyrights: Vec::new(),         // TODO: implement
-        holders: Vec::new(),            // TODO: implement
-        authors: Vec::new(),            // TODO: implement
-        emails: Vec::new(),             // TODO: implement
-        urls: Vec::new(),               // TODO: implement
+        percentage_of_license_text: license_enabled.then_some(0.0),
+        copyrights: Vec::new(), // TODO: implement
+        holders: Vec::new(),    // TODO: implement
+        authors: Vec::new(),    // TODO: implement
+        emails: Vec::new(),     // TODO: implement
+        urls: Vec::new(),       // TODO: implement
         for_packages: Vec::new(),
         scan_errors: Vec::new(),
         is_source: collect_info.then_some(false),
@@ -730,9 +843,15 @@ fn process_directory(path: &Path, metadata: &fs::Metadata, collect_info: bool) -
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_detection_to_model, is_go_non_production_source};
+    use super::{
+        compute_percentage_of_license_text, convert_detection_to_model, is_go_non_production_source,
+    };
     use crate::license_detection::LicenseDetection as InternalLicenseDetection;
+    use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::dictionary::TokenDictionary;
     use crate::license_detection::models::{LicenseMatch, MatcherKind, RuleKind};
+    use crate::license_detection::query::Query;
+    use crate::scanner::LicenseScanOptions;
     use std::fs;
     use tempfile::tempdir;
 
@@ -779,13 +898,21 @@ mod tests {
         }
     }
 
+    fn create_test_index(entries: &[(&str, u16)], len_legalese: usize) -> LicenseIndex {
+        let dictionary = TokenDictionary::new_with_legalese(entries);
+        let mut index = LicenseIndex::new(dictionary);
+        index.len_legalese = len_legalese;
+        index
+    }
+
     #[test]
     fn test_convert_detection_to_model_preserves_rule_url() {
         let detection = make_detection(
             "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE",
         );
 
-        let (converted, clues) = convert_detection_to_model(detection, false, "");
+        let (converted, clues) =
+            convert_detection_to_model(&detection, LicenseScanOptions::default(), "", None);
         let converted = converted.expect("detection should convert");
 
         assert_eq!(
@@ -801,7 +928,8 @@ mod tests {
     fn test_convert_detection_to_model_emits_null_for_empty_rule_url() {
         let detection = make_detection("");
 
-        let (converted, clues) = convert_detection_to_model(detection, false, "");
+        let (converted, clues) =
+            convert_detection_to_model(&detection, LicenseScanOptions::default(), "", None);
         let converted = converted.expect("detection should convert");
 
         assert_eq!(converted.matches[0].rule_url, None);
@@ -822,7 +950,15 @@ mod tests {
         detection.matches[0].rule_identifier = "license-clue_1.RULE".to_string();
         detection.matches[0].rule_kind = RuleKind::Clue;
 
-        let (converted, clues) = convert_detection_to_model(detection, true, "clue text");
+        let (converted, clues) = convert_detection_to_model(
+            &detection,
+            LicenseScanOptions {
+                include_text: true,
+                ..LicenseScanOptions::default()
+            },
+            "clue text",
+            None,
+        );
 
         assert!(converted.is_none());
         assert_eq!(clues.len(), 1);
@@ -836,6 +972,99 @@ mod tests {
             Some("license-clue_1.RULE")
         );
         assert_eq!(clues[0].matched_text.as_deref(), Some("MIT"));
+        assert_eq!(clues[0].matched_text_diagnostics, None);
+    }
+
+    #[test]
+    fn test_convert_detection_to_model_includes_diagnostics_when_enabled() {
+        let text = concat!(
+            "Reproduction and distribution of this file, with or without modification, are\n",
+            "permitted in any medium without royalties provided the copyright notice\n",
+            "and this notice are preserved. This file is offered as-is, without any warranties.\n",
+        );
+        let index = create_test_index(
+            &[
+                ("reproduction", 0),
+                ("distribution", 1),
+                ("file", 2),
+                ("without", 3),
+                ("modification", 4),
+                ("permitted", 5),
+                ("medium", 6),
+                ("royalties", 7),
+                ("provided", 8),
+                ("copyright", 9),
+                ("notice", 10),
+                ("preserved", 11),
+                ("offered", 12),
+                ("warranties", 13),
+            ],
+            14,
+        );
+        let query = Query::from_extracted_text(text, &index, false).expect("query should build");
+        let mut detection = make_detection(
+            "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/fsf-ap.LICENSE",
+        );
+        detection.detection_log = vec!["imperfect-match-coverage".to_string()];
+        detection.matches[0].license_expression = "fsf-ap".to_string();
+        detection.matches[0].license_expression_spdx = Some("FSFAP".to_string());
+        detection.matches[0].rule_identifier = "fsf-ap.LICENSE".to_string();
+        detection.matches[0].matched_text = None;
+        detection.matches[0].start_line = 1;
+        detection.matches[0].end_line = 3;
+        detection.matches[0].start_token = 0;
+        detection.matches[0].end_token = query.tokens.len();
+        detection.matches[0].qspan_positions = Some(
+            query
+                .tokens
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, _)| (idx != 9).then_some(idx))
+                .collect(),
+        );
+        detection.identifier = Some("fsf_ap-test".to_string());
+
+        let (converted, clues) = convert_detection_to_model(
+            &detection,
+            LicenseScanOptions {
+                include_text: true,
+                include_text_diagnostics: true,
+                include_diagnostics: true,
+                unknown_licenses: false,
+            },
+            text,
+            Some(&query),
+        );
+        let converted = converted.expect("detection should convert");
+
+        assert!(clues.is_empty());
+        assert_eq!(converted.detection_log, vec!["imperfect-match-coverage"]);
+        assert_eq!(
+            converted.matches[0].matched_text.as_deref(),
+            Some(text.trim_end())
+        );
+        let diagnostics = converted.matches[0]
+            .matched_text_diagnostics
+            .as_deref()
+            .expect("diagnostics should be present");
+        assert!(diagnostics.contains('['));
+        assert!(diagnostics.contains(']'));
+        assert_ne!(diagnostics, text.trim_end());
+    }
+
+    #[test]
+    fn test_compute_percentage_of_license_text_counts_unknown_tokens() {
+        let index = create_test_index(&[("alpha", 0), ("mit", 1)], 2);
+        let text = "alpha MIT omega";
+        let query = Query::from_extracted_text(text, &index, false).expect("query should build");
+        let mut detection = make_detection("");
+        detection.matches[0].qspan_positions = Some(vec![1]);
+        detection.matches[0].start_token = 1;
+        detection.matches[0].end_token = 2;
+
+        let percentage = compute_percentage_of_license_text(&query, &[detection]);
+
+        assert_eq!(percentage, 33.33);
     }
 
     #[test]

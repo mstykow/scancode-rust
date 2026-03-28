@@ -73,13 +73,20 @@ implementation plan again.
 
 - ✅ Core multi-strategy license-detection engine
 - ✅ Public file/package `license_detections`
+- ✅ Public file-level `license_clues`
 - ✅ Public package `other_license_detections`
 - ✅ `--license` CLI flag
 - ✅ `--license-rules-path` CLI flag
-- ✅ Rust `--include-text` flag for matched text in output
+- ✅ Upstream-named `--license-text` flag for matched text in output
+- ✅ `--license-text-diagnostics` CLI flag
+- ✅ `--license-diagnostics` CLI flag
+- ✅ `--unknown-licenses` CLI flag
 - ✅ Internal clue/reference-aware rule and match kinds
 - ✅ Internal detection diagnostics (`detection_log`)
 - ✅ Internal unknown-license engine support
+- ✅ Public file/package `detection_log`
+- ✅ Public match-level `matched_text_diagnostics`
+- ✅ Public file-level `percentage_of_license_text`
 - ✅ Top-level output model fields for `license_references` and
   `license_rule_references`
 - ✅ `--from-json` round-trip preservation of preexisting
@@ -87,11 +94,7 @@ implementation plan again.
 
 ### Known Public Parity Gaps
 
-- ❌ No emitted file-level `license_clues` field
 - ❌ Clue-only internal detections are dropped before public serialization
-- ❌ No emitted detection-level `detection_log`
-- ❌ No emitted `matched_text_diagnostics`
-- ❌ No emitted `percentage_of_license_text`
 - ❌ No top-level unique `license_detections`
 - ❌ No live generation of top-level `license_references`
 - ❌ No live generation of top-level `license_rule_references`
@@ -104,13 +107,10 @@ implementation plan again.
 ### Known CLI Parity Gaps
 
 - ❌ No `--license-score`
-- ❌ No upstream-named `--license-text` flag (Rust currently exposes
-  `--include-text` instead)
-- ❌ No `--license-text-diagnostics`
-- ❌ No `--license-diagnostics`
-- ❌ No `--unknown-licenses`
 - ❌ No `--license-references`
 - ❌ No `--license-url-template`
+- ⚠️ Legacy `--include-text` remains as a compatibility alias; the upstream
+  public flag is now `--license-text`
 - ⚠️ Upstream `--is-license-text` is no longer a live parity target; current
   parity should instead track the emitted `percentage_of_license_text` field
 

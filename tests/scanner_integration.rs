@@ -3,6 +3,7 @@ use provenant::license_detection::{LicenseDetectionEngine, SCANCODE_LICENSES_DAT
 use provenant::models::PackageType;
 use provenant::parsers::list_parser_types;
 use provenant::progress::{ProgressMode, ScanProgress};
+use provenant::scanner::LicenseScanOptions;
 use provenant::utils::file::{ExtractedTextKind, extract_text_for_detection};
 use provenant::utils::hash::calculate_sha256;
 use provenant::{FileType, TextDetectionOptions, collect_paths, process_collected};
@@ -50,11 +51,12 @@ fn scan<P: AsRef<Path>>(
 ) -> provenant::scanner::ProcessResult {
     let progress = hidden_progress();
     let collected = collect_paths(path.as_ref(), max_depth, patterns);
+    let _ = include_text;
     process_collected(
         &collected,
         progress,
         license_engine,
-        include_text,
+        LicenseScanOptions::default(),
         options.unwrap_or(&TextDetectionOptions::default()),
     )
 }

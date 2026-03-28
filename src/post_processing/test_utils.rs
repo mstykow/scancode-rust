@@ -28,7 +28,7 @@ use crate::models::{FileInfo, FileType, Package, PackageType};
 use crate::progress::{ProgressMode, ScanProgress};
 #[cfg(feature = "golden-tests")]
 use crate::scan_result_shaping::normalize_paths;
-use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+use crate::scanner::{LicenseScanOptions, TextDetectionOptions, collect_paths, process_collected};
 
 pub(crate) fn file(path: &str) -> FileInfo {
     FileInfo::new(
@@ -462,7 +462,7 @@ pub(crate) fn compute_fixture_output(
         &collected,
         progress,
         Some(test_license_engine()),
-        false,
+        LicenseScanOptions::default(),
         &TextDetectionOptions {
             collect_info: false,
             detect_packages: true,
@@ -533,7 +533,7 @@ pub(crate) fn compute_fixture_summary(
         &collected,
         progress,
         Some(test_license_engine()),
-        false,
+        LicenseScanOptions::default(),
         &TextDetectionOptions {
             collect_info: false,
             detect_packages: true,
@@ -855,7 +855,7 @@ pub(crate) fn assert_classify_fixture_matches_expected(
         &collected,
         progress,
         Some(test_license_engine()),
-        false,
+        LicenseScanOptions::default(),
         &TextDetectionOptions {
             collect_info: false,
             detect_packages: true,
@@ -926,7 +926,7 @@ pub(crate) fn scan_and_assemble_with_keyfiles(
         &collected,
         progress,
         None,
-        false,
+        LicenseScanOptions::default(),
         &TextDetectionOptions {
             collect_info: false,
             detect_packages: true,

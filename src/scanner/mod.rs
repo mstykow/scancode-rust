@@ -10,6 +10,14 @@ pub struct ProcessResult {
     pub excluded_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LicenseScanOptions {
+    pub include_text: bool,
+    pub include_text_diagnostics: bool,
+    pub include_diagnostics: bool,
+    pub unknown_licenses: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct TextDetectionOptions {
     pub collect_info: bool,
@@ -55,7 +63,7 @@ mod tests {
     use crate::models::FileType;
     use crate::progress::{ProgressMode, ScanProgress};
 
-    use super::{TextDetectionOptions, collect_paths, process_collected};
+    use super::{LicenseScanOptions, TextDetectionOptions, collect_paths, process_collected};
 
     #[test]
     fn default_options_keep_copyright_detection_enabled() {
@@ -75,7 +83,13 @@ mod tests {
 
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
         let collected = collect_paths(temp_dir.path(), 0, &[]);
-        let result = process_collected(&collected, progress, None, false, options);
+        let result = process_collected(
+            &collected,
+            progress,
+            None,
+            LicenseScanOptions::default(),
+            options,
+        );
 
         result
             .files

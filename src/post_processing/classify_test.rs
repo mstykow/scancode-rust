@@ -54,8 +54,10 @@ fn classify_key_files_marks_nested_ruby_license_from_file_references() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut files = vec![metadata_file, license_file];

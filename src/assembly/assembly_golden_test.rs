@@ -124,6 +124,7 @@ mod tests {
                 license_expression: None,
                 license_detections: vec![],
                 license_clues: vec![],
+                percentage_of_license_text: None,
                 copyrights: vec![],
                 holders: vec![],
                 authors: vec![],

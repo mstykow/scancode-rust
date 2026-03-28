@@ -74,8 +74,10 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let output_with_flags = create_output(
@@ -201,8 +203,10 @@ fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let output = create_output(
@@ -265,6 +269,7 @@ fn create_output_preserves_file_level_license_clues_in_json_shape() {
         matched_text: Some(
             "This product currently only contains code developed by authors".to_string(),
         ),
+        matched_text_diagnostics: None,
     }];
 
     let output = create_output(
@@ -509,8 +514,10 @@ fn create_output_summary_still_resolves_after_strip_root_normalization() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut files = vec![dir(root.to_str().unwrap()), manifest];

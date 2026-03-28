@@ -163,8 +163,10 @@ fn filter_redundant_clues_with_rules_suppresses_ignorable_rule_and_cross_clues()
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     files[0].copyrights = vec![Copyright {
         copyright: "Copyright Example Corp".to_string(),
@@ -232,8 +234,10 @@ fn filter_redundant_clues_with_rules_ignores_low_coverage_matches() {
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     files[0].emails = vec![OutputEmail {
         email: "legal@example.com".to_string(),
@@ -369,6 +373,7 @@ fn normalize_paths_updates_license_match_from_file_paths_too() {
         rule_identifier: Some("mit_1.RULE".to_string()),
         rule_url: None,
         matched_text: None,
+        matched_text_diagnostics: None,
     }];
     files[0].license_detections = vec![crate::models::LicenseDetection {
         license_expression: "mit".to_string(),
@@ -387,8 +392,10 @@ fn normalize_paths_updates_license_match_from_file_paths_too() {
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     normalize_paths(&mut files, "project", true, false);
@@ -427,8 +434,10 @@ fn normalize_paths_updates_package_level_license_match_from_file_paths_too() {
                 rule_identifier: Some("mit_1.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                matched_text_diagnostics: None,
             }],
             identifier: None,
+            detection_log: vec![],
         }],
         other_license_detections: vec![crate::models::LicenseDetection {
             license_expression: "apache-2.0".to_string(),
@@ -447,8 +456,10 @@ fn normalize_paths_updates_package_level_license_match_from_file_paths_too() {
                 rule_identifier: Some("apache_2_0_1.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                matched_text_diagnostics: None,
             }],
             identifier: None,
+            detection_log: vec![],
         }],
         ..Default::default()
     }];
@@ -484,6 +495,7 @@ fn only_findings_keeps_all_supported_finding_types() {
         license_expression_spdx: "MIT".to_string(),
         matches: vec![],
         identifier: None,
+        detection_log: vec![],
     }];
     files[2].package_data = vec![crate::models::PackageData::default()];
     files[3].scan_errors = vec!["boom".to_string()];
@@ -518,6 +530,7 @@ fn only_findings_keeps_clue_only_files() {
         rule_identifier: Some("license-clue_1.RULE".to_string()),
         rule_url: None,
         matched_text: None,
+        matched_text_diagnostics: None,
     }];
 
     apply_only_findings_filter(&mut files);

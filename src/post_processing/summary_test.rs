@@ -44,8 +44,10 @@ fn key_file_license_clues_feed_summary_without_mutating_package_license_provenan
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     license_file.copyrights = vec![Copyright {
         copyright: "Copyright (c) 2019 Chef Software Inc.".to_string(),
@@ -109,8 +111,10 @@ fn manifest_declared_license_survives_into_package_and_summary() {
                 rule_identifier: None,
                 rule_url: None,
                 matched_text: None,
+                matched_text_diagnostics: None,
             }],
             identifier: None,
+            detection_log: vec![],
         }],
         ..Default::default()
     }];
@@ -136,8 +140,10 @@ fn manifest_declared_license_survives_into_package_and_summary() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut files = vec![gemspec];
@@ -185,8 +191,10 @@ fn compute_summary_uses_root_prefixed_top_level_key_files() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     classify_key_files(&mut files, &[]);
@@ -266,8 +274,10 @@ fn compute_summary_prefers_package_origin_info_and_preserves_other_tallies() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut mit = file("codebase/mit.LICENSE");
@@ -292,8 +302,10 @@ fn compute_summary_prefers_package_origin_info_and_preserves_other_tallies() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let summary = compute_summary(&[readme, apache, mit], &[package]).expect("summary exists");
@@ -341,8 +353,10 @@ fn compute_summary_resolves_joined_primary_license_without_ambiguity() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut mit = file("codebase/mit.LICENSE");
@@ -367,8 +381,10 @@ fn compute_summary_resolves_joined_primary_license_without_ambiguity() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let summary = compute_summary(&[readme, apache, mit], &[]).expect("summary exists");
@@ -416,8 +432,10 @@ fn compute_summary_penalizes_conflicting_non_key_licenses_without_false_ambiguit
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let mut non_key_gpl = file("codebase/tests/test_a.py");
@@ -439,8 +457,10 @@ fn compute_summary_penalizes_conflicting_non_key_licenses_without_false_ambiguit
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let summary = compute_summary(&[readme, mit, non_key_gpl], &[]).expect("summary exists");
@@ -556,8 +576,10 @@ fn compute_summary_keeps_null_other_license_expressions_when_declared_expression
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let summary = compute_summary(&[readme, mit], &[]).expect("summary exists");
@@ -736,8 +758,10 @@ fn compute_summary_combines_package_licenses_when_present_datafile_is_not_key_cl
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let summary = compute_summary(&[setup, cargo_toml], &[pypi, cargo]).expect("summary exists");
@@ -776,8 +800,10 @@ fn compute_summary_serializes_empty_declared_holder_when_none_found() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     let summary = compute_summary(&[pkg_info], &[package]).expect("summary exists");
     assert_eq!(summary.declared_holder.as_deref(), Some(""));
@@ -808,8 +834,10 @@ fn compute_summary_joins_multiple_holders_from_single_top_level_license_file() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     license.copyrights = vec![Copyright {
         copyright: "Copyright Mort Bay and Sun Microsystems.".to_string(),
@@ -921,8 +949,10 @@ fn compute_score_mode_uses_single_joined_expression_without_ambiguity() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     cargo.copyrights = vec![Copyright {
         copyright: "Copyright The Rand Project Developers.".to_string(),
@@ -951,8 +981,10 @@ fn compute_score_mode_uses_single_joined_expression_without_ambiguity() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     let mut mit = file("no_license_ambiguity/LICENSE-MIT");
     mit.is_legal = true;
@@ -976,8 +1008,10 @@ fn compute_score_mode_uses_single_joined_expression_without_ambiguity() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     let files = vec![cargo, apache, mit];
     let indexes = build_output_indexes(&files, None, false);
@@ -1026,8 +1060,10 @@ fn compute_score_mode_does_not_treat_with_expression_as_covering_base_license() 
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     manifest.copyrights = vec![Copyright {
         copyright: "Copyright Example Corp.".to_string(),
@@ -1057,8 +1093,10 @@ fn compute_score_mode_does_not_treat_with_expression_as_covering_base_license() 
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
 
     let files = vec![manifest, gpl];
@@ -1101,8 +1139,10 @@ fn compute_score_mode_scores_nested_manifest_key_file_without_copyright() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     let mut license = file("jar/META-INF/LICENSE.txt");
     license.is_legal = true;
@@ -1126,8 +1166,10 @@ fn compute_score_mode_scores_nested_manifest_key_file_without_copyright() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     let files = vec![pom, license];
     let indexes = build_output_indexes(&files, None, false);

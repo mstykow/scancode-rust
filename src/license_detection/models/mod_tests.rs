@@ -586,6 +586,7 @@ mod tests {
             rule_identifier: Some("spdx-license-identifier-mit-deadbeef".to_string()),
             rule_url: None,
             matched_text: Some("MIT".to_string()),
+            matched_text_diagnostics: None,
         };
 
         let json = serde_json::to_value(&output_match).unwrap();

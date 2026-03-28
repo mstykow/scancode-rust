@@ -5,7 +5,7 @@ use crate::assembly;
 use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
 use crate::models::{DatasourceId, FileInfo, TopLevelDependency};
 use crate::progress::{ProgressMode, ScanProgress};
-use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+use crate::scanner::{LicenseScanOptions, TextDetectionOptions, collect_paths, process_collected};
 
 pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
@@ -18,7 +18,7 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
         &collected,
         progress,
         None,
-        false,
+        LicenseScanOptions::default(),
         &TextDetectionOptions {
             collect_info: false,
             detect_packages: true,

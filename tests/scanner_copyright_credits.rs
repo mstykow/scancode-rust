@@ -1,5 +1,6 @@
 use glob::Pattern;
 use provenant::progress::{ProgressMode, ScanProgress};
+use provenant::scanner::LicenseScanOptions;
 use provenant::{FileType, TextDetectionOptions, collect_paths, process_collected};
 use serde::Deserialize;
 use std::fs;
@@ -44,7 +45,13 @@ fn scanner_matches_structured_credits_fixture() {
     };
 
     let collected = collect_paths(&fixture_dir, 0, &patterns);
-    let result = process_collected(&collected, progress, None, false, &options);
+    let result = process_collected(
+        &collected,
+        progress,
+        None,
+        LicenseScanOptions::default(),
+        &options,
+    );
 
     let scanned = result
         .files

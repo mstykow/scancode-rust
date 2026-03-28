@@ -21,6 +21,7 @@ pub struct CachedScanFindings {
     pub license_expression: Option<String>,
     pub license_detections: Vec<LicenseDetection>,
     pub license_clues: Vec<Match>,
+    pub percentage_of_license_text: Option<f64>,
     pub copyrights: Vec<Copyright>,
     pub holders: Vec<Holder>,
     pub authors: Vec<Author>,
@@ -36,6 +37,7 @@ impl CachedScanFindings {
             license_expression: file_info.license_expression.clone(),
             license_detections: file_info.license_detections.clone(),
             license_clues: file_info.license_clues.clone(),
+            percentage_of_license_text: file_info.percentage_of_license_text,
             copyrights: file_info.copyrights.clone(),
             holders: file_info.holders.clone(),
             authors: file_info.authors.clone(),
@@ -113,6 +115,7 @@ mod tests {
             license_expression: Some("mit".to_string()),
             license_detections: Vec::new(),
             license_clues: Vec::new(),
+            percentage_of_license_text: Some(100.0),
             copyrights: Vec::new(),
             holders: Vec::new(),
             authors: Vec::new(),
@@ -135,6 +138,10 @@ mod tests {
 
         assert_eq!(loaded.license_expression, findings.license_expression);
         assert_eq!(loaded.license_clues, findings.license_clues);
+        assert_eq!(
+            loaded.percentage_of_license_text,
+            findings.percentage_of_license_text
+        );
         assert_eq!(loaded.programming_language, findings.programming_language);
     }
 
@@ -163,7 +170,11 @@ mod tests {
                 matched_text: Some(
                     "This product currently only contains code developed by authors".to_string(),
                 ),
+                matched_text_diagnostics: Some(
+                    "This product currently only contains code developed by [authors]".to_string(),
+                ),
             }],
+            percentage_of_license_text: Some(42.0),
             copyrights: Vec::new(),
             holders: Vec::new(),
             authors: Vec::new(),
@@ -185,6 +196,10 @@ mod tests {
             .expect("cache hit");
 
         assert_eq!(loaded.license_clues, findings.license_clues);
+        assert_eq!(
+            loaded.percentage_of_license_text,
+            findings.percentage_of_license_text
+        );
     }
 
     #[test]
@@ -196,6 +211,7 @@ mod tests {
             license_expression: Some("apache-2.0".to_string()),
             license_detections: Vec::new(),
             license_clues: Vec::new(),
+            percentage_of_license_text: None,
             copyrights: Vec::new(),
             holders: Vec::new(),
             authors: Vec::new(),
