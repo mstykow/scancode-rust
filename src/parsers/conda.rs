@@ -36,6 +36,10 @@ use serde_yaml::Value;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data_from_pair,
+    normalize_spdx_declared_license,
+};
 
 fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
@@ -184,6 +188,8 @@ impl PackageParser for CondaMetaYamlParser {
             .and_then(|a| a.get("license"))
             .and_then(|v| v.as_str())
             .map(String::from);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_conda_declared_license(extracted_license_statement.as_deref());
 
         let description = about
             .and_then(|a| a.get("summary"))
@@ -235,6 +241,9 @@ impl PackageParser for CondaMetaYamlParser {
         pkg.purl = build_conda_package_purl(pkg.name.as_deref(), pkg.version.as_deref());
         pkg.download_url = download_url;
         pkg.homepage_url = homepage_url;
+        pkg.declared_license_expression = declared_license_expression;
+        pkg.declared_license_expression_spdx = declared_license_expression_spdx;
+        pkg.license_detections = license_detections;
         pkg.extracted_license_statement = extracted_license_statement;
         pkg.description = description;
         pkg.vcs_url = vcs_url;
@@ -244,6 +253,28 @@ impl PackageParser for CondaMetaYamlParser {
             pkg.extra_data = Some(extra_data);
         }
         vec![pkg]
+    }
+}
+
+fn normalize_conda_declared_license(
+    statement: Option<&str>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
+    match statement.map(str::trim).filter(|value| !value.is_empty()) {
+        Some("Apache Software") => build_declared_license_data_from_pair(
+            "apache-2.0",
+            "Apache-2.0",
+            DeclaredLicenseMatchMetadata::single_line("Apache Software"),
+        ),
+        Some("BSD-3-Clause") => build_declared_license_data_from_pair(
+            "bsd-new",
+            "BSD-3-Clause",
+            DeclaredLicenseMatchMetadata::single_line("BSD-3-Clause"),
+        ),
+        other => normalize_spdx_declared_license(other),
     }
 }
 

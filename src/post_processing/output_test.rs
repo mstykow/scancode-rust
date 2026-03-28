@@ -353,7 +353,6 @@ fn create_output_preserves_empty_package_data_license_and_dependency_arrays() {
                 include_tallies_with_details: false,
                 include_tallies_of_key_files: false,
                 include_generated: false,
-                scanned_root: None,
             },
         },
     );
