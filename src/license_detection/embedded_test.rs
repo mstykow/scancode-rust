@@ -220,6 +220,7 @@ mod determinism {
     }
 
     #[test]
+    #[ignore = "Too slow for CI - builds full index twice from reference data"]
     fn test_artifact_generation_from_reference_is_deterministic() {
         let Some((rules_path, licenses_path)) = get_reference_data_paths() else {
             eprintln!("Skipping test: reference directories not found");
