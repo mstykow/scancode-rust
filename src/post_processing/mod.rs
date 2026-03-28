@@ -1772,7 +1772,7 @@ fn package_other_detected_license_values(file: &FileInfo, skip_unknown: bool) ->
         values.retain(|expression| expression != "unknown-license-reference");
     }
 
-    unique(&values)
+    values
 }
 
 fn key_file_has_license_text(file: &FileInfo) -> bool {
@@ -2168,7 +2168,6 @@ fn detected_license_values(file: &FileInfo) -> Vec<String> {
         .map(|detection| canonicalize_summary_expression(&detection.license_expression))
         .collect();
     detection_expressions.extend(package_other_detected_license_values(file, false));
-    let detection_expressions = unique(&detection_expressions);
 
     if detection_expressions.is_empty() {
         return file
@@ -2190,7 +2189,6 @@ fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
         .filter(|expression| expression != "unknown-license-reference")
         .collect();
     detection_expressions.extend(package_other_detected_license_values(file, true));
-    let detection_expressions = unique(&detection_expressions);
 
     if detection_expressions.is_empty() {
         return file
