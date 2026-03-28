@@ -423,9 +423,10 @@ const TINY_RULE: usize = 6;                   // Very small rules
 
 The engine still carries richer internal detection metadata than the current
 public ScanCode-style JSON output. `detection_log`, clue-only serialization, and
-matched-text diagnostics are now preserved publicly, but file-region metadata
-and some downstream clue/provenance consumers are still not fully represented in
-the current serialized surfaces.
+matched-text diagnostics are now preserved publicly, and internal detections now
+carry real file-region metadata for unique aggregation, but some downstream
+clue/provenance consumers are still not fully represented in the current
+serialized surfaces.
 
 The remaining public-output parity work is tracked in
 [`docs/implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md)
@@ -441,7 +442,7 @@ pub struct LicenseDetection {
     pub matches: Vec<LicenseMatch>,              // Individual matches
     pub detection_log: Vec<String>,              // Classification
     pub identifier: Option<String>,              // UUID
-    pub file_region: Option<FileRegion>,         // Location
+    pub file_regions: Vec<FileRegion>,           // Internal aggregated locations
 }
 ```
 
