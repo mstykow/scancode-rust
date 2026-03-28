@@ -164,6 +164,7 @@ mod tests {
             None,
             false,
             &TextDetectionOptions {
+                collect_info: false,
                 detect_packages: true,
                 ..TextDetectionOptions::default()
             },

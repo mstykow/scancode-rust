@@ -475,6 +475,7 @@ pub(crate) fn compute_fixture_output(
         Some(test_license_engine()),
         false,
         &TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             detect_generated: options.include_generated,
             ..TextDetectionOptions::default()
@@ -545,6 +546,7 @@ pub(crate) fn compute_fixture_summary(
         Some(test_license_engine()),
         false,
         &TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             ..TextDetectionOptions::default()
         },
@@ -866,6 +868,7 @@ pub(crate) fn assert_classify_fixture_matches_expected(
         Some(test_license_engine()),
         false,
         &TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             ..TextDetectionOptions::default()
         },
@@ -932,6 +935,7 @@ pub(crate) fn scan_and_assemble_with_keyfiles(
         None,
         false,
         &TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             ..TextDetectionOptions::default()
         },

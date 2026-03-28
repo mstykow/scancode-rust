@@ -15,6 +15,7 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
         None,
         false,
         &TextDetectionOptions {
+            collect_info: false,
             detect_packages: true,
             ..TextDetectionOptions::default()
         },

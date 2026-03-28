@@ -146,6 +146,9 @@ pub struct Cli {
     #[arg(long = "max-in-memory", value_name = "INT")]
     pub max_in_memory: Option<usize>,
 
+    #[arg(short = 'i', long)]
+    pub info: bool,
+
     #[arg(long)]
     pub from_json: bool,
 
@@ -169,10 +172,24 @@ pub struct Cli {
     #[arg(long)]
     pub filter_clues: bool,
 
+    #[arg(
+        long = "ignore-author",
+        value_name = "PATTERN",
+        help = "Ignore a file and all its findings if an author matches the regex PATTERN"
+    )]
+    pub ignore_author: Vec<String>,
+
+    #[arg(
+        long = "ignore-copyright-holder",
+        value_name = "PATTERN",
+        help = "Ignore a file and all its findings if a copyright holder matches the regex PATTERN"
+    )]
+    pub ignore_copyright_holder: Vec<String>,
+
     #[arg(long)]
     pub only_findings: bool,
 
-    #[arg(long)]
+    #[arg(long, requires = "info")]
     pub mark_source: bool,
 
     #[arg(long)]
@@ -436,6 +453,26 @@ mod tests {
     }
 
     #[test]
+    fn test_parses_ignore_author_and_holder_filters() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--ignore-author",
+            "Jane.*",
+            "--ignore-author",
+            ".*Bot$",
+            "--ignore-copyright-holder",
+            "Example Corp",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert_eq!(parsed.ignore_author, vec!["Jane.*", ".*Bot$"]);
+        assert_eq!(parsed.ignore_copyright_holder, vec!["Example Corp"]);
+    }
+
+    #[test]
     fn test_parses_ignore_alias_for_exclude_patterns() {
         let parsed = Cli::try_parse_from([
             "provenant",
@@ -470,14 +507,29 @@ mod tests {
             "--json-pp",
             "scan.json",
             "--from-json",
+            "--info",
             "--mark-source",
             "sample-scan.json",
         ])
         .expect("cli parse should succeed");
 
         assert!(parsed.from_json);
+        assert!(parsed.info);
         assert_eq!(parsed.dir_path, vec!["sample-scan.json"]);
         assert!(parsed.mark_source);
+    }
+
+    #[test]
+    fn test_mark_source_requires_info() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--mark-source",
+            "samples",
+        ]);
+
+        assert!(parsed.is_err());
     }
 
     #[test]

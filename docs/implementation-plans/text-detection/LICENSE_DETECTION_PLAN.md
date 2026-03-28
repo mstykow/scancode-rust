@@ -95,8 +95,9 @@ implementation plan again.
 - ❌ No top-level unique `license_detections`
 - ❌ No live generation of top-level `license_references`
 - ❌ No live generation of top-level `license_rule_references`
-- ❌ `--filter-clues` is not license-aware because clue semantics are not carried
-  into the public output model
+- ❌ `--filter-clues` is only partially license-aware today: shaping now suppresses
+  ignorable clues using public match metadata and rule identifiers, but some
+  JSON/public-license-shape edge cases still diverge from upstream
 - ❌ SPDX output still hardcodes `NOASSERTION` / `NONE` instead of exporting real
   declared/detected license conclusions
 
@@ -155,8 +156,9 @@ The repository still has a mix of:
 - **[CLI_PLAN.md](../infrastructure/CLI_PLAN.md)** owns the flag inventory and
   runtime CLI gating.
 - **[SCAN_RESULT_SHAPING_PLAN.md](../post-processing/SCAN_RESULT_SHAPING_PLAN.md)**
-  owns `--filter-clues`; this plan owns the missing license semantics that make
-  license-aware clue filtering possible.
+  now owns the completed shaping/runtime implementation of `--filter-clues`;
+  this plan owns the remaining public license-shape differences that still
+  affect exact filtered-output parity.
 - **[OUTPUT_FORMATS_PLAN.md](../output/OUTPUT_FORMATS_PLAN.md)** and
   **[PARITY_SCORECARD.md](../output/PARITY_SCORECARD.md)** own format-specific
   output claims such as SPDX parity.
@@ -188,7 +190,7 @@ The repository still has a mix of:
    - Align help text and docs with the actual runtime surface
 
 5. **Phase 4 — Downstream consumer parity**
-   - Make `--filter-clues` license-aware where appropriate
+   - Close the remaining `--filter-clues` license-edge cases where appropriate
    - Feed SPDX writers with real license conclusions/info-from-files
    - Audit summary/tally consumers of package `other_license_detections`
 
