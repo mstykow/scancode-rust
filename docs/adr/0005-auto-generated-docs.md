@@ -94,7 +94,7 @@ impl PackageParser for NpmParser {
 - Always accurate (generated from actual code)
 - Comprehensive (covers all parsers automatically)
 - Consistent format (same template for all)
-- No manual maintenance (automated in pre-commit hook)
+- No manual maintenance (automated in the Lefthook pre-commit hook)
 
 #### 2. Rust Doc Comments (API Reference)
 
@@ -193,14 +193,12 @@ docs/
 
 ```bash
 #!/bin/bash
-# .git/hooks/pre-commit
+# Installed by Lefthook; hook behavior is configured in lefthook.yml.
+lefthook run pre-commit
 
-# Hook behavior is configured in .pre-commit-config.yaml.
-# The docs regeneration hook runs this command when parser files change:
-cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats
-
-# Then it stages the generated file:
-git add docs/SUPPORTED_FORMATS.md
+# The docs regeneration command triggered for parser-file changes is:
+# cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats
+# Lefthook stages generated changes automatically when stage_fixed: true is set.
 ```
 
 #### Documentation Generator (Conceptual)

@@ -2,7 +2,7 @@
 #
 # Setup script for Provenant development
 #
-# This script initializes git submodules and installs pre-commit hooks.
+# This script initializes git submodules and, when Node tooling is present, installs git hooks.
 #
 # The license detection index is already embedded in the binary at:
 #   resources/license_detection/license_index_loader.msgpack.zst
@@ -11,7 +11,7 @@
 #
 # You only need to run this script if you:
 # - Are building from source for the first time
-# - Want to install pre-commit hooks
+# - Want to install git hooks after installing Node dependencies
 # - Want to update to the latest license rules/licenses
 #
 # Run this script:
@@ -23,13 +23,14 @@ echo "Initializing submodules..."
 git submodule update --init --filter=blob:none
 
 echo ""
-echo "Installing pre-commit hooks..."
-if command -v pre-commit >/dev/null 2>&1; then
-    pre-commit install
-    echo "✅ Pre-commit hooks installed"
+echo "Installing git hooks..."
+if [ -x node_modules/.bin/lefthook ]; then
+    npm run hooks:install
+    echo "✅ Lefthook hooks installed"
 else
-    echo "⚠️  pre-commit is not installed. Install it, then run:"
-    echo "   pre-commit install"
+    echo "⚠️  Lefthook is not installed yet. Run npm install first (it will auto-install hooks), or run:"
+    echo "   npm install"
+    echo "   npm run hooks:install"
 fi
 
 echo ""

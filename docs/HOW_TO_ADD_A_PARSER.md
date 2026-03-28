@@ -1,1075 +1,350 @@
 # How To Add A Parser
 
-This guide walks you through adding a new package parser to Provenant.
+This guide covers the parts of parser work that are specific to Provenant: parser invariants,
+registration, datasource wiring, test expectations, and assembly/file-reference integration.
 
-## Prerequisites
+It intentionally does **not** repeat generic setup, Rust style, or broad testing workflow docs.
+Use these as the source of truth for project-wide guidance:
 
-- Rust development environment set up
-- Git submodules initialized: `git submodule update --init --filter=blob:none` (or `./setup.sh` on Linux, macOS, or WSL)
-- Familiarity with the target package ecosystem
-- Access to sample package manifest files
+- [`README.md`](../README.md) for local setup and hook installation
+- [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md) for test-layer definitions and command guidance
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) for parser/assembly subsystem rationale
+- [`AGENTS.md`](../AGENTS.md) for contributor guardrails and repo conventions
 
-If you are contributing from Windows, prefer WSL for shell-based setup and helper commands.
+## Parser workflow in this repo
 
-## Overview
+Adding a parser usually means doing all of the following:
 
-Adding a parser involves:
+1. research the manifest or lockfile behavior you need to preserve
+2. implement `src/parsers/<ecosystem>.rs`
+3. register the parser in `src/parsers/mod.rs`
+4. register parser metadata with `register_parser!`
+5. add parser-local tests and, by default, parser goldens
+6. classify every new `DatasourceId` for assembly accounting
+7. add assembly or file-reference wiring when the ecosystem needs it
+8. validate behavior against the Python reference or the authoritative format spec
 
-1. **Research** - Understand the package format
-2. **Implementation** - Create the parser module
-3. **Testing** - Add comprehensive tests
-4. **Registration** - Register the parser with the scanner
-5. **Golden Tests** - Add regression tests (expected for new production parsers)
-6. **Assembly Support** - Add manifest/lockfile merging (if applicable)
-7. **Validation** - Verify against reference implementation
-8. **Documentation** - Document the implementation
-9. **Quality Checks** - Run linting and formatting
+## 1. Decide the parser surface before coding
 
-**Time estimate**: 2-8 hours depending on complexity
+Before you write code, answer these questions:
 
-## Step 1: Research the Package Format
+- Which concrete filenames or file patterns does this parser own?
+- Is this one datasource or several distinct datasources handled by one parser?
+- Does the format carry package identity, dependencies, declared-license metadata, or file
+  references?
+- Does the ecosystem need sibling/workspace assembly, or is it intentionally unassembled?
+- If the Python ScanCode parser exists, what behavior and edge cases must be preserved?
 
-**Choose your path:**
+If the ecosystem exists under `reference/scancode-toolkit/src/packagedcode/`, use the Python
+implementation and tests as a **behavioral specification**. Use them to learn what the Rust parser
+must do, not how to write it.
 
-### Path A: Parser with Python Reference (Most Common)
+Collect representative fixtures early. At minimum, gather files that cover:
 
-If the ecosystem exists in `reference/scancode-toolkit/src/packagedcode/`:
+- a basic success case
+- malformed or partially missing input
+- dependency scope variations, if the format has them
+- declared-license variations, if the format exposes them
+- manifest/lockfile or file-reference cases, if downstream assembly depends on them
 
-```bash
-cd reference/scancode-toolkit/
-find src/packagedcode/ -name "*<ecosystem>*"
-cat src/packagedcode/<ecosystem>.py
-find tests/packagedcode/ -name "*<ecosystem>*"
-```
+## 2. Implement the parser
 
-**Use the Python reference to understand:**
+Create `src/parsers/<ecosystem>.rs` and implement `PackageParser`.
 
-- What file formats are handled
-- What fields should be extracted
-- Edge cases and known bugs to fix
-- Expected output structure
-
-**⚠️ CRITICAL**: Use the reference to understand **WHAT** to build, not **HOW**. Never port line-by-line. See [AGENTS.md](../AGENTS.md#using-the-reference-submodule) for details.
-
-### Path B: Parser without Python Reference (New Ecosystem)
-
-If adding a parser for an ecosystem **not** in the original Python ScanCode:
-
-1. **Find the Official Specification**
-   - Locate package format documentation (e.g., TOML spec, JSON schema)
-   - Identify authoritative sources (language docs, package registry docs)
-   - Check for version history (format evolution)
-
-2. **Study Real-World Examples**
-
-   ```bash
-   # Clone popular projects using this format
-   git clone https://github.com/<popular-project>
-   find . -name "<manifest-file>" | head -10
-   ```
-
-3. **Analyze Format Structure**
-   - What fields are required vs optional?
-   - How are dependencies specified?
-   - What metadata is standard?
-   - Are there multiple file formats (manifest + lockfile)?
-
-4. **Research Existing Tooling**
-   - How do official tools parse this format?
-   - Are there parsing libraries in the ecosystem?
-   - What edge cases do tools handle?
-
-5. **Define Extraction Scope**
-   - What information is valuable for SBOM/licensing?
-   - Package identity (name, version, namespace)
-   - Dependencies (with versions, scopes)
-   - Licensing information (declarations, URLs)
-   - Maintainer/author information
-   - URLs (homepage, repository, download)
-
-### Common Step: Gather Test Data
-
-Collect real-world package manifest examples:
-
-```bash
-mkdir -p testdata/<ecosystem>/
-# Add 3-5 representative manifest files
-# Include edge cases: empty, complex, minimal
-```
-
-**For Path A (Python Reference)**: Use files from `reference/scancode-toolkit/tests/`
-
-**For Path B (New Ecosystem)**: Collect from popular open-source projects
-
-## Step 2: Create the Parser Module
-
-### File Structure
-
-Create `src/parsers/<ecosystem>.rs`:
+Use the current parser contract from `src/parsers/mod.rs`, not an older string-based template:
 
 ```rust
-//! Parser for <Ecosystem> package manifests.
-//!
-//! ## Supported Formats
-//! - `manifest.ext` - Main package manifest
-//! - `lockfile.ext` - Dependency lockfile (if applicable)
-//!
-//! ## Key Features
-//! - Extracts package metadata
-//! - Handles dependencies with version constraints
-//! - Supports all standard fields
-//!
-//! ## Implementation Notes
-//! - Uses serde for JSON/TOML/YAML parsing
-//! - Graceful error handling with structured scan diagnostics
-//! - No code execution (AST parsing only)
-
-use std::fs;
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
-
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, PackageData, PackageType};
 use crate::parser_warn as warn;
 
 use super::PackageParser;
 
-/// Parser for <Ecosystem> package manifests
-pub struct MyEcosystemParser;
+pub struct MyParser;
 
-impl PackageParser for MyEcosystemParser {
-    const PACKAGE_TYPE: &'static str = "<ecosystem>";
+impl PackageParser for MyParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Npm;
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| {
-            matches!(
-                name.to_str(),
-                Some("manifest.json") | Some("package.lock")
-            )
-        })
+        path.file_name().is_some_and(|name| name == "package.json")
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read file {:?}: {}", path, e);
-                return vec![PackageData {
-                    package_type: Some(Self::PACKAGE_TYPE.to_string()),
-                    datasource_id: Some(DatasourceId::MyEcosystemManifest),
-                    ..Default::default()
-                }];
-            }
-        };
-
-        vec![parse_manifest(&content)]
-    }
-}
-
-// Serde struct matching the manifest format
-#[derive(Debug, Deserialize)]
-struct ManifestFile {
-    name: Option<String>,
-    version: Option<String>,
-    description: Option<String>,
-    homepage: Option<String>,
-    license: Option<String>,
-    dependencies: Option<std::collections::HashMap<String, String>>,
-    // Add fields as needed
-}
-
-fn parse_manifest(content: &str) -> PackageData {
-    let manifest: ManifestFile = match serde_json::from_str(content) {
-        Ok(m) => m,
-        Err(e) => {
-            warn!("Failed to parse manifest: {}", e);
-            return PackageData {
-                package_type: Some("<ecosystem>".to_string()),
-                datasource_id: Some(DatasourceId::MyEcosystemManifest),
+        match std::fs::read_to_string(path) {
+            Ok(_content) => vec![PackageData {
+                package_type: Some(Self::PACKAGE_TYPE),
+                datasource_id: Some(DatasourceId::NpmPackageJson),
                 ..Default::default()
-            };
+            }],
+            Err(error) => {
+                warn!("Failed to read {:?}: {}", path, error);
+                vec![PackageData {
+                    package_type: Some(Self::PACKAGE_TYPE),
+                    datasource_id: Some(DatasourceId::NpmPackageJson),
+                    ..Default::default()
+                }]
+            }
         }
-    };
-
-    // Extract dependencies
-    let dependencies = manifest
-        .dependencies
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(name, version)| Dependency {
-            purl: Some(build_purl(&name, Some(&version))),
-            extracted_requirement: Some(version),
-            scope: Some("dependencies".to_string()),
-            is_runtime: Some(true),
-            is_optional: Some(false),
-            is_pinned: None,
-            is_direct: Some(true),
-            ..Default::default()
-        })
-        .collect();
-
-    PackageData {
-        package_type: Some("<ecosystem>".to_string()),
-        datasource_id: Some(DatasourceId::MyEcosystemManifest),
-        name: manifest.name,
-        version: manifest.version,
-        description: manifest.description,
-        homepage_url: manifest.homepage,
-        extracted_license_statement: manifest.license,
-        dependencies,
-        ..Default::default()
     }
 }
+```
 
-fn build_purl(name: &str, version: Option<&str>) -> String {
-    match version {
-        Some(v) => format!("pkg:<ecosystem>/{}@{}", name, v),
-        None => format!("pkg:<ecosystem>/{}", name),
-    }
-}
+### Parser invariants that matter here
 
+- Set `datasource_id` on **every production path**, including error and fallback returns.
+- Use `crate::parser_warn!` (typically imported as `warn`) for parser failures so diagnostics land
+  in structured scan output.
+- Do not use plain `log::warn!()` for file-scoped parser failures.
+- Do not execute package-manager code or shell commands from parser logic.
+- Do not do broad file-content license detection, copyright detection, or backfilling from sibling
+  files inside the parser.
+- Preserve raw dependency and license input when the source format is ambiguous.
+
+### Declared-license contract
+
+If the format exposes a **trustworthy declared-license surface** such as an SPDX-compatible manifest
+field, populate:
+
+- `extracted_license_statement`
+- `declared_license_expression`
+- `declared_license_expression_spdx`
+- parser-side `license_detections`
+
+Use the shared helper in `src/parsers/license_normalization.rs` instead of writing parser-specific
+normalization logic.
+
+If the license surface is weak or ambiguous, keep the parser raw-only:
+
+- preserve `extracted_license_statement`
+- leave declared-license fields empty
+- do not emit guessed or partial expressions
+
+### Dependency contract
+
+- Populate `dependencies` whenever the format actually carries dependency data.
+- Preserve the ecosystem's native scope terminology unless an existing parser pattern says
+  otherwise.
+- Treat parser tests and parser goldens as interface-contract checks for dependency fields, not just
+  smoke tests.
+
+### Parser metadata registration
+
+Add `crate::register_parser!(...)` near the end of the parser file. This feeds
+`docs/SUPPORTED_FORMATS.md` generation through `src/parsers/metadata.rs`.
+
+```rust
 crate::register_parser!(
-    "<Ecosystem> package manifest",
-    &["**/manifest.json", "**/package.lock"],
-    "<ecosystem>",
-    "<Language>",
-    Some("https://example.com/docs"),
+    "npm package.json manifest",
+    &["**/package.json"],
+    "npm",
+    "JavaScript",
+    Some("https://docs.npmjs.com/cli/v10/configuring-npm/package-json"),
 );
 ```
 
-> **Important**: The `register_parser!` macro at the end of the file registers metadata for
-> auto-generating `docs/SUPPORTED_FORMATS.md`. Without it, your parser works for scanning but
-> won't appear in the supported formats documentation.
+If you skip this macro, the parser can still work at scan time, but it will be missing from the
+generated supported-formats docs.
 
-### Key Principles
+### Use existing parsers as templates
 
-**DO**:
+Prefer copying patterns from a nearby real parser over inventing a fresh structure. Good starting
+points in this repo:
 
-- ✅ Use `PackageParser` trait
-- ✅ Return `PackageData` struct
-- ✅ Handle errors gracefully with `parser_warn!()` / the local `warn!` alias so scanner output captures parser failures in `scan_errors`
-- ✅ Extract all fields Python does
-- ✅ Use established Rust parsers (serde_json, toml, yaml)
+- `src/parsers/cargo.rs` for a manifest parser with declared-license normalization and dependencies
+- `src/parsers/about.rs` for file-reference handling
+- `src/parsers/npm.rs` or `src/parsers/python.rs` for more complex multi-surface ecosystems
 
-**DON'T**:
+## 3. Register the parser in `src/parsers/mod.rs`
 
-- ❌ Execute code (use AST parsing)
-- ❌ Panic on errors
-- ❌ Use plain `log::warn!()` in parser code for file-scoped failures; that bypasses the structured parser diagnostics path
-- ❌ Use `.unwrap()` in library code
-- ❌ Run broad file-content license detection in parser code
-- ❌ Normalize ambiguous prose/URL/file-hint license metadata into declared expressions
-- ❌ Detect copyrights (separate pipeline stage)
+You need both module wiring and scanner registration.
 
-Parser-side declared-license normalization is allowed only for **trustworthy declared metadata** (for example, SPDX-expression-compatible manifest fields) and should use the shared parser license-normalization helper rather than one-off parser logic.
+### Module wiring
 
-### Declared-license and dependency contract
-
-- If the format exposes a **trustworthy declared-license surface**, populate:
-  - `extracted_license_statement`
-  - `declared_license_expression`
-  - `declared_license_expression_spdx`
-  - parser-side `license_detections`
-  - using the shared helper in `src/parsers/license_normalization.rs`
-- If the license surface is ambiguous or weak, keep the parser **raw-only by design**:
-  - preserve `extracted_license_statement`
-  - leave declared-license fields empty
-  - do **not** emit partial or guessed declared expressions
-- Populate `dependencies` whenever the source format actually encodes dependency data.
-  Empty is correct only when the format has no dependency surface or the concrete file truly does not declare any dependencies.
-- Parser-side `license_detections` represent **declared metadata normalization**, not discovered file-content matches.
-- Treat parser tests and parser goldens as interface-contract checks: if a parser emits meaningful declared-license or dependency data, add assertions/fixtures that prove those fields are populated correctly.
-
-## Step 3: Add Comprehensive Tests
-
-### Create Test File
-
-`src/parsers/<ecosystem>_test.rs`:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_is_match() {
-        assert!(MyEcosystemParser::is_match(&PathBuf::from("package.json")));
-        assert!(!MyEcosystemParser::is_match(&PathBuf::from("README.md")));
-    }
-
-    #[test]
-    fn test_extract_basic() {
-        let path = PathBuf::from("testdata/<ecosystem>/basic.json");
-        let data = MyEcosystemParser::extract_packages(&path);
-
-        assert_eq!(data.name, Some("my-package".to_string()));
-        assert_eq!(data.version, Some("1.0.0".to_string()));
-        assert!(!data.dependencies.is_empty());
-    }
-
-    #[test]
-    fn test_extract_with_all_fields() {
-        let path = PathBuf::from("testdata/<ecosystem>/complete.json");
-        let data = MyEcosystemParser::extract_packages(&path);
-
-        assert!(data.description.is_some());
-        assert!(data.homepage_url.is_some());
-        assert!(data.extracted_license_statement.is_some());
-    }
-
-    #[test]
-    fn test_extract_malformed_json() {
-        let path = PathBuf::from("testdata/<ecosystem>/malformed.json");
-        let data = MyEcosystemParser::extract_packages(&path);
-
-        // Should not panic, returns default
-        assert_eq!(data.package_type, Some("<ecosystem>".to_string()));
-    }
-
-    #[test]
-    fn test_dependency_scopes() {
-        let path = PathBuf::from("testdata/<ecosystem>/dependencies.json");
-        let data = MyEcosystemParser::extract_packages(&path);
-
-        let runtime_deps: Vec<_> = data.dependencies
-            .iter()
-            .filter(|d| d.is_runtime == Some(true))
-            .collect();
-
-        let dev_deps: Vec<_> = data.dependencies
-            .iter()
-            .filter(|d| d.scope == Some("dev".to_string()))
-            .collect();
-
-        assert!(!runtime_deps.is_empty());
-        assert!(!dev_deps.is_empty());
-    }
-}
-```
-
-### Test Coverage Checklist
-
-- [ ] `is_match()` correctly identifies manifest files
-- [ ] Basic extraction works (name, version)
-- [ ] All fields are extracted
-- [ ] Dependencies with version constraints
-- [ ] Different dependency scopes
-- [ ] Malformed input handled gracefully
-- [ ] Edge cases (empty, minimal, complex)
-- [ ] Golden fixtures added for representative parser outputs
-- [ ] At least one fixture-backed scan/assembly contract test added when the parser emits meaningful downstream package or dependency data
-
-### Integration Test Verification
-
-After implementing your parser, verify it's properly wired up to the scanner:
-
-**Run the integration test suite:**
-
-```bash
-cargo test --test scanner_integration
-```
-
-The `test_all_parsers_are_registered_and_exported` test will verify your parser is:
-
-1. Listed in the `register_package_handlers!` macro
-2. Exported from the parsers module
-3. Accessible to the scanner
-
-**If this test fails**, it means you forgot to add your parser to the `register_package_handlers!` macro in Step 4.2.
-
-### Ecosystem-Level Scan/Assembly Tests (Default for Downstream Package Contracts)
-
-Unit tests and parser golden tests are the baseline. Some ecosystems also benefit from a small
-number of **fixture-backed scanner/assembly tests** that exercise the higher-level flow:
-
-1. file discovery via the scanner
-2. parser extraction
-3. package/file-reference assignment
-4. assembly behavior when relevant
-
-These tests are valuable when parser correctness depends on more than parsing a single file in
-isolation. In practice, this is the default for parsers that emit top-level package identity,
-meaningful dependencies, or file/package linkage consumed by assembly and output stages.
-
-**Good candidates**:
-
-- installed metadata that must attach referenced files correctly (`RECORD`, `installed-files.txt`,
-  Debian `status.d` + `.list` / `.md5sums` sidecars)
-- ecosystems with multiple competing metadata surfaces where scanner/assembly ordering matters
-- archive or extracted layouts where normalized paths or file references affect final behavior
-- intentionally unassembled formats whose scanner behavior must stay stable
-- package/lockfile pairs whose final package visibility, dependency hoisting, or `for_packages`
-  linkage would not be proven by parser-only goldens
-- parsers whose downstream contract depends on package-shape fields such as `namespace`/`name`,
-  `purl`, declared-license fields, `datasource_id`, or assembled `datafile_paths`
-
-**Recommended location**: keep these tests near the owning ecosystem under `src/parsers/` in a
-dedicated file such as `src/parsers/<ecosystem>_scan_test.rs`. For broad retroactive audits across
-multiple existing ecosystems, add parser-local scan files for each covered ecosystem.
-
-If your parser emits meaningful `PackageData.file_references`, treat one of these scan tests as
-effectively required. Parser unit tests can prove that references were extracted; only a
-scanner/assembly test proves that those references are actually resolved back onto scanned files via
-final `for_packages` links.
-
-This keeps them distinct from:
-
-- parser unit tests in `src/parsers/<ecosystem>_test.rs`
-- parser golden tests in `src/parsers/<ecosystem>_golden_test.rs`
-- top-level scanner integration tests in `tests/scanner_integration.rs`, which should stay focused
-  on cross-parser/system behavior rather than ecosystem-specific fixtures
-
-**Rule of thumb**: if your parser emits package data that downstream assembly or output consumes,
-add at least one fixture-backed scan-and-assemble contract test. Unit tests and parser goldens do
-not prove final package visibility, `for_packages`, dependency hoisting, or file-link behavior.
-
-## Step 4: Register the Parser
-
-### Update `src/parsers/mod.rs`
-
-**Step 4.1: Add module declaration and public re-export**
+Add the parser module and its test modules:
 
 ```rust
 mod my_ecosystem;
 #[cfg(test)]
 mod my_ecosystem_test;
+#[cfg(test)]
+mod my_ecosystem_scan_test;
 
 pub use self::my_ecosystem::MyEcosystemParser;
 ```
 
-**Step 4.2: Register in `register_package_handlers!` macro**
+Match the test-module style used by neighboring parsers. Do **not** add per-parser golden modules
+directly to `src/parsers/mod.rs`; this repo centralizes parser golden wiring in
+`src/parsers/golden_test.rs`.
 
-This is **CRITICAL** - if you skip this step, your parser will be implemented but never called by the scanner!
+### Scanner registration
 
-Find the `register_package_handlers!` macro in `src/parsers/mod.rs` and add your parser to the `parsers` list:
+Add the parser to the `parsers:` list inside `register_package_handlers!`.
 
-```rust
-register_package_handlers! {
-    parsers: [
-        NpmWorkspaceParser,
-        NpmParser,
-        // ... other parsers ...
-        MyEcosystemParser,  // <-- ADD YOUR PARSER HERE
-        // ... more parsers ...
-    ],
-    recognizers: [
-        // ... file-type recognizers (don't add parsers here) ...
-    ],
-}
-```
+If the parser is not listed there, it will never be called by scanner dispatch even if the
+implementation and tests compile.
 
-**Why this matters**: The `register_package_handlers!` macro generates the `try_parse_file()` function that the scanner uses to match files to parsers. If your parser isn't in this list, it will never be invoked, even if fully implemented and tested.
-
-**Verification**: After adding your parser, verify it's registered:
+You can verify registration with the parser-golden utility:
 
 ```bash
-# Should include "MyEcosystemParser" in output
-cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list | grep MyEcosystemParser
-```
-
-## Step 5: Add Golden Tests (Expected for New Production Parsers)
-
-Golden tests compare parser output against reference `.expected.json` files to catch regressions.
-
-For new production parser work in this repository, treat golden tests as the default expectation rather than a nice-to-have. The only reasonable exception is an explicitly incremental parser slice with a documented follow-up task to add the missing goldens before calling the ecosystem support complete.
-
-### Generate Expected Output
-
-Use the test generator utility to create expected output files:
-
-```bash
-# List all available parser types
 cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list
-
-# Generate expected output using parser struct name
-cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- MyEcosystemParser \
-  testdata/<ecosystem>/sample.json \
-  testdata/<ecosystem>/sample.json.expected.json
-
-# Or use the convenience wrapper script
-./scripts/update_parser_golden.sh MyEcosystemParser \
-  testdata/<ecosystem>/sample.json \
-  testdata/<ecosystem>/sample.json.expected.json
 ```
 
-For canonical script purpose and full CLI argument reference, see [`scripts/README.md`](../scripts/README.md).
+The parser should appear in that output after registration.
 
-**Auto-Discovery**: The generator automatically discovers ALL parsers registered in `src/parsers/mod.rs` via the `register_package_handlers!` macro. When you add your parser to that list, it becomes immediately available - no manual updates needed!
+## 4. Add the tests this repo expects
 
-### Create Golden Test File
+### Unit tests
 
-Create `src/parsers/<ecosystem>_golden_test.rs`:
+Add `src/parsers/<ecosystem>_test.rs` and cover the parser contract directly:
 
-```rust
-#[cfg(test)]
-mod golden_tests {
-    use crate::parsers::PackageParser;
-    use crate::parsers::my_ecosystem::MyEcosystemParser;
-    use crate::test_utils::compare_package_data_parser_only;
-    use std::path::PathBuf;
+- `is_match()`
+- basic extraction of package identity
+- malformed or partial input
+- dependency extraction and scope handling
+- declared-license behavior when the format has a trustworthy license field
+- any parser-specific edge case the reference implementation already handles
 
-    #[test]
-    fn test_golden_basic() {
-        let test_file = PathBuf::from("testdata/<ecosystem>/basic.json");
-        let expected_file = PathBuf::from("testdata/<ecosystem>/basic.json.expected.json");
+### Parser golden tests
 
-        let package_data = MyEcosystemParser::extract_packages(&test_file);
+For new production parsers in this repository, parser goldens are the default expectation.
 
-        match compare_package_data_parser_only(&package_data, &expected_file) {
-            Ok(_) => (),
-            Err(e) => panic!("Golden test failed: {}", e),
-        }
-    }
-}
-```
+Create `src/parsers/<ecosystem>_golden_test.rs`, follow the feature-gating pattern already used in
+neighboring golden tests, and add representative fixtures under `testdata/<ecosystem>-golden/` or
+the ecosystem-specific golden layout already used nearby.
 
-### Update Module Registration
-
-Add golden test module to `src/parsers/mod.rs`:
+After adding the file, register it in `src/parsers/golden_test.rs` with the same pattern used by
+existing parsers:
 
 ```rust
+#[path = "my_ecosystem_golden_test.rs"]
 mod my_ecosystem_golden_test;
 ```
 
-## Step 6: Add Assembly Support (If Applicable)
-
-Assembly merges related manifest/lockfile pairs into logical packages. If your ecosystem has multiple related files (e.g., manifest + lockfile), you need assembly support.
-
-### Understanding Datasource IDs
-
-**Datasource IDs** are unique identifiers for each type of package data source your parser handles. They serve as the bridge between parsers and the assembly system.
-
-**Key Concepts**:
-
-- **`DatasourceId` enum**: A type-safe enum in `src/models/datasource_id.rs` with variants for every supported file format. Using an enum instead of strings provides compile-time checking and prevents typos.
-- **`datasource_id` field**: Set in each `PackageData` instance to indicate which specific file type was parsed
-- **Assembly matching**: The assembler uses `datasource_id` values to group related files (e.g., manifest + lockfile)
-
-**Example - Single Datasource Parser**:
-
-```rust
-use crate::models::DatasourceId;
-
-// In extract_packages():
-PackageData {
-    datasource_id: Some(DatasourceId::CargoToml),
-    // ...
-}
-```
-
-**Example - Multi-Datasource Parser**:
-
-```rust
-use crate::models::DatasourceId;
-
-// In extract_packages():
-if path.ends_with("pyproject.toml") {
-    PackageData {
-        datasource_id: Some(DatasourceId::PypiPyprojectToml),
-        // ...
-    }
-} else if path.ends_with("setup.py") {
-    PackageData {
-        datasource_id: Some(DatasourceId::PypiSetupPy),
-        // ...
-    }
-}
-```
-
-**Naming Convention**: Enum variants use `PascalCase` (e.g., `NpmPackageJson`, `CargoLock`, `MavenPom`). They serialize to `snake_case` strings for JSON output.
-
-**Critical Rules**:
-
-1. Every new file format needs a corresponding `DatasourceId` variant in `src/models/datasource_id.rs`
-2. Datasource IDs are globally unique — enforced at compile time by the enum
-3. The `datasource_id` field must NEVER be `None` in production code paths
-4. Every new `DatasourceId` must be classified in `src/assembly/assemblers.rs` — either in an `AssemblerConfig` or in `UNASSEMBLED_DATASOURCE_IDS`
-
-### Classify Every Datasource for Assembly Accounting
-
-Even when your parser does **not** need manifest/lockfile merging, you still need to classify its datasource for assembly accounting.
-
-- If the datasource participates in package assembly, add it to the appropriate `AssemblerConfig` in `src/assembly/assemblers.rs`.
-- If it is intentionally standalone or otherwise not assembled, add it to `UNASSEMBLED_DATASOURCE_IDS` in that same file.
-
-This is enforced by the `assembly::assemblers::tests::test_every_datasource_id_is_accounted_for` test. If you skip this step, CI fails even if your parser logic and parser tests are correct.
-
-### Register File-Reference Resolution Ownership (When Applicable)
-
-Some parsers emit `PackageData.file_references` that should later be resolved back onto scanned
-files and attached to the assembled package via `FileInfo.for_packages`.
-
-If your parser emits meaningful file references, you must do **both** of the following:
-
-1. **Register the ownership path in assembly**:
-   - either add the datasource to the declarative resolver registry in
-     `src/assembly/file_ref_resolve.rs`
-   - or handle it in another explicit post-assembly pass such as a dedicated
-     `*_resource_assign.rs` / merger step
-
-2. **Add a parser-adjacent scan test** in `src/parsers/<ecosystem>_scan_test.rs` proving the final
-   behavior on real scanned files.
-
-Without this, it is easy to end up in a partial state where the parser extracts file references but
-the scanner output never links those files back to the package.
-
-### Check if Assembly is Needed
-
-Does your ecosystem have:
-
-- ✅ A manifest file (package.json, Cargo.toml, go.mod, etc.)
-- ✅ A lockfile (package-lock.json, Cargo.lock, go.sum, etc.)
-- ✅ Multiple related metadata files that describe the same package?
-
-If **YES** to any, your parser needs assembly support.
-
-If **NO**, your datasource still needs an explicit entry in `UNASSEMBLED_DATASOURCE_IDS` so the assembly-accounting test knows the omission is intentional.
-
-### Add Assembler Configuration
-
-Edit `src/assembly/assemblers.rs` and add your ecosystem to the `ASSEMBLERS` array:
-
-```rust
-// Add to the ASSEMBLERS array
-AssemblerConfig {
-    datasource_ids: &[
-        DatasourceId::MyEcosystemManifest,
-        DatasourceId::MyEcosystemLock,
-    ],
-    sibling_file_patterns: &["manifest.ext", "lockfile.ext"],
-    mode: AssemblyMode::SiblingMerge,
-},
-```
-
-**Key points**:
-
-- `datasource_ids`: Must **exactly match** the `datasource_id` values your parsers emit in `PackageData`
-- `sibling_file_patterns`: Filenames to look for in the same directory (order matters - first is primary)
-- Patterns support exact match, case-insensitive match, and glob wildcards (`*.podspec`)
-- The assembler will only merge packages whose `datasource_id` values are listed in the same `AssemblerConfig`
-
-If your parser is intentionally **not** assembled, add it to `UNASSEMBLED_DATASOURCE_IDS` instead:
-
-```rust
-pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
-    // ... existing entries ...
-    DatasourceId::MyEcosystemManifest,
-];
-```
-
-### Add Assembly Golden Tests
-
-Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
-
-1. **Create directory**:
-
-   ```bash
-   mkdir -p testdata/assembly-golden/<ecosystem>-basic
-   ```
-
-2. **Add test files**:
-   - Add a minimal manifest file
-   - Add a minimal lockfile (if applicable)
-   - Keep files small and focused (5-20 lines each)
-
-3. **Generate expected output**:
-   The test will auto-generate `expected.json` on first run:
-
-   ```bash
-   cargo test test_assembly_<ecosystem>_basic
-   ```
-
-4. **Review generated output**:
-   - Check `testdata/assembly-golden/<ecosystem>-basic/expected.json`
-   - Verify UUIDs are normalized to `fixed-uid-done-for-testing-5642512d1758`
-   - Verify packages and dependencies are correctly assembled
-   - Verify `datafile_paths` includes both files
-   - Verify `datasource_ids` includes both parser IDs
-
-5. **Add test function**:
-   Edit `src/assembly/assembly_golden_test.rs` and add:
-
-   ```rust
-   #[test]
-   fn test_assembly_<ecosystem>_basic() {
-       match run_assembly_golden_test("<ecosystem>-basic") {
-           Ok(_) => (),
-           Err(e) => panic!("Assembly golden test failed for <ecosystem>-basic: {}", e),
-       }
-   }
-   ```
-
-6. **Verify test passes**:
-
-   ```bash
-   cargo test test_assembly_<ecosystem>_basic
-   ```
-
-### Assembly Checklist
-
-- [ ] Datasource classified in `src/assembly/assemblers.rs` (`ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`)
-- [ ] Assembler config added to `src/assembly/assemblers.rs` when assembly is needed
-- [ ] If parser emits meaningful `file_references`, its resolution ownership is registered in `src/assembly/file_ref_resolve.rs` or another explicit post-assembly pass
-- [ ] `datasource_ids` match parser `datasource_id` values
-- [ ] `sibling_file_patterns` match actual filenames
-- [ ] Test fixtures created in `testdata/assembly-golden/<ecosystem>-basic/`
-- [ ] Golden test function added to `src/assembly/assembly_golden_test.rs`
-- [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
-- [ ] Datasource accounting test passes: `cargo test test_every_datasource_id_is_accounted_for --lib`
-- [ ] Expected JSON reviewed and committed
-
-### Common Assembly Patterns
-
-**Sibling-Merge** (most common):
-
-- Files in same directory (package.json + package-lock.json)
-- Pattern: `["manifest.ext", "lockfile.ext"]`
-- See `src/assembly/assemblers.rs` for current implementations
-
-**Multi-File Merge**:
-
-- Multiple related files (\*.podspec + Podfile + Podfile.lock)
-- Pattern: `["*.podspec", "Podfile", "Podfile.lock"]`
-- Supports glob patterns for variable filenames
-
-**Metadata Pairs**:
-
-- Two metadata files (metadata.json + metadata.rb)
-- Pattern: `["metadata.json", "metadata.rb"]`
-- For ecosystems with multiple metadata formats
-
-### Related Documentation
-
-- [Assembly Golden Tests README](../testdata/assembly-golden/README.md) - Test structure and UUID normalization
-- [Architecture](ARCHITECTURE.md#package-assembly-system) - Assembly architecture and design principles
-- [Assembler Configurations](../src/assembly/assemblers.rs) - All registered assemblers
-
-## Step 7: Validate Implementation
-
-### Path A: Validation with Python Reference
-
-If you followed Path A (Python reference exists):
+Use the parser-golden maintenance tool to generate expected output:
 
 ```bash
-cd reference/scancode-toolkit/
-scancode -p testdata/<ecosystem>/basic.json --json reference_output.json
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list
 ```
 
-Compare outputs:
+Then generate the exact expected files you need. See [`scripts/README.md`](../scripts/README.md)
+and [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md) for the current command patterns and golden-test
+feature-gating.
 
-```bash
-cargo run -- --json-pp rust_output.json testdata/<ecosystem>/
-# Compare fields manually or use diff tool
-```
+### Parser-adjacent scan tests
 
-**Validation Checklist**:
+Add `src/parsers/<ecosystem>_scan_test.rs` when parser correctness depends on scanner wiring,
+assembly, or file/package linkage rather than single-file extraction alone.
 
-- [ ] All fields Python extracts are present
-- [ ] Field values match (or are improved)
-- [ ] Dependencies are equivalent
-- [ ] PURLs are correctly formatted
-- [ ] Edge cases handled
-- [ ] Golden tests pass (if added)
+Treat a scan test as effectively required when the parser emits meaningful downstream contract data,
+including:
 
-### Path B: Validation without Python Reference
+- package visibility after assembly
+- `for_packages` links
+- `datafile_paths`
+- dependency hoisting or manifest/lockfile interaction
+- `PackageData.file_references`
 
-If you followed Path B (new ecosystem):
+See `src/parsers/cargo_scan_test.rs` for a minimal example.
 
-1. **Test Against Official Tools**
+### Keep local verification scoped
 
-   ```bash
-   # Run ecosystem's native tool
-   <ecosystem-tool> show <package>
+This repo prefers narrow local validation. Do not treat broad commands as the default path from this
+guide. Use [`TESTING_STRATEGY.md`](TESTING_STRATEGY.md) for the canonical test taxonomy and command
+guidance, then run the smallest unit, golden, scan, or assembly target that proves the parser work.
 
-   # Compare with our extraction
-   cargo run -- --json-pp output.json testdata/<ecosystem>/
-   cat output.json | jq '.packages[0]'
-   ```
+## 5. Wire `DatasourceId` and assembly accounting
 
-2. **Validate Against Specification**
-   - Check that all required fields are extracted
-   - Verify dependency syntax parsing is correct
-   - Ensure PURL format follows [purl-spec](https://github.com/package-url/purl-spec)
+Every new file format needs a `DatasourceId`, and every new datasource must be accounted for in
+assembly.
 
-3. **Cross-Reference with Package Registries**
-   - Compare extracted metadata with registry API
-   - Verify version constraints are parsed correctly
-   - Check that URLs and identifiers match
+### Add datasource variants
 
-**Validation Checklist**:
+Add the new `DatasourceId` variant or variants to `src/models/datasource_id.rs`.
 
-- [ ] All fields from format spec are extracted
-- [ ] Dependencies parsed according to spec
-- [ ] PURLs follow purl-spec format
-- [ ] Output matches registry metadata
-- [ ] Edge cases from real projects handled
-- [ ] Golden tests pass (if added)
+Use one variant per concrete file format, not one variant per ecosystem. A manifest parser and a
+lockfile parser usually need different datasource IDs.
 
-## Step 8: Document Your Work
+### Classify every datasource
 
-### Add Module Documentation
+Edit `src/assembly/assemblers.rs` and do one of the following for every new datasource:
 
-Ensure your parser file has comprehensive `//!` module docs (already shown in Step 2).
+- add it to an `AssemblerConfig` when it participates in assembly
+- add it to `UNASSEMBLED_DATASOURCE_IDS` when it is intentionally standalone
 
-### Document Improvements (If Beyond Parity)
+If you skip this, `test_every_datasource_id_is_accounted_for` will fail even if the parser itself
+works.
 
-If you fixed bugs or added features Python doesn't have, create `docs/improvements/<ecosystem>-parser.md`:
+### Add assembly config when needed
 
-```markdown
-# <Ecosystem> Parser: Improvements Over Python
+If the ecosystem has related manifest/lockfile or sibling metadata surfaces, add an
+`AssemblerConfig` with the exact datasource IDs your parser emits.
 
-## Summary
+Keep `sibling_file_patterns` aligned with the real filenames the scanner will see. The assembler can
+only merge package data whose datasource IDs live in the same config.
 
-Our Rust implementation improves on the Python reference by:
+If the ecosystem needs a brand-new post-assembly behavior rather than just a new datasource entry,
+register that pass in `src/assembly/assemblers.rs` via `PostAssemblyPassKind` and
+`POST_ASSEMBLY_PASSES`.
 
-- 🐛 **Bug Fix**: [Describe what was broken in Python]
-- ✨ **New Feature**: [Describe what Python has as TODO]
-- 🔍 **Enhanced**: [Describe where we extract more data]
+### File-reference resolution ownership
 
-## Problem in Python Reference
+If the parser emits `PackageData.file_references`, you must also wire ownership of that resolution.
 
-[Explain the issue with code examples if possible]
+Register the datasource in `src/assembly/file_ref_resolve.rs` or another explicit post-assembly
+pass, then add a parser-adjacent scan test proving the final scanned files link back to the package.
 
-## Our Solution
+Without this, the parser can extract file references correctly while final scan results still fail
+to attach those files to the package.
 
-[Explain how Rust implementation improves it]
+### Assembly goldens
 
-## Before/After Comparison
+If the ecosystem assembles multiple files into one logical package, add assembly fixtures under
+`testdata/assembly-golden/<ecosystem>-basic/` and a matching test in
+`src/assembly/assembly_golden_test.rs`.
 
-**Python Output**:
-\`\`\`json
-{ "field": null }
-\`\`\`
+Use assembly goldens to prove the final assembled package shape, not just parser extraction.
 
-**Rust Output**:
-\`\`\`json
-{ "field": "correct-value" }
-\`\`\`
+## 6. Validate behavior before calling the parser done
 
-## References
+If a Python ScanCode parser exists, compare behavior against it. Validate at least:
 
-### Python Reference Issues
+- package identity fields
+- dependency presence and scope
+- declared-license output and raw statement preservation
+- purl shape
+- datasource IDs and assembly behavior
+- file-reference linkage when applicable
 
-- Bug/TODO description
+If no Python reference exists, validate against the authoritative format spec and real-world
+fixtures from that ecosystem.
 
-### <Ecosystem> Documentation
+If the Rust parser intentionally improves on the Python behavior, document the improvement briefly in
+`docs/improvements/<ecosystem>-parser.md`. Keep that doc focused on the behavior difference, not as
+an implementation diary.
 
-- [Official Docs](https://...)
+## Common failure modes in this repo
 
-## Status
-
-- ✅ **Implementation**: Complete, validated, production-ready
-- ✅ **Documentation**: Complete
-```
-
-### Update Supported Formats
-
-The pre-commit hook will automatically regenerate `docs/SUPPORTED_FORMATS.md` when you commit,
-**but only if your parser file includes the `register_parser!` macro** (shown in Step 2).
-This macro registers metadata that the generator uses to build the formats table.
-
-## Step 9: Quality Checks
-
-### Run All Tests
-
-```bash
-cargo test <ecosystem>
-cargo test --lib  # Fast: tests only library code
-cargo test        # Full: includes all tests
-```
-
-### Check Code Quality
-
-```bash
-cargo fmt                    # Format code
-cargo clippy                 # Lint
-cargo clippy --fix          # Auto-fix suggestions
-```
-
-### Verify Documentation
-
-```bash
-cargo doc --open  # Generate and view API docs
-```
-
-### Pre-commit Hook
-
-```bash
-pre-commit run --all-files
-```
-
-For hook installation and contributor setup, see [`README.md`](../README.md).
-
-## Common Pitfalls & Solutions
-
-### Issue: Parser Not Being Called
-
-**Problem**: Your parser's `is_match()` returns false
-
-**Solution**: Check file name patterns carefully. Use debug prints to verify:
-
-```rust
-fn is_match(path: &Path) -> bool {
-    let matches = path.file_name().is_some_and(|name| {
-        name.to_str() == Some("manifest.json")
-    });
-    eprintln!("Checking {:?}: {}", path, matches);  // Debug
-    matches
-}
-```
-
-### Issue: Parsing Fails Silently
-
-**Problem**: serde deserialization fails but you don't know why
-
-**Solution**: Add detailed error logging:
-
-```rust
-let manifest: ManifestFile = match serde_json::from_str(content) {
-    Ok(m) => m,
-    Err(e) => {
-        warn!("Failed to parse manifest: {}. Content: {}", e, content);
-        return PackageData {
-            package_type: Some("<ecosystem>".to_string()),
-            datasource_id: Some(DatasourceId::MyEcosystemManifest),
-            ..Default::default()
-        };
-    }
-};
-```
-
-### Issue: Tests Pass But Golden Tests Fail
-
-**Problem**: Your output structure doesn't match Python's
-
-**Solution**: Compare field-by-field with Python output. Common issues:
-
-- Different field names (check `PackageData` struct)
-- Missing `package_type` field
-- Incorrect PURL format
-- Wrong dependency scope values
-
-### Issue: Dependency Version Constraints Wrong
-
-**Problem**: Version strings not parsed correctly
-
-**Solution**: Don't parse version constraints. Extract as-is:
-
-```rust
-// Good: Extract raw string
-extracted_requirement: Some("^1.2.3".to_string())
-
-// Bad: Try to parse/normalize
-// Don't do this - keep original format
-```
-
-## Beyond Parity Opportunities
-
-Look for opportunities to improve on Python:
-
-**Fix Known Bugs**: Check Python code for TODOs, FIXMEs, or incorrect behavior
-
-**Extract More Data**: If the manifest has fields Python ignores, extract them into `extra_data`
-
-**Handle Edge Cases**: If Python crashes on malformed input, handle it gracefully
-
-**Security Improvements**: If Python executes code, use AST parsing instead
-
-**Performance**: Use efficient parsers and zero-copy where possible
-
-## Getting Help
-
-**Resources**:
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design
-- [ADR 0001](adr/0001-trait-based-parsers.md) - Parser architecture
-- [ADR 0003](adr/0003-golden-test-strategy.md) - Testing strategy
-- [ADR 0004](adr/0004-security-first-parsing.md) - Security guidelines
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design principles
-
-**Questions?**: Check existing parsers as examples:
-
-- Simple: `src/parsers/cargo.rs` (TOML-based)
-- Medium: `src/parsers/npm.rs` (JSON with multiple formats)
-- Complex: `src/parsers/python.rs` (Multiple file formats, setup.py)
-
-## Checklist
-
-Before submitting your parser:
-
-### Implementation
-
-- [ ] Parser implements `PackageParser` trait
-- [ ] `DatasourceId` variant(s) added to `src/models/datasource_id.rs` for each file format
-- [ ] `is_match()` correctly identifies files
-- [ ] `extract_packages()` extracts all fields
-- [ ] `datasource_id` field set correctly in ALL code paths (never `None` in production)
-- [ ] Dependencies extracted with proper scopes
-- [ ] PURLs correctly formatted
-- [ ] Graceful error handling (no panics)
-- [ ] Uses appropriate parser (serde_json, toml, yaml)
-
-### Testing
-
-- [ ] Unit tests for `is_match()`
-- [ ] Unit tests for basic extraction
-- [ ] Tests for all fields
-- [ ] Tests for dependencies
-- [ ] Tests for malformed input
-- [ ] Tests pass: `cargo test <ecosystem>`
-
-### Code Quality
-
-- [ ] Code formatted: `cargo fmt`
-- [ ] No clippy warnings: `cargo clippy`
-- [ ] No compiler warnings
-- [ ] Documentation builds: `cargo doc --open`
-
-### Documentation
-
-- [ ] Module `//!` comments present
-- [ ] Public functions have `///` doc comments
-- [ ] Improvement doc created if beyond parity
-- [ ] Test data added to `testdata/<ecosystem>/`
-
-### Integration
-
-- [ ] Parser module declared in `src/parsers/mod.rs`
-- [ ] Parser exported with `pub use`
-- [ ] Parser added to `register_package_handlers!` macro
-- [ ] `register_parser!` macro added at end of parser file
-- [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
-- [ ] Datasource classified in `ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`
-- [ ] If parser emits meaningful downstream package/dependency data, final package visibility / `for_packages` / dependency hoisting is proven by a parser-adjacent `*_scan_test.rs`
-- [ ] Pre-commit hooks pass
-- [ ] SUPPORTED_FORMATS.md auto-updated
-
-### Assembly (If Applicable)
-
-- [ ] Datasource classified in `src/assembly/assemblers.rs`
-- [ ] Assembler config added to `src/assembly/assemblers.rs`
-- [ ] Assembly golden test created in `testdata/assembly-golden/`
-- [ ] Assembly test function added to `src/assembly/assembly_golden_test.rs`
-- [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
-- [ ] Datasource accounting test passes: `cargo test test_every_datasource_id_is_accounted_for --lib`
-
-### Validation
-
-- [ ] Output compared with Python reference
-- [ ] All Python-extracted fields present
-- [ ] Edge cases handled
-- [ ] Known Python bugs fixed (if any)
-
-## Conclusion
-
-You now have a complete parser integrated into Provenant! Your contribution helps achieve feature parity with ScanCode Toolkit while leveraging Rust's safety and performance advantages.
-
-**Next Steps**:
-
-1. Test on real-world package repositories
-2. Compare results with Python ScanCode
-3. Document any intentional differences
-4. Submit pull request
-
-Welcome to the Provenant project! 🦀
+- The parser compiles but never runs because it was not added to `register_package_handlers!`.
+- `datasource_id` is set on the happy path but forgotten on parse-error or fallback returns.
+- The parser uses `log::warn!()` instead of `parser_warn!()`, so scan diagnostics are lost.
+- The parser guesses declared-license expressions from weak metadata instead of preserving raw input.
+- Parser-only tests pass, but the real scanner output is wrong because the parser needed a
+  `*_scan_test.rs`.
+- The parser emits `file_references`, but no resolver ownership was added in assembly.
+- `register_parser!` was skipped, so generated supported-formats docs never pick up the parser.
+
+## Done definition
+
+Before considering a new parser complete, make sure all of these are true:
+
+- implementation exists in `src/parsers/<ecosystem>.rs`
+- `datasource_id` is correct on every production path
+- parser is exported and registered in `src/parsers/mod.rs`
+- `register_parser!` metadata is present
+- parser unit tests exist
+- parser goldens exist unless an explicitly scoped follow-up is already planned
+- parser-adjacent scan tests exist when downstream package or file-link behavior matters
+- every new datasource is classified in `src/assembly/assemblers.rs`
+- file-reference ownership is wired when the parser emits `PackageData.file_references`
+- behavior has been validated against the Python reference or authoritative spec

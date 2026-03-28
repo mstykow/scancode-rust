@@ -4,6 +4,9 @@
   "private": true,
   "description": "Documentation tooling for Provenant",
   "scripts": {
+    "prepare": "lefthook install",
+    "hooks:install": "lefthook install",
+    "hooks:run": "lefthook run pre-commit --all-files",
     "format": "npx prettier --write \"**/*.{yml,yaml,json,md}\"",
     "format:check": "npx prettier --check \"**/*.{yml,yaml,json,md}\"",
     "lint:md": "npx markdownlint-cli2",
@@ -17,6 +20,7 @@
     "node": ">=24.0.0"
   },
   "devDependencies": {
+    "lefthook": "2.1.4",
     "markdownlint-cli2": "0.22.0",
     "prettier": "3.8.1"
   }

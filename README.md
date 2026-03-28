@@ -154,12 +154,13 @@ A typical local setup on Linux, macOS, or WSL is:
 ```sh
 git clone https://github.com/mstykow/provenant.git
 cd provenant
+npm install
 ./setup.sh
 cargo build
 cargo test
 ```
 
-If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's pre-commit configuration. Those setup and helper commands are currently shell-oriented, so Windows contributors should prefer running them inside WSL2.
+If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's `lefthook.yml` configuration. `npm install` fetches the pinned hook/docs tooling and installs hooks via the package `prepare` script; `npm run hooks:install` is available if you need to re-install them manually. Those setup and helper commands are currently shell-oriented, so Windows contributors should prefer running them inside WSL2.
 
 ## Credits
 

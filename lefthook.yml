@@ -1,0 +1,51 @@
+glob_matcher: doublestar
+
+pre-commit:
+  commands:
+    rustfmt:
+      glob:
+        - "src/**/*.rs"
+        - "tests/**/*.rs"
+        - "xtask/**/*.rs"
+      run: rustfmt --edition 2024 {staged_files}
+      stage_fixed: true
+
+    clippy:
+      glob:
+        - "src/**/*.rs"
+        - "tests/**/*.rs"
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    xtask-clippy:
+      glob:
+        - "xtask/**/*.rs"
+      run: cargo clippy --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+
+    check-xtask-lockfile-sync:
+      glob:
+        - Cargo.toml
+        - xtask/Cargo.toml
+        - release.sh
+      run: ./scripts/check_xtask_lockfile_sync.sh
+
+    generate-supported-formats:
+      glob: src/parsers/*.rs
+      exclude:
+        - src/parsers/*_test.rs
+        - src/parsers/*_golden_test.rs
+      run: cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats
+      stage_fixed: true
+
+    markdown-lint:
+      glob: "**/*.md"
+      run: npm exec -- markdownlint-cli2 --fix --no-globs {staged_files}
+      stage_fixed: true
+
+    prettier:
+      glob:
+        - "**/*.yml"
+        - "**/*.yaml"
+        - "**/*.json"
+        - "**/*.md"
+      run: npm exec -- prettier --write {staged_files}
+      stage_fixed: true
