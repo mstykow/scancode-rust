@@ -290,22 +290,14 @@ fn run() -> Result<()> {
 
     let end_time = Utc::now();
 
-    let recompute_shaped_top_level_license_sections = cli.from_json
-        && (cli.filter_clues
-            || !cli.include.is_empty()
-            || !cli.exclude.is_empty()
-            || cli.only_findings
-            || cli.strip_root
-            || cli.full_root);
-
-    let license_detections = if cli.from_json && !recompute_shaped_top_level_license_sections {
-        preloaded_license_detections
+    let license_detections = if cli.from_json {
+        let _ = preloaded_license_detections;
+        collect_top_level_license_detections(&scan_result.files)
     } else {
         collect_top_level_license_detections(&scan_result.files)
     };
 
     let should_recompute_license_references = cli.from_json
-        && recompute_shaped_top_level_license_sections
         && (!preloaded_license_references.is_empty()
             || !preloaded_license_rule_references.is_empty()
             || cli.license_references);

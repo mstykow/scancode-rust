@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: ✅ Complete — shared provenance cleanup, the current summary/tally reducers, localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, package-copyright holder precedence, package-datafile summary eligibility, active summary/score/generated/classify/tally parity, and Phase 11 performance hardening are implemented
+> **Status**: ✅ Complete — shared provenance cleanup, package-aware summary/tally reducers (including package-origin other-license evidence), localized summary/score/classify/generated/facet/tallies fixtures, package-preferred summary origin, package-copyright holder precedence, package-datafile summary eligibility, active summary/score/generated/classify/tally parity, and Phase 11 performance hardening are implemented
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
