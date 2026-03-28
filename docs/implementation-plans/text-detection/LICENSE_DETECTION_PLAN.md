@@ -105,8 +105,9 @@ implementation plan again.
 - ❌ `--filter-clues` is only partially license-aware today: shaping now suppresses
   ignorable clues using public match metadata and rule identifiers, but some
   JSON/public-license-shape edge cases still diverge from upstream
-- ❌ SPDX output still hardcodes `NOASSERTION` / `NONE` instead of exporting real
-  declared/detected license conclusions
+- ⚠️ SPDX output parity now consumes real file/package license-info surfaces, but
+  any remaining SPDX drift should be tracked as format-specific follow-up rather
+  than as a blocker on missing license-output data
 
 ### Known CLI Parity Gaps
 
@@ -194,7 +195,8 @@ The repository still has a mix of:
 
 5. **Phase 4 — Downstream consumer parity**
    - Close the remaining `--filter-clues` license-edge cases where appropriate
-   - Feed SPDX writers with real license conclusions/info-from-files
+   - Feed SPDX writers with real license-info-from-files / extracted-license
+     data while preserving upstream `NOASSERTION` conclusions
    - Audit summary/tally consumers of package `other_license_detections`
 
 ## Verify-First Gap List
@@ -222,7 +224,7 @@ whenever work resumes here:
 - [ ] `license_references` and `license_rule_references` are generated on native
       scans instead of only being preserved from input JSON
 - [ ] The CLI plan accurately reflects the implemented and pending license flags
-- [ ] SPDX writers consume real license data instead of placeholder conclusions
+- [ ] SPDX writers consume current-scan license data with fixture-backed parity
 - [ ] Evergreen docs describe the current public output shape accurately
 
 ## Related Documents

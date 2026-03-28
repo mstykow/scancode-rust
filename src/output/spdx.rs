@@ -1,12 +1,20 @@
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{self, Write};
 use std::path::PathBuf;
 
 use sha1::{Digest, Sha1};
 
-use crate::models::{FileInfo, FileType, Output};
+use crate::models::{FileInfo, FileType, Match, Output};
 
 use super::shared::{sorted_files, xml_escape};
 use super::{EMPTY_SHA1, OutputWriteConfig, SPDX_DOCUMENT_NOTICE};
+
+struct ExtractedLicenseInfo {
+    license_id: String,
+    name: String,
+    extracted_text: String,
+    comment: String,
+}
 
 pub(crate) fn write_spdx_tag_value(
     output: &Output,
@@ -23,6 +31,9 @@ pub(crate) fn write_spdx_tag_value(
 
     let document_namespace = format!("http://spdx.org/spdxdocs/{}", package_name);
     let package_verification_code = spdx_package_verification_code(&files);
+    let package_license_info_from_files = spdx_package_license_info_from_files(&files);
+    let package_copyright_text = spdx_package_copyright_text(&files);
+    let extracted_license_infos = spdx_extracted_license_infos(output, &files);
 
     writeln!(writer, "## Document Information")?;
     writeln!(writer, "SPDXVersion: SPDX-2.2")?;
@@ -48,28 +59,31 @@ pub(crate) fn write_spdx_tag_value(
         package_verification_code
     )?;
     writeln!(writer, "PackageLicenseConcluded: NOASSERTION")?;
-    writeln!(writer, "PackageLicenseInfoFromFiles: NONE")?;
+    for license_id in &package_license_info_from_files {
+        writeln!(writer, "PackageLicenseInfoFromFiles: {}", license_id)?;
+    }
+    if package_license_info_from_files.is_empty() {
+        writeln!(writer, "PackageLicenseInfoFromFiles: NONE")?;
+    }
     writeln!(writer, "PackageLicenseDeclared: NOASSERTION")?;
-    writeln!(writer, "PackageCopyrightText: NONE")?;
+    writeln!(writer, "PackageCopyrightText: {}", package_copyright_text)?;
     writeln!(writer, "## File Information")?;
 
     let mut file_index = 1usize;
     for file in files {
         let sha1 = file.sha1.as_deref().unwrap_or(EMPTY_SHA1);
+        let file_license_info = spdx_file_license_info(file);
         writeln!(writer, "FileName: ./{}", file.path)?;
         writeln!(writer, "SPDXID: SPDXRef-{}", file_index)?;
         writeln!(writer, "FileChecksum: SHA1: {}", sha1)?;
         writeln!(writer, "LicenseConcluded: NOASSERTION")?;
-        let has_license_detections = !file.license_detections.is_empty();
-        writeln!(
-            writer,
-            "LicenseInfoInFile: {}",
-            if has_license_detections {
-                "NOASSERTION"
-            } else {
-                "NONE"
+        if file_license_info.is_empty() {
+            writeln!(writer, "LicenseInfoInFile: NONE")?;
+        } else {
+            for license_id in file_license_info {
+                writeln!(writer, "LicenseInfoInFile: {}", license_id)?;
             }
-        )?;
+        }
 
         if file.copyrights.is_empty() {
             writeln!(writer, "FileCopyrightText: NONE")?;
@@ -85,6 +99,18 @@ pub(crate) fn write_spdx_tag_value(
 
         writeln!(writer)?;
         file_index += 1;
+    }
+
+    if !extracted_license_infos.is_empty() {
+        writeln!(writer, "## License Information")?;
+        for info in extracted_license_infos {
+            writeln!(writer, "LicenseID: {}", info.license_id)?;
+            writeln!(writer, "ExtractedText: <text>{}", info.extracted_text)?;
+            writeln!(writer, "</text>")?;
+            writeln!(writer, "LicenseName: {}", info.name)?;
+            writeln!(writer, "LicenseComment: <text>{}", info.comment)?;
+            writeln!(writer, "</text>")?;
+        }
     }
 
     Ok(())
@@ -109,6 +135,9 @@ pub(crate) fn write_spdx_rdf_xml(
 
     let package_name = xml_escape(&package_name_raw);
     let package_verification_code = spdx_package_verification_code(&files);
+    let package_license_info_from_files = spdx_package_license_info_from_files(&files);
+    let package_copyright_text = xml_escape(&spdx_package_copyright_text(&files));
+    let extracted_license_infos = spdx_extracted_license_infos(output, &files);
     let created_raw = output
         .headers
         .first()
@@ -131,15 +160,24 @@ pub(crate) fn write_spdx_rdf_xml(
     xml.push_str(
         "    <spdx:licenseDeclared rdf:resource=\"http://spdx.org/rdf/terms#noassertion\"/>\n",
     );
-    xml.push_str(
-        "    <spdx:licenseInfoFromFiles rdf:resource=\"http://spdx.org/rdf/terms#none\"/>\n",
-    );
+    if package_license_info_from_files.is_empty() {
+        xml.push_str(
+            "    <spdx:licenseInfoFromFiles rdf:resource=\"http://spdx.org/rdf/terms#none\"/>\n",
+        );
+    } else {
+        for license_id in &package_license_info_from_files {
+            xml.push_str("    <spdx:licenseInfoFromFiles rdf:resource=\"");
+            xml.push_str(&xml_escape(&spdx_license_rdf_resource(license_id)));
+            xml.push_str("\"/>\n");
+        }
+    }
     xml.push_str("    <spdx:packageVerificationCode><spdx:PackageVerificationCode><spdx:packageVerificationCodeValue>");
     xml.push_str(&package_verification_code);
     xml.push_str("</spdx:packageVerificationCodeValue></spdx:PackageVerificationCode></spdx:packageVerificationCode>\n");
 
     for (idx, file) in files.iter().enumerate() {
         let file_id = idx + 1usize;
+        let file_license_info = spdx_file_license_info(file);
         xml.push_str("    <spdx:relationship><spdx:Relationship>");
         xml.push_str("<spdx:relationshipType rdf:resource=\"http://spdx.org/rdf/terms#relationshipType_contains\"/>");
         xml.push_str("<spdx:relatedSpdxElement><spdx:File rdf:about=\"#SPDXRef-");
@@ -148,7 +186,17 @@ pub(crate) fn write_spdx_rdf_xml(
         xml.push_str(
             "<spdx:licenseConcluded rdf:resource=\"http://spdx.org/rdf/terms#noassertion\"/>",
         );
-        xml.push_str("<spdx:licenseInfoInFile rdf:resource=\"http://spdx.org/rdf/terms#none\"/>");
+        if file_license_info.is_empty() {
+            xml.push_str(
+                "<spdx:licenseInfoInFile rdf:resource=\"http://spdx.org/rdf/terms#none\"/>",
+            );
+        } else {
+            for license_id in file_license_info {
+                xml.push_str("<spdx:licenseInfoInFile rdf:resource=\"");
+                xml.push_str(&xml_escape(&spdx_license_rdf_resource(&license_id)));
+                xml.push_str("\"/>");
+            }
+        }
         xml.push_str("<spdx:checksum><spdx:Checksum><spdx:algorithm rdf:resource=\"http://spdx.org/rdf/terms#checksumAlgorithm_sha1\"/>");
         xml.push_str("<spdx:checksumValue>");
         xml.push_str(&xml_escape(file.sha1.as_deref().unwrap_or(EMPTY_SHA1)));
@@ -175,7 +223,9 @@ pub(crate) fn write_spdx_rdf_xml(
         );
     }
 
-    xml.push_str("    <spdx:copyrightText>NONE</spdx:copyrightText>\n");
+    xml.push_str("    <spdx:copyrightText>");
+    xml.push_str(&package_copyright_text);
+    xml.push_str("</spdx:copyrightText>\n");
     xml.push_str("    <spdx:name>");
     xml.push_str(&package_name);
     xml.push_str("</spdx:name>\n");
@@ -186,6 +236,26 @@ pub(crate) fn write_spdx_rdf_xml(
     xml.push_str("    <rdfs:comment>");
     xml.push_str(&xml_escape(SPDX_DOCUMENT_NOTICE));
     xml.push_str("</rdfs:comment>\n");
+    for info in extracted_license_infos {
+        xml.push_str(
+            "    <spdx:hasExtractedLicensingInfo><spdx:ExtractedLicensingInfo rdf:about=\"#",
+        );
+        xml.push_str(&xml_escape(&info.license_id));
+        xml.push_str("\">");
+        xml.push_str("<spdx:licenseId>");
+        xml.push_str(&xml_escape(&info.license_id));
+        xml.push_str("</spdx:licenseId>");
+        xml.push_str("<spdx:name>");
+        xml.push_str(&xml_escape(&info.name));
+        xml.push_str("</spdx:name>");
+        xml.push_str("<rdfs:comment>");
+        xml.push_str(&xml_escape(&info.comment));
+        xml.push_str("</rdfs:comment>");
+        xml.push_str("<spdx:extractedText>");
+        xml.push_str(&xml_escape(&info.extracted_text));
+        xml.push_str("</spdx:extractedText>");
+        xml.push_str("</spdx:ExtractedLicensingInfo></spdx:hasExtractedLicensingInfo>\n");
+    }
     xml.push_str("    <spdx:name>SPDX Document created by Provenant</spdx:name>\n");
     xml.push_str("    <spdx:specVersion>SPDX-2.2</spdx:specVersion>\n");
     xml.push_str("    <spdx:creationInfo><spdx:CreationInfo><spdx:created>");
@@ -250,4 +320,142 @@ fn spdx_package_verification_code(files: &[&FileInfo]) -> String {
         hasher.update(sha1.as_bytes());
     }
     format!("{:x}", hasher.finalize())
+}
+
+fn spdx_file_license_info(file: &FileInfo) -> Vec<String> {
+    let mut license_ids = Vec::new();
+
+    for detection in &file.license_detections {
+        if detection.matches.is_empty() {
+            license_ids.extend(spdx_ids_from_expression(&detection.license_expression_spdx));
+            continue;
+        }
+
+        for detection_match in &detection.matches {
+            let expression = if detection_match.license_expression_spdx.is_empty() {
+                &detection.license_expression_spdx
+            } else {
+                &detection_match.license_expression_spdx
+            };
+            license_ids.extend(spdx_ids_from_expression(expression));
+        }
+    }
+
+    license_ids
+}
+
+fn spdx_package_license_info_from_files(files: &[&FileInfo]) -> Vec<String> {
+    let mut unique = BTreeSet::new();
+    for file in files {
+        for license_id in spdx_file_license_info(file) {
+            unique.insert(license_id);
+        }
+    }
+    unique.into_iter().collect()
+}
+
+fn spdx_package_copyright_text(files: &[&FileInfo]) -> String {
+    let copyrights: BTreeSet<String> = files
+        .iter()
+        .flat_map(|file| file.copyrights.iter())
+        .map(|copyright| copyright.copyright.clone())
+        .collect();
+
+    if copyrights.is_empty() {
+        "NONE".to_string()
+    } else {
+        copyrights.into_iter().collect::<Vec<_>>().join("\n")
+    }
+}
+
+fn spdx_extracted_license_infos(output: &Output, files: &[&FileInfo]) -> Vec<ExtractedLicenseInfo> {
+    let license_reference_names: HashMap<&str, &str> = output
+        .license_references
+        .iter()
+        .map(|reference| (reference.spdx_license_key.as_str(), reference.name.as_str()))
+        .collect();
+    let mut seen = HashSet::new();
+    let mut infos = Vec::new();
+
+    for file in files {
+        for detection in &file.license_detections {
+            for detection_match in &detection.matches {
+                let expression = if detection_match.license_expression_spdx.is_empty() {
+                    &detection.license_expression_spdx
+                } else {
+                    &detection_match.license_expression_spdx
+                };
+
+                for license_id in spdx_ids_from_expression(expression) {
+                    if !license_id.starts_with("LicenseRef-") || !seen.insert(license_id.clone()) {
+                        continue;
+                    }
+
+                    let comment = spdx_license_comment(detection_match);
+                    let extracted_text = detection_match
+                        .matched_text
+                        .clone()
+                        .filter(|text| !text.is_empty())
+                        .unwrap_or_else(|| comment.clone());
+                    let name = license_reference_names
+                        .get(license_id.as_str())
+                        .copied()
+                        .unwrap_or(license_id.as_str())
+                        .to_string();
+
+                    infos.push(ExtractedLicenseInfo {
+                        license_id,
+                        name,
+                        extracted_text,
+                        comment,
+                    });
+                }
+            }
+        }
+    }
+
+    infos
+}
+
+fn spdx_license_comment(detection_match: &Match) -> String {
+    if let Some(rule_url) = detection_match.rule_url.as_deref()
+        && !rule_url.is_empty()
+    {
+        format!("See details at {}", rule_url)
+    } else {
+        detection_match
+            .matched_text
+            .clone()
+            .unwrap_or_else(|| "NOASSERTION".to_string())
+    }
+}
+
+fn spdx_license_rdf_resource(license_id: &str) -> String {
+    format!("http://spdx.org/licenses/{}", license_id)
+}
+
+fn spdx_ids_from_expression(expression: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let mut token = String::new();
+
+    let flush = |token: &mut String, ids: &mut Vec<String>| {
+        if token.is_empty() {
+            return;
+        }
+        if !matches!(token.as_str(), "AND" | "OR" | "WITH") {
+            ids.push(token.clone());
+        }
+        token.clear();
+    };
+
+    for ch in expression.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '.' | '+') {
+            token.push(ch);
+        } else {
+            flush(&mut token, &mut ids);
+        }
+    }
+    flush(&mut token, &mut ids);
+
+    ids
 }
