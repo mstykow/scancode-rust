@@ -1846,9 +1846,9 @@ Test package description.
                 .any(|p| p.starts_with("pkg:pypi/setuptools@")),
             "Should contain setuptools dependency"
         );
-        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/attrs"));
-        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/semantic-version"));
-        assert!(dep_purls.iter().any(|p| *p == "pkg:pypi/semver"));
+        assert!(dep_purls.contains(&"pkg:pypi/attrs"));
+        assert!(dep_purls.contains(&"pkg:pypi/semantic-version"));
+        assert!(dep_purls.contains(&"pkg:pypi/semver"));
 
         for dep in &package_data.dependencies {
             assert_eq!(dep.is_runtime, Some(true));

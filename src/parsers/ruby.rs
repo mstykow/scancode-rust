@@ -37,6 +37,7 @@ use std::path::{Path, PathBuf};
 use tar::Archive;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const PACKAGE_TYPE: PackageType = PackageType::Gem;
 
@@ -1443,8 +1444,8 @@ fn parse_gemspec_with_context(content: &str, base_dir: Option<&Path>) -> Package
         license
     };
 
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(extracted_license_statement.as_deref());
 
     // Prefer description over summary
     let final_description = description.or(summary);
@@ -1472,6 +1473,7 @@ fn parse_gemspec_with_context(content: &str, base_dir: Option<&Path>) -> Package
         download_url,
         declared_license_expression,
         declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         parties,
         dependencies,
@@ -1626,8 +1628,8 @@ fn parse_gem_metadata_yaml(
         None
     };
 
-    let license_expression = None;
-    let license_expression_spdx = None;
+    let (license_expression, license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(extracted_license_statement.as_deref());
 
     // Authors
     let authors: Vec<String> = yaml
@@ -1765,6 +1767,7 @@ fn parse_gem_metadata_yaml(
         code_view_url,
         declared_license_expression: license_expression,
         declared_license_expression_spdx: license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         file_references,
         parties,
