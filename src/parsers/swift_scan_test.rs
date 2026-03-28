@@ -2,16 +2,11 @@
 mod tests {
     use std::fs;
     use std::path::Path;
-    use std::sync::Arc;
 
     use regex::Regex;
     use serde_json::{Value, json};
 
-    use super::super::scan_pipeline_test_utils::strip_root_paths;
-    use crate::assembly;
-    use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
-    use crate::progress::{ProgressMode, ScanProgress};
-    use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+    use super::super::scan_test_utils::scan_and_assemble_with_stripped_root;
 
     fn normalize_test_uuids(json_str: &str) -> String {
         let re = Regex::new(r"uuid=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -157,27 +152,7 @@ mod tests {
     }
 
     fn swift_scan_and_assemble(path: &Path) -> Value {
-        let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let collected = collect_paths(
-            path,
-            0,
-            &build_collection_exclude_patterns(path, &path.join(DEFAULT_CACHE_DIR_NAME)),
-        );
-        let result = process_collected(
-            &collected,
-            progress,
-            None,
-            false,
-            &TextDetectionOptions {
-                collect_info: false,
-                detect_packages: true,
-                ..TextDetectionOptions::default()
-            },
-        );
-
-        let mut files = result.files;
-        strip_root_paths(&mut files, path);
-        let assembly_result = assembly::assemble(&mut files);
+        let (mut files, assembly_result) = scan_and_assemble_with_stripped_root(path);
 
         files.sort_by(|left, right| left.path.cmp(&right.path));
         let files_json: Vec<Value> = files

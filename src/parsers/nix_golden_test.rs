@@ -2,8 +2,8 @@
 mod golden_tests {
     use std::path::PathBuf;
 
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::{NixDefaultParser, NixFlakeLockParser, NixFlakeParser, PackageParser};
-    use crate::test_utils::compare_package_data_parser_only;
 
     fn run_golden<P: PackageParser>(test_file: &str, expected_file: &str) {
         let package_data = P::extract_first_package(&PathBuf::from(test_file));

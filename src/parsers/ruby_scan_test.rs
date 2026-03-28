@@ -3,7 +3,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::super::scan_pipeline_test_utils::{
+    use super::super::scan_test_utils::{
         assert_dependency_present, assert_file_links_to_package, scan_and_assemble,
     };
     use crate::models::{DatasourceId, PackageType};

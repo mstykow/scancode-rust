@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::rpm_db::{
         RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser,
     };
@@ -9,7 +10,6 @@ mod golden_tests {
     use crate::parsers::rpm_parser::*;
     use crate::parsers::rpm_specfile::RpmSpecfileParser;
     use crate::parsers::rpm_yumdb::RpmYumdbParser;
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     #[test]

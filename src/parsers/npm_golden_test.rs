@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::npm::NpmParser;
     use crate::parsers::npm_lock::NpmLockParser;
     use crate::parsers::npm_workspace::NpmWorkspaceParser;
     use crate::parsers::yarn_lock::YarnLockParser;
-    use crate::test_utils::compare_package_data_parser_only;
     use serde_json::Value;
     use std::fs;
     use std::path::PathBuf;

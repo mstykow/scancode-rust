@@ -38,9 +38,6 @@ mod scan_result_shaping;
 mod scanner;
 mod utils;
 
-#[cfg(test)]
-mod test_utils;
-
 fn main() -> std::io::Result<()> {
     if let Err(err) = run() {
         eprintln!("Error: {}", err);

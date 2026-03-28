@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::meson::MesonParser;
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     fn run_golden(test_file: &str, expected_file: &str) {

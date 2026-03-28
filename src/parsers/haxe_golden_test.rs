@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::{HaxeParser, PackageParser};
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     #[test]

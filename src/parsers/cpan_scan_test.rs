@@ -2,7 +2,7 @@
 mod tests {
     use std::fs;
 
-    use super::super::scan_pipeline_test_utils::scan_and_assemble;
+    use super::super::scan_test_utils::scan_and_assemble;
 
     #[test]
     fn test_cpan_manifest_scan_assigns_referenced_files() {

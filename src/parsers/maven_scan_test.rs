@@ -2,7 +2,7 @@
 mod tests {
     use std::path::Path;
 
-    use super::super::scan_pipeline_test_utils::scan_and_assemble;
+    use super::super::scan_test_utils::scan_and_assemble;
     use crate::models::{DatasourceId, PackageType};
 
     #[test]

@@ -1,5 +1,5 @@
 use super::*;
-use crate::scan_result_shaping::test_support::json_file;
+use crate::scan_result_shaping::test_fixtures::json_file;
 use serde_json::json;
 use std::fs;
 

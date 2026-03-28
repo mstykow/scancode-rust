@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::scan_pipeline_test_utils::scan_and_assemble;
+    use super::super::scan_test_utils::scan_and_assemble;
 
     #[test]
     fn test_debian_status_d_scan_assigns_installed_files_and_keeps_dependencies() {

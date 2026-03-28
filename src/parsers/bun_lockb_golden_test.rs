@@ -4,7 +4,7 @@ mod golden_tests {
 
     use crate::parsers::PackageParser;
     use crate::parsers::bun_lockb::BunLockbParser;
-    use crate::test_utils::compare_package_data_parser_only;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
 
     #[test]
     fn test_golden_bun_lockb_v2() {

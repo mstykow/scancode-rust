@@ -127,6 +127,8 @@ mod go_scan_test;
 mod go_test;
 #[cfg(test)]
 mod go_work_test;
+#[cfg(all(test, feature = "golden-tests"))]
+pub(crate) mod golden_test_utils;
 mod gradle;
 mod gradle_lock;
 #[cfg(test)]
@@ -267,7 +269,7 @@ mod sbt;
 #[cfg(test)]
 mod sbt_test;
 #[cfg(test)]
-mod scan_pipeline_test_utils;
+mod scan_test_utils;
 mod swift_manifest_json;
 #[cfg(test)]
 mod swift_manifest_json_test;

@@ -3,7 +3,7 @@ mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::cargo::CargoParser;
     use crate::parsers::cargo_lock::CargoLockParser;
-    use crate::test_utils::compare_package_data_parser_only;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     #[test]

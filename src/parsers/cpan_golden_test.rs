@@ -4,7 +4,7 @@ mod golden_tests {
     use crate::parsers::cpan::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser};
     use crate::parsers::cpan_dist_ini::CpanDistIniParser;
     use crate::parsers::cpan_makefile_pl::CpanMakefilePlParser;
-    use crate::test_utils::compare_package_data_parser_only;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     fn run_golden(parser_type: &str, test_file: &str, expected_file: &str) {

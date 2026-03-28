@@ -3,10 +3,10 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::swift_manifest_json::SwiftManifestJsonParser;
     use crate::parsers::swift_resolved::SwiftPackageResolvedParser;
     use crate::parsers::swift_show_dependencies::SwiftShowDependenciesParser;
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     #[test]

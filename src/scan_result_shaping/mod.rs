@@ -3,7 +3,7 @@ mod core_test;
 pub(crate) mod json_input;
 pub(crate) mod selection;
 #[cfg(test)]
-mod test_support;
+mod test_fixtures;
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};

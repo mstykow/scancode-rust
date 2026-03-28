@@ -1,7 +1,7 @@
 #[cfg(all(test, feature = "golden-tests"))]
 mod golden_tests {
+    use crate::parsers::golden_test_utils::compare_package_data_parser_only;
     use crate::parsers::{GradleModuleParser, PackageParser};
-    use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
     fn run_golden(test_file: &str, expected_file: &str) {

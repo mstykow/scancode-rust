@@ -2,7 +2,7 @@
 mod tests {
     use std::fs;
 
-    use super::super::scan_pipeline_test_utils::{assert_dependency_present, scan_and_assemble};
+    use super::super::scan_test_utils::{assert_dependency_present, scan_and_assemble};
     use crate::models::DatasourceId;
 
     #[test]

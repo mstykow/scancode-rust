@@ -39,9 +39,6 @@ pub mod progress;
 pub mod scanner;
 pub mod utils;
 
-#[cfg(test)]
-pub mod test_utils;
-
 pub use models::{ExtraData, FileInfo, FileType, Header, Output, SystemEnvironment};
 pub use output::{
     OutputFormat, OutputWriteConfig, OutputWriter, write_output_file, writer_for_format,
