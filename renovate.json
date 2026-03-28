@@ -16,7 +16,8 @@
     "rust-toolchain.toml",
     ".nvmrc",
     "renovate.json",
-    ".github/workflows/**"
+    ".github/workflows/**",
+    ".github/actions/**"
   ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
