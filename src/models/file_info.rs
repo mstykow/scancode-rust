@@ -45,6 +45,9 @@ pub struct FileInfo {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub license_clues: Vec<Match>,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub percentage_of_license_text: Option<f64>,
+    #[builder(default)]
     #[serde(default)]
     pub copyrights: Vec<Copyright>,
     #[builder(default)]
@@ -199,6 +202,7 @@ impl FileInfo {
             license_expression,
             license_detections,
             license_clues,
+            percentage_of_license_text: None,
             copyrights,
             holders,
             authors,
@@ -342,6 +346,8 @@ pub struct LicenseDetection {
     pub license_expression: String,
     pub license_expression_spdx: String,
     pub matches: Vec<Match>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub detection_log: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identifier: Option<String>,
 }
@@ -371,6 +377,8 @@ pub struct Match {
     pub rule_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched_text_diagnostics: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

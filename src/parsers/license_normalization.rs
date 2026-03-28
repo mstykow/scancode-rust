@@ -215,7 +215,9 @@ pub(crate) fn build_declared_license_detection(
             rule_identifier: None,
             rule_url: None,
             matched_text: Some(metadata.matched_text.to_string()),
+            matched_text_diagnostics: None,
         }],
+        detection_log: vec![],
         identifier: None,
     }
 }

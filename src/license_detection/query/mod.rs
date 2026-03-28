@@ -2,10 +2,29 @@
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
+use crate::license_detection::tokenize::STOPWORDS;
 use crate::license_detection::tokenize::tokenize_as_ids;
 use bit_set::BitSet;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
+
+static QUERY_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("valid query regex"));
+static MATCHED_TEXT_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?P<token>[^_\W]+\+?[^_\W]*)|(?P<punct>[_\W\s\+]+[_\W\s]?)")
+        .expect("valid matched text regex")
+});
+
+#[derive(Clone)]
+struct MatchedTextToken {
+    value: String,
+    line_num: usize,
+    pos: Option<usize>,
+    is_text: bool,
+    is_matched: bool,
+}
 
 /// A span representing a range of token positions.
 ///
@@ -146,6 +165,227 @@ pub fn matched_text_from_text(text: &str, start_line: usize, end_line: usize) ->
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub fn matched_text_diagnostics_from_text(
+    text: &str,
+    query: &Query<'_>,
+    matched_positions: &HashSet<usize>,
+    start_pos: usize,
+    end_pos: usize,
+    start_line: usize,
+    end_line: usize,
+) -> String {
+    let tokens = tokenize_matched_text(text, query);
+    let reportable_tokens = collect_reportable_tokens(
+        tokens,
+        matched_positions,
+        start_pos,
+        end_pos,
+        start_line,
+        end_line,
+    );
+    let line_endings = collect_line_endings(text);
+
+    render_diagnostic_tokens(&reportable_tokens, &line_endings)
+}
+
+fn tokenize_matched_text(text: &str, query: &Query<'_>) -> Vec<MatchedTextToken> {
+    let mut tokens = Vec::new();
+    let mut pos = 0usize;
+    let mut line_num = 1usize;
+
+    for line in text.split_inclusive('\n') {
+        for capture in MATCHED_TEXT_PATTERN.captures_iter(line) {
+            if let Some(token_match) = capture.name("token") {
+                let token_text = token_match.as_str();
+                let retokenized: Vec<String> = QUERY_PATTERN
+                    .find_iter(&token_text.to_lowercase())
+                    .map(|m| m.as_str().to_string())
+                    .filter(|token| !STOPWORDS.contains(token.as_str()))
+                    .collect();
+
+                if retokenized.is_empty() {
+                    tokens.push(MatchedTextToken {
+                        value: token_text.to_string(),
+                        line_num,
+                        pos: None,
+                        is_text: true,
+                        is_matched: false,
+                    });
+                } else if retokenized.len() == 1 {
+                    let token = &retokenized[0];
+                    let token_pos = if query.index.dictionary.get(token).is_some() {
+                        let current_pos = pos;
+                        pos += 1;
+                        Some(current_pos)
+                    } else {
+                        None
+                    };
+
+                    tokens.push(MatchedTextToken {
+                        value: token_text.to_string(),
+                        line_num,
+                        pos: token_pos,
+                        is_text: true,
+                        is_matched: false,
+                    });
+                } else {
+                    for token in retokenized {
+                        let token_pos = if query.index.dictionary.get(&token).is_some() {
+                            let current_pos = pos;
+                            pos += 1;
+                            Some(current_pos)
+                        } else {
+                            None
+                        };
+
+                        tokens.push(MatchedTextToken {
+                            value: token,
+                            line_num,
+                            pos: token_pos,
+                            is_text: true,
+                            is_matched: false,
+                        });
+                    }
+                }
+            } else if let Some(punct_match) = capture.name("punct") {
+                tokens.push(MatchedTextToken {
+                    value: punct_match.as_str().to_string(),
+                    line_num,
+                    pos: None,
+                    is_text: false,
+                    is_matched: false,
+                });
+            }
+        }
+
+        line_num += 1;
+    }
+
+    tokens
+}
+
+fn collect_reportable_tokens(
+    tokens: Vec<MatchedTextToken>,
+    matched_positions: &HashSet<usize>,
+    start_pos: usize,
+    end_pos: usize,
+    start_line: usize,
+    end_line: usize,
+) -> Vec<MatchedTextToken> {
+    let mut reportable = Vec::new();
+    let mut started = false;
+    let mut finished = false;
+    let mut end_real_pos = None;
+    let mut last_real_pos = None;
+
+    for (real_pos, mut token) in tokens.into_iter().enumerate() {
+        if token.line_num < start_line {
+            continue;
+        }
+
+        if token.line_num > end_line {
+            break;
+        }
+
+        let mut is_included = false;
+
+        if token
+            .pos
+            .is_some_and(|pos| matched_positions.contains(&pos))
+        {
+            token.is_matched = true;
+            is_included = true;
+        }
+
+        if !started && token.pos == Some(start_pos) {
+            started = true;
+            is_included = true;
+        }
+
+        if started && !finished {
+            is_included = true;
+        }
+
+        if token.pos == Some(end_pos) {
+            finished = true;
+            started = false;
+            end_real_pos = Some(real_pos);
+        }
+
+        if finished && !started && end_real_pos.is_some() && last_real_pos == end_real_pos {
+            end_real_pos = None;
+            if !token.is_text && !token.value.trim().is_empty() {
+                is_included = true;
+            }
+        }
+
+        last_real_pos = Some(real_pos);
+
+        if is_included {
+            reportable.push(token);
+        }
+    }
+
+    reportable
+}
+
+fn collect_line_endings(text: &str) -> Vec<String> {
+    text.split_inclusive('\n')
+        .map(|line| {
+            if line.ends_with("\r\n") {
+                "\r\n".to_string()
+            } else if line.ends_with('\n') {
+                "\n".to_string()
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+fn render_diagnostic_tokens(tokens: &[MatchedTextToken], line_endings: &[String]) -> String {
+    let mut rendered = String::new();
+    let mut previous_line: Option<usize> = None;
+
+    for token in tokens {
+        if let Some(prev_line) = previous_line
+            && token.line_num > prev_line
+        {
+            for line in prev_line..token.line_num {
+                if let Some(line_ending) = line_endings.get(line.saturating_sub(1)) {
+                    rendered.push_str(line_ending.as_str());
+                }
+            }
+        }
+
+        let token_value = if token.is_text {
+            token.value.as_str()
+        } else {
+            token
+                .value
+                .strip_suffix("\r\n")
+                .or_else(|| token.value.strip_suffix('\n'))
+                .unwrap_or(token.value.as_str())
+        };
+
+        if token.is_text && !STOPWORDS.contains(token.value.to_lowercase().as_str()) {
+            if token.is_matched {
+                rendered.push_str(token_value);
+            } else {
+                rendered.push('[');
+                rendered.push_str(token_value);
+                rendered.push(']');
+            }
+        } else {
+            rendered.push_str(token_value);
+        }
+
+        previous_line = Some(token.line_num);
+    }
+
+    rendered
 }
 
 impl<'a> Query<'a> {

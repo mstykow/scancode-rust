@@ -13,7 +13,9 @@ mod tests {
         normalize_scan_json,
     };
     use crate::progress::{ProgressMode, ScanProgress};
-    use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+    use crate::scanner::{
+        LicenseScanOptions, TextDetectionOptions, collect_paths, process_collected,
+    };
 
     #[test]
     fn test_golden_summary_fixtures_match_expected_summary_blocks() {
@@ -143,7 +145,7 @@ mod tests {
             &collected,
             progress,
             None,
-            false,
+            LicenseScanOptions::default(),
             &TextDetectionOptions {
                 collect_info: false,
                 detect_generated: true,

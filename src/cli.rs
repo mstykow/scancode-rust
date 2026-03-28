@@ -166,8 +166,17 @@ pub struct Cli {
     pub license_rules_path: Option<String>,
 
     /// Include matched text in license detection output
-    #[arg(long, requires = "license")]
-    pub include_text: bool,
+    #[arg(long = "license-text", alias = "include-text", requires = "license")]
+    pub license_text: bool,
+
+    #[arg(long = "license-text-diagnostics", requires = "license_text")]
+    pub license_text_diagnostics: bool,
+
+    #[arg(long = "license-diagnostics", requires = "license")]
+    pub license_diagnostics: bool,
+
+    #[arg(long = "unknown-licenses", requires = "license")]
+    pub unknown_licenses: bool,
 
     #[arg(long)]
     pub filter_clues: bool,
@@ -687,15 +696,65 @@ mod tests {
     }
 
     #[test]
-    fn test_include_text_requires_license() {
+    fn test_license_text_requires_license() {
         let result = Cli::try_parse_from([
             "provenant",
             "--json-pp",
             "scan.json",
-            "--include-text",
+            "--license-text",
             "samples",
         ]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_license_text_diagnostics_requires_license_text() {
+        let result = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license",
+            "--license-text-diagnostics",
+            "samples",
+        ]);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parses_license_text_and_diagnostics_flags() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license",
+            "--license-text",
+            "--license-text-diagnostics",
+            "--license-diagnostics",
+            "--unknown-licenses",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.license_text);
+        assert!(parsed.license_text_diagnostics);
+        assert!(parsed.license_diagnostics);
+        assert!(parsed.unknown_licenses);
+    }
+
+    #[test]
+    fn test_include_text_alias_still_parses_as_license_text() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license",
+            "--include-text",
+            "samples",
+        ])
+        .expect("cli parse should accept include-text alias");
+
+        assert!(parsed.license_text);
     }
 
     #[test]

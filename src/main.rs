@@ -21,7 +21,7 @@ use crate::scan_result_shaping::{
     normalize_top_level_output_paths, prepare_filter_clue_rule_lookup, resolve_native_scan_inputs,
     trim_preloaded_assembly_to_files,
 };
-use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+use crate::scanner::{LicenseScanOptions, TextDetectionOptions, collect_paths, process_collected};
 
 mod assembly;
 mod cache;
@@ -156,12 +156,18 @@ fn run() -> Result<()> {
 
         let thread_count = resolve_thread_count(cli.processes);
         progress.start_scan(total_files);
+        let license_options = LicenseScanOptions {
+            include_text: cli.license_text,
+            include_text_diagnostics: cli.license_text_diagnostics,
+            include_diagnostics: cli.license_diagnostics,
+            unknown_licenses: cli.unknown_licenses,
+        };
         let mut result = run_with_thread_pool(thread_count, || {
             Ok(process_collected(
                 &collected,
                 Arc::clone(&progress),
                 license_engine.clone(),
-                cli.include_text,
+                license_options,
                 &text_options,
             ))
         })?;

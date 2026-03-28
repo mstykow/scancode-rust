@@ -25,8 +25,10 @@ fn compute_tallies_counts_file_findings_and_missing_values() {
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
+            matched_text_diagnostics: None,
         }],
         identifier: None,
+        detection_log: vec![],
     }];
     mit_file.copyrights = vec![Copyright {
         copyright: "Copyright (c) Example Corp.".to_string(),
@@ -66,8 +68,10 @@ fn compute_tallies_counts_file_findings_and_missing_values() {
                 rule_identifier: None,
                 rule_url: None,
                 matched_text: None,
+                matched_text_diagnostics: None,
             }],
             identifier: None,
+            detection_log: vec![],
         },
         crate::models::LicenseDetection {
             license_expression: "mit".to_string(),
@@ -86,8 +90,10 @@ fn compute_tallies_counts_file_findings_and_missing_values() {
                 rule_identifier: None,
                 rule_url: None,
                 matched_text: None,
+                matched_text_diagnostics: None,
             }],
             identifier: None,
+            detection_log: vec![],
         },
     ];
     dual_license_file.copyrights = vec![Copyright {
