@@ -1750,6 +1750,31 @@ fn summary_license_expression(file: &FileInfo) -> Option<String> {
         .map(canonicalize_summary_expression)
 }
 
+fn package_other_detected_license_values(file: &FileInfo, skip_unknown: bool) -> Vec<String> {
+    let mut values = file
+        .package_data
+        .iter()
+        .flat_map(|package_data| {
+            package_data
+                .other_license_detections
+                .iter()
+                .map(|detection| canonicalize_summary_expression(&detection.license_expression))
+                .chain(
+                    package_data
+                        .other_license_expression
+                        .as_deref()
+                        .map(canonicalize_summary_expression),
+                )
+        })
+        .collect::<Vec<_>>();
+
+    if skip_unknown {
+        values.retain(|expression| expression != "unknown-license-reference");
+    }
+
+    unique(&values)
+}
+
 fn key_file_has_license_text(file: &FileInfo) -> bool {
     file.license_detections
         .iter()
@@ -2137,11 +2162,13 @@ where
 }
 
 fn detected_license_values(file: &FileInfo) -> Vec<String> {
-    let detection_expressions: Vec<String> = file
+    let mut detection_expressions: Vec<String> = file
         .license_detections
         .iter()
         .map(|detection| canonicalize_summary_expression(&detection.license_expression))
         .collect();
+    detection_expressions.extend(package_other_detected_license_values(file, false));
+    let detection_expressions = unique(&detection_expressions);
 
     if detection_expressions.is_empty() {
         return file
@@ -2156,12 +2183,14 @@ fn detected_license_values(file: &FileInfo) -> Vec<String> {
 }
 
 fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
-    let detection_expressions: Vec<String> = file
+    let mut detection_expressions: Vec<String> = file
         .license_detections
         .iter()
         .map(|detection| canonicalize_summary_expression(&detection.license_expression))
         .filter(|expression| expression != "unknown-license-reference")
         .collect();
+    detection_expressions.extend(package_other_detected_license_values(file, true));
+    let detection_expressions = unique(&detection_expressions);
 
     if detection_expressions.is_empty() {
         return file

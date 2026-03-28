@@ -152,6 +152,16 @@ pub(crate) fn prepare_filter_clue_rule_lookup(
     let needs_rule_lookup = files.iter().any(|file| {
         file.license_detections
             .iter()
+            .chain(
+                file.package_data
+                    .iter()
+                    .flat_map(|package_data| package_data.license_detections.iter()),
+            )
+            .chain(
+                file.package_data
+                    .iter()
+                    .flat_map(|package_data| package_data.other_license_detections.iter()),
+            )
             .any(|detection| !detection.matches.is_empty())
     });
     if !needs_rule_lookup {
@@ -311,7 +321,20 @@ fn collect_rule_ignorables(
         return ignorables;
     };
 
-    for detection in &file.license_detections {
+    for detection in file
+        .license_detections
+        .iter()
+        .chain(
+            file.package_data
+                .iter()
+                .flat_map(|package_data| package_data.license_detections.iter()),
+        )
+        .chain(
+            file.package_data
+                .iter()
+                .flat_map(|package_data| package_data.other_license_detections.iter()),
+        )
+    {
         for detection_match in &detection.matches {
             let Some(rule_identifier) = detection_match.rule_identifier.as_deref() else {
                 continue;
