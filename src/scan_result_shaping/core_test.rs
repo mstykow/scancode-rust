@@ -163,6 +163,7 @@ fn filter_redundant_clues_with_rules_suppresses_ignorable_rule_and_cross_clues()
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -273,6 +274,7 @@ fn filter_redundant_clues_with_rules_uses_package_origin_detections() {
                 rule_identifier: Some("mit_1.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             identifier: Some("mit-from-package".to_string()),
@@ -326,6 +328,7 @@ fn filter_redundant_clues_with_rules_ignores_low_coverage_matches() {
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -465,6 +468,7 @@ fn normalize_paths_updates_license_match_from_file_paths_too() {
         rule_identifier: Some("mit_1.RULE".to_string()),
         rule_url: None,
         matched_text: None,
+        referenced_filenames: None,
         matched_text_diagnostics: None,
     }];
     files[0].license_detections = vec![crate::models::LicenseDetection {
@@ -484,6 +488,7 @@ fn normalize_paths_updates_license_match_from_file_paths_too() {
             rule_identifier: Some("mit_1.RULE".to_string()),
             rule_url: None,
             matched_text: None,
+            referenced_filenames: None,
             matched_text_diagnostics: None,
         }],
         identifier: None,
@@ -526,6 +531,7 @@ fn normalize_paths_updates_package_level_license_match_from_file_paths_too() {
                 rule_identifier: Some("mit_1.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             identifier: None,
@@ -548,6 +554,7 @@ fn normalize_paths_updates_package_level_license_match_from_file_paths_too() {
                 rule_identifier: Some("apache_2_0_1.RULE".to_string()),
                 rule_url: None,
                 matched_text: None,
+                referenced_filenames: None,
                 matched_text_diagnostics: None,
             }],
             identifier: None,
@@ -622,6 +629,7 @@ fn only_findings_keeps_clue_only_files() {
         rule_identifier: Some("license-clue_1.RULE".to_string()),
         rule_url: None,
         matched_text: None,
+        referenced_filenames: None,
         matched_text_diagnostics: None,
     }];
 

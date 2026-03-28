@@ -11,8 +11,9 @@ use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::post_processing::{
-    CreateOutputContext, CreateOutputOptions, build_facet_rules,
-    collect_top_level_license_detections, collect_top_level_license_references, create_output,
+    CreateOutputContext, CreateOutputOptions, apply_local_file_reference_following,
+    build_facet_rules, collect_top_level_license_detections, collect_top_level_license_references,
+    create_output,
 };
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scan_result_shaping::{
@@ -287,6 +288,8 @@ fn run() -> Result<()> {
     for package in &mut assembly_result.packages {
         package.backfill_license_provenance();
     }
+
+    apply_local_file_reference_following(&mut scan_result.files, &assembly_result.packages);
 
     let end_time = Utc::now();
 

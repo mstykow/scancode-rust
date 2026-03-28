@@ -424,8 +424,9 @@ const TINY_RULE: usize = 6;                   // Very small rules
 The engine still carries richer internal detection metadata than the current
 public ScanCode-style JSON output. `detection_log`, clue-only serialization, and
 matched-text diagnostics are now preserved publicly, and internal detections now
-carry real file-region metadata for unique aggregation, but some downstream
-clue/provenance consumers are still not fully represented in the current
+carry real file-region metadata for unique aggregation. File/resource
+reference-following now consumes that metadata internally, but some downstream
+package/reference consumers are still not fully represented in the current
 serialized surfaces.
 
 The remaining public-output parity work is tracked in
