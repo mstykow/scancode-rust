@@ -21,7 +21,7 @@ use tempfile::{TempDir, tempdir};
 
 use super::*;
 use crate::assembly;
-use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
 #[cfg(feature = "golden-tests")]
 use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{FileInfo, FileType, Package, PackageType};
@@ -310,16 +310,8 @@ pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
     }
 }
 
-pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
-    [
-        DEFAULT_CACHE_DIR_NAME.to_string(),
-        format!("{DEFAULT_CACHE_DIR_NAME}/*"),
-        format!("**/{DEFAULT_CACHE_DIR_NAME}"),
-        format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
-    ]
-    .into_iter()
-    .map(|pattern| Pattern::new(&pattern).expect("fixture exclude pattern should be valid"))
-    .collect()
+pub(crate) fn fixture_exclude_patterns(root: &Path) -> Vec<Pattern> {
+    build_collection_exclude_patterns(root, &root.join(DEFAULT_CACHE_DIR_NAME))
 }
 
 #[cfg(feature = "golden-tests")]
@@ -463,7 +455,7 @@ pub(crate) fn compute_fixture_output(
     let fixture_root = Path::new(fixture_dir);
     let resolved_scan_root = resolve_fixture_scan_root(fixture_root);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let exclude_patterns = fixture_exclude_patterns();
+    let exclude_patterns = fixture_exclude_patterns(&resolved_scan_root.scan_root);
     let collected = collect_paths(&resolved_scan_root.scan_root, 0, &exclude_patterns);
     let facet_rules = build_facet_rules(options.facet_defs).expect("facet rules should compile");
     let scan_result = process_collected(
@@ -535,7 +527,7 @@ pub(crate) fn compute_fixture_summary(
     let fixture_root = Path::new(fixture_dir);
     let resolved_scan_root = resolve_fixture_scan_root(fixture_root);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let exclude_patterns = fixture_exclude_patterns();
+    let exclude_patterns = fixture_exclude_patterns(&resolved_scan_root.scan_root);
     let collected = collect_paths(&resolved_scan_root.scan_root, 0, &exclude_patterns);
     let scan_result = process_collected(
         &collected,
@@ -858,7 +850,7 @@ pub(crate) fn assert_classify_fixture_matches_expected(
 ) {
     let fixture_root = Path::new(fixture_dir);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(fixture_root, 0, &fixture_exclude_patterns());
+    let collected = collect_paths(fixture_root, 0, &fixture_exclude_patterns(fixture_root));
     let scan_result = process_collected(
         &collected,
         progress,
@@ -929,7 +921,7 @@ pub(crate) fn scan_and_assemble_with_keyfiles(
     path: &Path,
 ) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(path, 0, &fixture_exclude_patterns());
+    let collected = collect_paths(path, 0, &fixture_exclude_patterns(path));
     let result = process_collected(
         &collected,
         progress,

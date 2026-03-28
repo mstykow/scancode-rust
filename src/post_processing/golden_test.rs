@@ -138,7 +138,7 @@ mod tests {
         let generated_root = Path::new("testdata/summarycode-golden/generated");
         let fixture_root = generated_root.join("simple");
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let collected = collect_paths(&fixture_root, 0, &fixture_exclude_patterns());
+        let collected = collect_paths(&fixture_root, 0, &fixture_exclude_patterns(&fixture_root));
         let mut files = process_collected(
             &collected,
             progress,

@@ -1,17 +1,19 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use glob::Pattern;
-
 use crate::assembly;
-use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
 use crate::models::{DatasourceId, FileInfo, TopLevelDependency};
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
 pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(path, 0, &fixture_exclude_patterns());
+    let collected = collect_paths(
+        path,
+        0,
+        &build_collection_exclude_patterns(path, &path.join(DEFAULT_CACHE_DIR_NAME)),
+    );
     let result = process_collected(
         &collected,
         progress,
@@ -27,18 +29,6 @@ pub(crate) fn scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::Assemb
     let mut files = result.files;
     let assembly_result = assembly::assemble(&mut files);
     (files, assembly_result)
-}
-
-fn fixture_exclude_patterns() -> Vec<Pattern> {
-    [
-        DEFAULT_CACHE_DIR_NAME.to_string(),
-        format!("{DEFAULT_CACHE_DIR_NAME}/*"),
-        format!("**/{DEFAULT_CACHE_DIR_NAME}"),
-        format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
-    ]
-    .into_iter()
-    .map(|pattern| Pattern::new(&pattern).expect("fixture exclude pattern should be valid"))
-    .collect()
 }
 
 pub(crate) fn strip_root_paths(files: &mut [FileInfo], scan_root: &Path) {
