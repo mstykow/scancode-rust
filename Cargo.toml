@@ -31,27 +31,47 @@ sign-tag = true
 push = true
 # Commit message template
 pre-release-commit-message = "chore: release v{{version}}"
-pre-release-hook = ["cargo", "generate-lockfile", "--manifest-path", "xtask/Cargo.toml"]
+pre-release-hook = ["cargo", "generate-lockfile"]
 # Tag message template
 tag-message = "Release v{{version}}"
 # Publish to crates.io automatically
 publish = true
 
-[dependencies]
+[workspace]
+resolver = "3"
+members = ["xtask"]
+
+[workspace.dependencies]
 anyhow = "1.0.102"
+bincode = { version = "2.0.1", features = ["serde"] }
+clap = { version = "4.6.0", features = ["derive"] }
+inventory = "0.3.22"
+lazy_static = "1.5.0"
+rayon = "1.11.0"
+regex = "1.12.3"
+rmp-serde = "1.3.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
+serde_yaml = "0.9.34"
+tempfile = "3.27.0"
+url = "2.5.8"
+zstd = "0.13.3"
+
+[dependencies]
+anyhow = { workspace = true }
 bzip2 = "0.6.1"
 flate2 = "1.1.9"
-lazy_static = "1.5.0"
+lazy_static = { workspace = true }
 liblzma = "0.4.6"
 log = "0.4.29"
-regex = "1.12.3"
+regex = { workspace = true }
 rustpython-parser = "0.4.0"
 unicode-normalization = "0.1.25"
 base64 = "0.22.1"
 chrono = "0.4.44"
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { workspace = true }
 content_inspector = "0.2.4"
-zstd = "0.13.3"
+zstd = { workspace = true }
 derive_builder = "0.20.2"
 glob = "0.3.3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff", "webp"] }
@@ -65,20 +85,20 @@ mime_guess = "2.0.5"
 packageurl = "0.6.0"
 pep508_rs = "0.9.2"
 pdf-extract = "0.10.0"
-rayon = "1.11.0"
+rayon = { workspace = true }
 rustc_version_runtime = "0.3.0"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149", features = ["preserve_order"] }
-serde_yaml = "0.9.34"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 sha1 = "0.10.6"
 hex = "0.4.3"
 csv = "1.4.0"
-inventory = "0.3.22"
+inventory = { workspace = true }
 sha2 = "0.10.9"
 tar = "0.4.45"
 sys-info = "0.9.1"
 toml = "1.0.6"
-url = "2.5.8"
+url = { workspace = true }
 urlencoding = "2.1.3"
 xml-rs = "1.0.0"
 quick-xml = "0.39.2"
@@ -93,16 +113,16 @@ env_logger = "0.11.10"
 ar = "0.9"           # Unix ar archive format (for .deb)
 rpm = { version = "0.19.0", default-features = false, features = ["gzip-compression", "xz-compression", "zstd-compression", "bzip2-compression"] }
 strum = { version = "0.28.0", features = ["derive"] }
-rmp-serde = "1.3.1"
+rmp-serde = { workspace = true }
 bit-set = "0.9.1"
-bincode = { version = "2.0.1", features = ["serde"] }
+bincode = { workspace = true }
 daachorse = "1.0.0"
 
 [target.'cfg(unix)'.dependencies]
 rpmdb = { version = "0.1.0", git = "https://github.com/yybit/rpmdb-rs", rev = "8a20c8b8" }
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = { workspace = true }
 
 [profile.release]
 # Enable link-time optimization for better cross-module optimizations

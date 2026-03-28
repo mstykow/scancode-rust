@@ -10,6 +10,7 @@
   "includePaths": [
     "Cargo.toml",
     "Cargo.lock",
+    "xtask/Cargo.toml",
     "package.json",
     "package-lock.json",
     "rust-toolchain.toml",

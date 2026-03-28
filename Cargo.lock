@@ -2075,6 +2075,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "provenant-xtask"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bincode 2.0.1",
+ "clap",
+ "inventory",
+ "lazy_static",
+ "provenant-cli",
+ "rayon",
+ "regex",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "url",
+ "zstd",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
