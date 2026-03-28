@@ -12,8 +12,33 @@ permissions:
   contents: write
 
 jobs:
+  license-index:
+    name: Prepare Embedded License Index
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          submodules: recursive
+          lfs: false
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606
+        with:
+          cache: false
+          rustflags: ""
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        with:
+          key: embedded-license-index
+
+      - name: Prepare embedded license index
+        uses: ./.github/actions/prepare-embedded-license-index
+
   build:
     name: Build ${{ matrix.target }}
+    needs: license-index
     strategy:
       fail-fast: false
       matrix:
@@ -48,8 +73,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
-          submodules: recursive
-          lfs: true
+          lfs: false
+
+      - name: Download embedded license index
+        uses: ./.github/actions/download-embedded-license-index
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606

@@ -3,10 +3,6 @@
 # Setup script for Provenant development
 #
 # This script initializes git submodules and, when Node tooling is present, installs git hooks.
-#
-# The license detection index is already embedded in the binary at:
-#   resources/license_detection/license_index_loader.msgpack.zst
-#
 # License rules and licenses are in the reference/scancode-toolkit submodule.
 #
 # You only need to run this script if you:
