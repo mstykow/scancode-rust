@@ -422,9 +422,10 @@ const TINY_RULE: usize = 6;                   // Very small rules
 ## Output Structure
 
 The engine still carries richer internal detection metadata than the current
-public ScanCode-style JSON output. In particular, `detection_log`, clue-only
-classification, and file-region metadata are not all preserved in the current
-serialized `crate::models::LicenseDetection` surface.
+public ScanCode-style JSON output. `detection_log`, clue-only serialization, and
+matched-text diagnostics are now preserved publicly, but file-region metadata
+and some downstream clue/provenance consumers are still not fully represented in
+the current serialized surfaces.
 
 The remaining public-output parity work is tracked in
 [`docs/implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md`](implementation-plans/text-detection/LICENSE_DETECTION_PLAN.md)
@@ -446,8 +447,8 @@ pub struct LicenseDetection {
 
 ### JSON Output Example
 
-The current public JSON output uses a reduced detection shape and does **not**
-currently emit `detection_log` or `file_region`.
+The current public JSON output still omits `file_region`, but it does preserve
+`detection_log` on public detections.
 
 ```json
 {
