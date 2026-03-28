@@ -1,87 +1,11 @@
 use super::*;
 use crate::models::{
-    Author, Copyright, DatasourceId, Dependency, FileInfo, FileReference, FileType, OutputEmail,
-    OutputURL, Package, PackageData, TopLevelDependency,
+    Author, Copyright, DatasourceId, Dependency, FileReference, OutputEmail, OutputURL, Package,
+    PackageData, TopLevelDependency,
 };
+use crate::scan_result_shaping::test_support::{dir, file};
 use regex::Regex;
 use std::collections::HashSet;
-use std::path::Path;
-
-fn file(path: &str) -> FileInfo {
-    FileInfo::new(
-        Path::new(path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default()
-            .to_string(),
-        Path::new(path)
-            .file_stem()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default()
-            .to_string(),
-        Path::new(path)
-            .extension()
-            .and_then(|n| n.to_str())
-            .map(|ext| format!(".{ext}"))
-            .unwrap_or_default(),
-        path.to_string(),
-        FileType::File,
-        None,
-        1,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Vec::new(),
-        None,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    )
-}
-
-fn dir(path: &str) -> FileInfo {
-    FileInfo::new(
-        Path::new(path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default()
-            .to_string(),
-        Path::new(path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default()
-            .to_string(),
-        String::new(),
-        path.to_string(),
-        FileType::Directory,
-        None,
-        0,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Vec::new(),
-        None,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    )
-}
 
 #[test]
 fn include_filter_keeps_matching_files_and_parent_dirs() {

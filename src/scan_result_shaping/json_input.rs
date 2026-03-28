@@ -11,6 +11,10 @@ use crate::scanner::ProcessResult;
 
 use super::{normalize_paths, normalize_top_level_output_paths};
 
+#[cfg(test)]
+#[path = "json_input_test.rs"]
+mod json_input_test;
+
 #[derive(Deserialize)]
 pub(crate) struct JsonScanInput {
     #[serde(default)]

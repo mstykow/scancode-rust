@@ -2,48 +2,13 @@ use super::*;
 use clap::Parser;
 use serde_json::json;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::cache::DEFAULT_CACHE_DIR_NAME;
-use crate::scan_result_shaping::{
-    JsonScanInput, apply_user_path_filters_to_collected, is_included_path, load_scan_from_json,
-    normalize_loaded_json_scan, normalize_scan_relative_path, resolve_native_scan_inputs,
+use crate::scan_result_shaping::json_input::{
+    JsonScanInput, load_scan_from_json, normalize_loaded_json_scan,
 };
 use crate::scanner::collect_paths;
-
-#[test]
-fn load_scan_from_json_reads_files_and_metadata_sections() {
-    let temp_path = std::env::temp_dir().join("provenant-from-json-test.json");
-    let content = json!({
-        "files": [
-            {
-                "name": "main.rs",
-                "base_name": "main",
-                "extension": ".rs",
-                "path": "src/main.rs",
-                "type": "file",
-                "size": 10,
-                "programming_language": "Rust"
-            }
-        ],
-        "packages": [],
-        "dependencies": [],
-        "license_references": [
-            {"name":"MIT","short_name":"MIT","spdx_license_key":"MIT","text":"..."}
-        ],
-        "license_rule_references": []
-    });
-    fs::write(&temp_path, content.to_string()).expect("write json fixture");
-
-    let parsed = load_scan_from_json(temp_path.to_str().expect("utf-8 path"))
-        .expect("from-json loading should succeed");
-
-    assert_eq!(parsed.files.len(), 1);
-    assert_eq!(parsed.files[0].path, "src/main.rs");
-    assert_eq!(parsed.license_references.len(), 1);
-
-    let _ = fs::remove_file(temp_path);
-}
 
 #[test]
 fn resolve_thread_count_supports_reference_compat_values() {
@@ -160,98 +125,6 @@ fn compile_regex_patterns_rejects_invalid_regex() {
 }
 
 #[test]
-fn is_included_path_requires_include_match_before_excludes() {
-    assert!(is_included_path(
-        "user/src/test/sample.doc",
-        &["*.doc".to_string()],
-        &[]
-    ));
-    assert!(!is_included_path(
-        "user/src/test/sample.txt",
-        &["*.doc".to_string()],
-        &[]
-    ));
-}
-
-#[test]
-fn is_included_path_applies_exclude_after_include() {
-    assert!(!is_included_path(
-        "src/dist/build/mylib.so",
-        &["/src/*".to_string()],
-        &["/src/*.so".to_string()]
-    ));
-    assert!(is_included_path(
-        "some/src/this/that",
-        &["src".to_string()],
-        &["src/*.so".to_string()]
-    ));
-}
-
-#[test]
-fn apply_user_path_filters_to_collected_filters_files_without_pruning_directories() {
-    let scan_root = PathBuf::from("/scan");
-    let placeholder_metadata = fs::metadata(std::env::temp_dir()).expect("temp dir metadata");
-    let mut collected = crate::scanner::CollectedPaths {
-        files: vec![
-            (
-                scan_root.join("src/test/sample.doc"),
-                placeholder_metadata.clone(),
-            ),
-            (
-                scan_root.join("src/test/sample.txt"),
-                placeholder_metadata.clone(),
-            ),
-        ],
-        directories: vec![
-            (scan_root.clone(), placeholder_metadata.clone()),
-            (scan_root.join("src"), placeholder_metadata.clone()),
-            (scan_root.join("src/test"), placeholder_metadata.clone()),
-            (scan_root.join("other"), placeholder_metadata.clone()),
-        ],
-        excluded_count: 0,
-        total_file_bytes: 0,
-        collection_errors: Vec::new(),
-    };
-
-    let removed = apply_user_path_filters_to_collected(
-        &mut collected,
-        &scan_root,
-        &["*.doc".to_string()],
-        &[],
-    );
-
-    assert_eq!(removed, 2);
-    assert_eq!(collected.files.len(), 1);
-    let kept_dirs: Vec<_> = collected
-        .directories
-        .iter()
-        .map(|(path, _)| normalize_scan_relative_path(path, &scan_root))
-        .collect();
-    assert_eq!(
-        kept_dirs,
-        vec!["".to_string(), "src".to_string(), "src/test".to_string()]
-    );
-    assert_eq!(
-        normalize_scan_relative_path(&collected.files[0].0, &scan_root),
-        "src/test/sample.doc"
-    );
-}
-
-#[test]
-fn is_included_path_treats_directory_include_patterns_recursively() {
-    assert!(is_included_path(
-        "src/foo/bar/baz.txt",
-        &["src/foo".to_string()],
-        &[]
-    ));
-    assert!(!is_included_path(
-        "src/other/bar.txt",
-        &["src/foo".to_string()],
-        &[]
-    ));
-}
-
-#[test]
 fn from_json_with_no_assemble_preserves_preloaded_package_sections() {
     let temp_path = std::env::temp_dir().join("provenant-from-json-with-packages-test.json");
     let content = json!({
@@ -328,74 +201,6 @@ fn validate_scan_option_compatibility_allows_multiple_paths_without_from_json() 
         crate::cli::Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "dir-a", "dir-b"])
             .unwrap();
     assert!(validate_scan_option_compatibility(&cli).is_ok());
-}
-
-#[test]
-fn resolve_native_scan_inputs_builds_common_prefix_and_synthetic_includes() {
-    let (scan_root, includes) =
-        resolve_native_scan_inputs(&["src/foo".to_string(), "src/bar/baz".to_string()])
-            .expect("multiple relative inputs should resolve");
-
-    assert_eq!(scan_root, "src");
-    assert_eq!(includes, vec!["src/foo", "src/bar/baz"]);
-}
-
-#[test]
-fn resolve_native_scan_inputs_uses_component_aware_prefix_for_siblings() {
-    let temp_dir = tempfile::tempdir().expect("tempdir");
-    let parent = temp_dir.path().join("src");
-    fs::create_dir_all(parent.join("bar")).expect("create bar dir");
-    fs::create_dir_all(parent.join("baz")).expect("create baz dir");
-
-    let old_cwd = std::env::current_dir().expect("current dir");
-    std::env::set_current_dir(temp_dir.path()).expect("set cwd");
-
-    let result = resolve_native_scan_inputs(&["src/bar".to_string(), "src/baz".to_string()]);
-
-    std::env::set_current_dir(old_cwd).expect("restore cwd");
-
-    let (scan_root, includes) = result.expect("sibling inputs should resolve");
-    assert_eq!(scan_root, "src");
-    assert_eq!(includes, vec!["src/bar", "src/baz"]);
-}
-
-#[test]
-fn normalize_loaded_json_scan_applies_strip_root_per_loaded_input() {
-    let mut loaded = JsonScanInput {
-        files: vec![
-            json_file("archive/root", crate::models::FileType::Directory),
-            json_file("archive/root/src/main.rs", crate::models::FileType::File),
-        ],
-        packages: vec![],
-        dependencies: vec![],
-        license_references: vec![],
-        license_rule_references: vec![],
-        excluded_count: 0,
-    };
-
-    normalize_loaded_json_scan(&mut loaded, true, false);
-
-    let paths: Vec<_> = loaded.files.iter().map(|file| file.path.as_str()).collect();
-    assert_eq!(paths, vec!["root", "src/main.rs"]);
-}
-
-#[test]
-fn normalize_loaded_json_scan_trims_full_root_display_without_absolutizing() {
-    let mut loaded = JsonScanInput {
-        files: vec![json_file(
-            "/tmp/archive/root/src/main.rs",
-            crate::models::FileType::File,
-        )],
-        packages: vec![],
-        dependencies: vec![],
-        license_references: vec![],
-        license_rule_references: vec![],
-        excluded_count: 0,
-    };
-
-    normalize_loaded_json_scan(&mut loaded, false, true);
-
-    assert_eq!(loaded.files[0].path, "tmp/archive/root/src/main.rs");
 }
 
 #[test]

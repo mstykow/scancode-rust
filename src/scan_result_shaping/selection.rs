@@ -8,6 +8,10 @@ use crate::scanner::CollectedPaths;
 
 use super::apply_path_selection_filter;
 
+#[cfg(test)]
+#[path = "selection_test.rs"]
+mod selection_test;
+
 pub(crate) fn resolve_native_scan_inputs(inputs: &[String]) -> Result<(String, Vec<String>)> {
     if inputs.is_empty() {
         return Err(anyhow!("No directory input path provided"));
