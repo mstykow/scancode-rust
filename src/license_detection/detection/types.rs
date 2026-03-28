@@ -2,6 +2,19 @@
 
 use crate::license_detection::models::LicenseMatch;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct FileRegion {
+    pub(crate) path: String,
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct UniqueDetection {
+    pub(crate) identifier: String,
+    pub(crate) file_regions: Vec<FileRegion>,
+}
+
 pub struct DetectionGroup {
     /// The matches in this group
     pub matches: Vec<LicenseMatch>,
@@ -33,6 +46,8 @@ pub struct LicenseDetection {
     /// An identifier unique for a license detection, containing the license
     /// expression and a UUID crafted from the match contents.
     pub identifier: Option<String>,
+
+    pub(crate) file_regions: Vec<FileRegion>,
 }
 
 #[cfg(test)]

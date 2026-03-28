@@ -1178,6 +1178,7 @@ mod tests {
             matches: vec![m],
             detection_log: vec!["perfect-detection".to_string()],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(classify_detection(&detection, 0.0));
     }
@@ -1202,6 +1203,7 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(!classify_detection(&detection, 50.0));
     }
@@ -1226,6 +1228,7 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(!classify_detection(&detection, 0.0));
     }
@@ -1238,6 +1241,7 @@ mod tests {
             matches: vec![],
             detection_log: vec![],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(!classify_detection(&detection, 0.0));
     }
@@ -1262,6 +1266,7 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(classify_detection(&detection, 45.0));
         assert!(!classify_detection(&detection, 50.0));
@@ -1287,6 +1292,7 @@ mod tests {
             matches: vec![m],
             detection_log: vec!["perfect-detection".to_string()],
             identifier: None,
+            file_regions: Vec::new(),
         };
         assert!(classify_detection(&detection, 0.0));
     }
