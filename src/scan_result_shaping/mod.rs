@@ -194,13 +194,11 @@ pub(crate) fn filter_redundant_clues_with_rules(
             (u.url.clone(), u.start_line, u.end_line)
         });
 
-        if let Some(clue_rule_lookup) = clue_rule_lookup {
-            filter_license_aware_clues(file, clue_rule_lookup);
-        }
+        filter_license_aware_clues(file, clue_rule_lookup);
     }
 }
 
-fn filter_license_aware_clues(file: &mut FileInfo, clue_rule_lookup: &ClueRuleLookup) {
+fn filter_license_aware_clues(file: &mut FileInfo, clue_rule_lookup: Option<&ClueRuleLookup>) {
     let rule_ignorables = collect_rule_ignorables(file, clue_rule_lookup);
     let copyrights_as_ignorable = file
         .copyrights
@@ -306,9 +304,12 @@ struct ResourceIgnorables {
 
 fn collect_rule_ignorables(
     file: &FileInfo,
-    clue_rule_lookup: &ClueRuleLookup,
+    clue_rule_lookup: Option<&ClueRuleLookup>,
 ) -> ResourceIgnorables {
     let mut ignorables = ResourceIgnorables::default();
+    let Some(clue_rule_lookup) = clue_rule_lookup else {
+        return ignorables;
+    };
 
     for detection in &file.license_detections {
         for detection_match in &detection.matches {

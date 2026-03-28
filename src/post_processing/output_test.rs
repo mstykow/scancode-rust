@@ -276,7 +276,7 @@ fn collect_top_level_license_detections_groups_file_detections_and_preserves_pat
 }
 
 #[test]
-fn collect_top_level_license_detections_skips_package_only_detections_without_identifier() {
+fn collect_top_level_license_detections_includes_package_origin_detections() {
     let mut manifest = file("project/package.json");
     manifest.package_data = vec![PackageData {
         package_type: Some(PackageType::Npm),
@@ -302,12 +302,41 @@ fn collect_top_level_license_detections_skips_package_only_detections_without_id
             detection_log: vec![],
             identifier: None,
         }],
+        other_license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            matches: vec![Match {
+                license_expression: "apache-2.0".to_string(),
+                license_expression_spdx: "Apache-2.0".to_string(),
+                from_file: None,
+                start_line: 2,
+                end_line: 2,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("Apache-2.0".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            detection_log: vec![],
+            identifier: None,
+        }],
         ..PackageData::default()
     }];
+    manifest.backfill_license_provenance();
 
     let detections = collect_top_level_license_detections(&[manifest]);
 
-    assert!(detections.is_empty());
+    assert_eq!(detections.len(), 2);
+    assert_eq!(detections[0].license_expression, "apache-2.0");
+    assert_eq!(detections[1].license_expression, "mit");
+    assert_eq!(
+        detections[1].reference_matches[0].from_file.as_deref(),
+        Some("project/package.json")
+    );
 }
 
 #[test]
