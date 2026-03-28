@@ -82,9 +82,9 @@ This plan is based on:
 
 - Baseline parity work is complete for most formats tracked in
   [`PARITY_SCORECARD.md`](PARITY_SCORECARD.md).
-- SPDX-specific license conclusion/info parity is still blocked by the missing
-  license-output surfaces tracked in
-  [`../text-detection/LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md).
+- SPDX writers now consume current file/package license-info surfaces; any
+  remaining SPDX drift is format-specific parity work rather than a blocker on
+  missing core license-output data.
 - Future work is optional hardening plus regression response unless a format is
   explicitly marked partial in the scorecard.
 
