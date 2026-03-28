@@ -4,7 +4,7 @@ use serde_json::json;
 use std::fs;
 use std::path::Path;
 
-use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
 use crate::scan_result_shaping::json_input::{
     JsonScanInput, load_scan_from_json, normalize_loaded_json_scan,
 };
@@ -380,7 +380,7 @@ fn build_collection_exclude_patterns_skips_default_cache_dir() {
     .unwrap();
 
     let config = crate::cache::CacheConfig::from_scan_root(&scan_root);
-    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config);
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, config.root_dir());
     let collected = collect_paths(&scan_root, 0, &exclude_patterns);
 
     assert!(
@@ -409,7 +409,7 @@ fn build_collection_exclude_patterns_skips_explicit_in_tree_cache_dir() {
     .unwrap();
 
     let config = crate::cache::CacheConfig::new(explicit_cache_dir.clone());
-    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config);
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, config.root_dir());
     let collected = collect_paths(&scan_root, 0, &exclude_patterns);
 
     assert!(
@@ -429,7 +429,7 @@ fn build_collection_exclude_patterns_does_not_exclude_scan_root_when_cache_root_
     fs::write(scan_root.join("src").join("main.rs"), "fn main() {}").unwrap();
 
     let config = crate::cache::CacheConfig::new(scan_root.clone());
-    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config);
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, config.root_dir());
     let collected = collect_paths(&scan_root, 0, &exclude_patterns);
 
     assert_eq!(collected.file_count(), 1);

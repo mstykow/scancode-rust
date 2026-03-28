@@ -9,6 +9,7 @@ mod tests {
 
     use super::super::scan_pipeline_test_utils::strip_root_paths;
     use crate::assembly;
+    use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
     use crate::progress::{ProgressMode, ScanProgress};
     use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
@@ -157,7 +158,11 @@ mod tests {
 
     fn swift_scan_and_assemble(path: &Path) -> Value {
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let collected = collect_paths(path, 0, &fixture_exclude_patterns());
+        let collected = collect_paths(
+            path,
+            0,
+            &build_collection_exclude_patterns(path, &path.join(DEFAULT_CACHE_DIR_NAME)),
+        );
         let result = process_collected(
             &collected,
             progress,
@@ -220,22 +225,6 @@ mod tests {
                 fixture_dir, expected_file, error
             );
         }
-    }
-
-    fn fixture_exclude_patterns() -> Vec<glob::Pattern> {
-        use crate::cache::DEFAULT_CACHE_DIR_NAME;
-
-        [
-            DEFAULT_CACHE_DIR_NAME.to_string(),
-            format!("{DEFAULT_CACHE_DIR_NAME}/*"),
-            format!("**/{DEFAULT_CACHE_DIR_NAME}"),
-            format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
-        ]
-        .into_iter()
-        .map(|pattern| {
-            glob::Pattern::new(&pattern).expect("fixture exclude pattern should be valid")
-        })
-        .collect()
     }
 
     #[test]

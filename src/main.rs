@@ -1,13 +1,12 @@
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use clap::Parser;
-use glob::Pattern;
 use regex::Regex;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
+use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig, build_collection_exclude_patterns};
 use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::output::{OutputWriteConfig, write_output_file};
@@ -108,7 +107,7 @@ fn run() -> Result<()> {
 
         let cache_config = prepare_cache_for_scan(&scan_path, &cli)?;
         let collection_exclude_patterns =
-            build_collection_exclude_patterns(Path::new(&scan_path), &cache_config);
+            build_collection_exclude_patterns(Path::new(&scan_path), cache_config.root_dir());
 
         let mut collected = collect_paths(&scan_path, cli.max_depth, &collection_exclude_patterns);
         let user_excluded_count = apply_user_path_filters_to_collected(
@@ -354,27 +353,6 @@ fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
 
     config.ensure_dirs()?;
     Ok(config)
-}
-
-fn build_collection_exclude_patterns(scan_root: &Path, cache_config: &CacheConfig) -> Vec<Pattern> {
-    let mut patterns = Vec::new();
-    let cache_root = cache_config.root_dir();
-
-    if let Ok(relative_cache_root) = cache_root.strip_prefix(scan_root)
-        && !relative_cache_root.as_os_str().is_empty()
-    {
-        for path in [cache_root.to_path_buf(), relative_cache_root.to_path_buf()] {
-            let normalized = path.to_string_lossy().replace('\\', "/");
-            let escaped = Pattern::escape(&normalized);
-            for pattern in [escaped.clone(), format!("{escaped}/**")] {
-                if let Ok(pattern) = Pattern::new(&pattern) {
-                    patterns.push(pattern);
-                }
-            }
-        }
-    }
-
-    patterns
 }
 
 fn compile_regex_patterns(option_name: &str, patterns: &[String]) -> Result<Vec<Regex>> {
