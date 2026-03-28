@@ -11,7 +11,6 @@ use std::sync::OnceLock;
 use chrono::Utc;
 #[cfg(feature = "golden-tests")]
 use flate2::read::GzDecoder;
-#[cfg(feature = "golden-tests")]
 use glob::Pattern;
 #[cfg(feature = "golden-tests")]
 use serde_json::{Value, json};
@@ -22,7 +21,6 @@ use tempfile::{TempDir, tempdir};
 
 use super::*;
 use crate::assembly;
-#[cfg(feature = "golden-tests")]
 use crate::cache::DEFAULT_CACHE_DIR_NAME;
 #[cfg(feature = "golden-tests")]
 use crate::license_detection::LicenseDetectionEngine;
@@ -312,7 +310,6 @@ pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
     }
 }
 
-#[cfg(feature = "golden-tests")]
 pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
     [
         DEFAULT_CACHE_DIR_NAME.to_string(),
@@ -861,7 +858,7 @@ pub(crate) fn assert_classify_fixture_matches_expected(
 ) {
     let fixture_root = Path::new(fixture_dir);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(fixture_root, 0, &[]);
+    let collected = collect_paths(fixture_root, 0, &fixture_exclude_patterns());
     let scan_result = process_collected(
         &collected,
         progress,
@@ -892,8 +889,12 @@ pub(crate) fn assert_classify_fixture_matches_expected(
             .file_name()
             .and_then(|name| name.to_str())
             .expect("fixture dir should have utf-8 file name");
-        files.push(dir(dir_name));
-    } else if let Some(dir_name) = fixture_root.file_name().and_then(|name| name.to_str()) {
+        if !files.iter().any(|file| file.path == dir_name) {
+            files.push(dir(dir_name));
+        }
+    } else if let Some(dir_name) = fixture_root.file_name().and_then(|name| name.to_str())
+        && !files.iter().any(|file| file.path == dir_name)
+    {
         files.push(dir(dir_name));
     }
 
@@ -928,7 +929,7 @@ pub(crate) fn scan_and_assemble_with_keyfiles(
     path: &Path,
 ) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(path, 0, &[]);
+    let collected = collect_paths(path, 0, &fixture_exclude_patterns());
     let result = process_collected(
         &collected,
         progress,
