@@ -8,7 +8,7 @@ inputs:
   artifact-path:
     description: Path to the embedded license index in the repository
     required: false
-    default: resources/license_detection/license_index.bincode.zst
+    default: resources/license_detection/license_index.zst
   retention-days:
     description: Artifact retention in days
     required: false

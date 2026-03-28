@@ -641,7 +641,7 @@ pub fn build_index_from_loaded(
 ///
 /// NOTE: This function is kept for potential future use by the xtask build process
 /// or for tests that need to build indexes dynamically. The main code path now uses
-/// the complete pre-built license index from `license_index.bincode.zst`.
+/// the complete pre-built license index from `license_index.zst`.
 ///
 /// # Arguments
 /// * `loaded_rules` - Rules loaded from the loader stage

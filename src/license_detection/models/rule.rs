@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::license_detection::index::dictionary::TokenId;
@@ -59,7 +60,20 @@ mod stopwords_serde {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    Serialize,
+    Deserialize,
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
 )]
 pub enum RuleKind {
     #[default]
@@ -274,11 +288,8 @@ fn serialize_token_ids<S>(token_ids: &[TokenId], serializer: S) -> Result<S::Ok,
 where
     S: serde::Serializer,
 {
-    token_ids
-        .iter()
-        .map(|id| id.raw())
-        .collect::<Vec<_>>()
-        .serialize(serializer)
+    let raw_ids: Vec<u16> = token_ids.iter().map(|id| id.raw()).collect();
+    <Vec<u16> as serde::Serialize>::serialize(&raw_ids, serializer)
 }
 
 fn deserialize_token_ids<'de, D>(deserializer: D) -> Result<Vec<TokenId>, D::Error>

@@ -22,7 +22,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        artifact="${{ inputs.destination }}/license_index.bincode.zst"
+        artifact="${{ inputs.destination }}/license_index.zst"
 
         if [[ ! -f "$artifact" ]]; then
           echo "Embedded license index was not restored to $artifact"
