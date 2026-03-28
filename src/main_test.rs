@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::cache::{DEFAULT_CACHE_DIR_NAME, build_collection_exclude_patterns};
+use crate::post_processing::collect_top_level_license_detections;
 use crate::scan_result_shaping::json_input::{
     JsonScanInput, load_scan_from_json, normalize_loaded_json_scan,
 };
@@ -241,6 +242,61 @@ fn from_json_skips_final_native_projection_block() {
     }
 
     assert_eq!(loaded.files[0].path, "tmp/archive/root/src/main.rs");
+}
+
+#[test]
+fn from_json_loaded_manifest_detections_can_be_recomputed_into_top_level_uniques() {
+    let mut loaded = JsonScanInput {
+        files: vec![json_file(
+            "project/package.json",
+            crate::models::FileType::File,
+        )],
+        packages: vec![],
+        dependencies: vec![],
+        license_detections: vec![],
+        license_references: vec![],
+        license_rule_references: vec![],
+        excluded_count: 0,
+    };
+    loaded.files[0].package_data = vec![crate::models::PackageData {
+        package_type: Some(crate::models::PackageType::Npm),
+        license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![crate::models::Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: None,
+                start_line: 1,
+                end_line: 1,
+                matcher: Some("parser-declared-license".to_string()),
+                score: 100.0,
+                matched_length: Some(1),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some("MIT".to_string()),
+                matched_text_diagnostics: None,
+            }],
+            detection_log: vec![],
+            identifier: None,
+        }],
+        ..Default::default()
+    }];
+
+    for file in &mut loaded.files {
+        file.backfill_license_provenance();
+    }
+
+    let top_level = collect_top_level_license_detections(&loaded.files);
+
+    assert_eq!(top_level.len(), 1);
+    assert_eq!(top_level[0].license_expression, "mit");
+    assert_eq!(
+        top_level[0].reference_matches[0].from_file.as_deref(),
+        Some("project/package.json")
+    );
 }
 
 fn json_file(path: &str, file_type: crate::models::FileType) -> crate::models::FileInfo {
