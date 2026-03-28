@@ -255,7 +255,7 @@ Canonical hook and CI definitions live in [`.pre-commit-config.yaml`](.pre-commi
 
 ### Opening Pull Requests
 
-- Use [`.github/pull_request_template.md`](.github/pull_request_template.md) for every agent-authored PR. When opening with `gh`, start from it via `gh pr create --template .github/pull_request_template.md`, complete every section, and write `None.` when a section does not apply.
+- Use [`.github/pull_request_template.md`](.github/pull_request_template.md) for every agent-authored PR. When opening with `gh`, start from it via `gh pr create --template .github/pull_request_template.md`, complete the applicable sections, and omit sections that do not apply.
 - Include concrete verification evidence in the PR body, including the exact local commands you ran and their outcomes. If golden or other expected-output fixture files changed, explain which files changed and why the new expected output is correct.
 - Keep PR scope disciplined. For ecosystem/parser work, prefer one ecosystem family per PR and do not hide unrelated refactors inside the same review unit.
 

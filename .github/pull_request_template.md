@@ -2,25 +2,27 @@
 
 -
 
-## Issues (write `None.` if not applicable)
+<!-- Omit optional sections that do not apply. -->
 
-- Covers: None.
-- Closes: None. <!-- Use closing keywords only for issues fully resolved and evidenced by this branch. -->
+## Issues
+
+- Covers:
+- Closes: <!-- Use closing keywords only for issues fully resolved and evidenced by this branch. -->
 
 ## Scope and exclusions
 
 - Included:
-- Explicit exclusions: None.
+- Explicit exclusions:
 
 ## Intentional differences from Python
 
-- None.
+-
 
-## Follow-up work (write `None.` if not applicable)
+## Follow-up work
 
-- Created or intentionally deferred: None.
+- Created or intentionally deferred:
 
-## Expected-output fixture changes (if any)
+## Expected-output fixture changes
 
-- Files changed: None.
-- Why the new expected output is correct: None. <!-- Examples: parser .expected.json, assembly expected.json, output-format expected files, golden YAML fixtures. -->
+- Files changed: <!-- Examples: parser .expected.json, assembly expected.json, output-format expected files, golden YAML fixtures. -->
+- Why the new expected output is correct:
