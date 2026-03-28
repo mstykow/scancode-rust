@@ -226,31 +226,26 @@ mod determinism {
             return;
         };
 
-        let mut loaded_rules1 =
+        let mut loaded_rules =
             rules::load_loaded_rules_from_directory(&rules_path).expect("Should load rules");
-        let mut loaded_licenses1 = rules::load_loaded_licenses_from_directory(&licenses_path)
+        let mut loaded_licenses = rules::load_loaded_licenses_from_directory(&licenses_path)
             .expect("Should load licenses");
 
-        let mut loaded_rules2 =
-            rules::load_loaded_rules_from_directory(&rules_path).expect("Should load rules");
-        let mut loaded_licenses2 = rules::load_loaded_licenses_from_directory(&licenses_path)
-            .expect("Should load licenses");
+        loaded_rules.sort_by(|a, b| a.identifier.cmp(&b.identifier));
+        loaded_licenses.sort_by(|a, b| a.key.cmp(&b.key));
 
-        loaded_rules1.sort_by(|a, b| a.identifier.cmp(&b.identifier));
-        loaded_licenses1.sort_by(|a, b| a.key.cmp(&b.key));
-        loaded_rules2.sort_by(|a, b| a.identifier.cmp(&b.identifier));
-        loaded_licenses2.sort_by(|a, b| a.key.cmp(&b.key));
+        let index = index::build_index_from_loaded(loaded_rules, loaded_licenses, false);
+        let embedded = EmbeddedLicenseIndex::from(&index);
+        let generated_bytes = embedded.serialize_to_bytes().expect("Should serialize");
 
-        let index1 = index::build_index_from_loaded(loaded_rules1, loaded_licenses1, false);
-        let index2 = index::build_index_from_loaded(loaded_rules2, loaded_licenses2, false);
+        let checked_in_bytes =
+            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
 
-        let embedded1 = EmbeddedLicenseIndex::from(&index1);
-        let embedded2 = EmbeddedLicenseIndex::from(&index2);
-
-        let bytes1 = embedded1.serialize_to_bytes().expect("Should serialize");
-        let bytes2 = embedded2.serialize_to_bytes().expect("Should serialize");
-
-        assert_eq!(bytes1, bytes2, "Regenerated artifacts should be identical");
+        assert_eq!(
+            generated_bytes.as_slice(),
+            checked_in_bytes,
+            "Generated artifact must match checked-in artifact. If rules changed, regenerate with: cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact"
+        );
     }
 }
 

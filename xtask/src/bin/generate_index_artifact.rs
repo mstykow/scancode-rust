@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use provenant::license_detection::embedded::EmbeddedLicenseIndex;
+use provenant::license_detection::embedded::index::EmbeddedLicenseIndex;
 use provenant::license_detection::index::build_index_from_loaded;
 use provenant::license_detection::rules::{
     load_loaded_licenses_from_directory, load_loaded_rules_from_directory,

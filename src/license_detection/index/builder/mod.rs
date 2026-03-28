@@ -327,12 +327,15 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut unknown_automaton_patterns: Vec<Vec<u8>> = Vec::new();
 
     let mut licenses_by_key: HashMap<String, License> = HashMap::new();
-    for license in licenses {
-        licenses_by_key.insert(license.key.clone(), license);
+    let mut sorted_licenses: Vec<License> = licenses;
+    sorted_licenses.sort_by(|a, b| a.key.cmp(&b.key));
+    for license in &sorted_licenses {
+        licenses_by_key.insert(license.key.clone(), license.clone());
     }
 
-    let license_rules =
-        build_rules_from_licenses(&licenses_by_key.values().cloned().collect::<Vec<_>>());
+    let mut license_rules_vec: Vec<License> = licenses_by_key.values().cloned().collect();
+    license_rules_vec.sort_by(|a, b| a.key.cmp(&b.key));
+    let license_rules = build_rules_from_licenses(&license_rules_vec);
 
     let mut all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
     all_rules.sort();

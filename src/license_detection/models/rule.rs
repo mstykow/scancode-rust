@@ -36,6 +36,28 @@ mod range_serde {
     }
 }
 
+mod stopwords_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+
+    pub fn serialize<S>(map: &HashMap<usize, usize>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut entries: Vec<(usize, usize)> = map.iter().map(|(k, v)| (*k, *v)).collect();
+        entries.sort_by_key(|(k, _)| *k);
+        entries.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<usize, usize>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let entries: Vec<(usize, usize)> = Vec::deserialize(deserializer)?;
+        Ok(entries.into_iter().collect())
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
 )]
@@ -178,6 +200,7 @@ pub struct Rule {
 
     /// Mapping from token position to count of stopwords at that position.
     /// Used for required phrase validation.
+    #[serde(with = "stopwords_serde", default)]
     pub stopwords_by_pos: HashMap<usize, usize>,
 
     /// Filenames where this rule should be considered
