@@ -1106,3 +1106,30 @@ fn test_detect_spdx_identifier_with_utf8_bom() {
         "Should detect SPDX identifier even with BOM"
     );
 }
+
+#[test]
+fn test_truncate_detection_text_preserves_char_boundary() {
+    let text = format!("{}é", "a".repeat(MAX_DETECTION_SIZE - 1));
+
+    let truncated = truncate_detection_text(&text);
+
+    assert!(truncated.len() <= MAX_DETECTION_SIZE);
+    assert_eq!(truncated.len(), MAX_DETECTION_SIZE - 1);
+    assert!(text.is_char_boundary(truncated.len()));
+}
+
+#[test]
+fn test_detect_with_kind_handles_multibyte_boundary_at_size_limit() {
+    let data_path = PathBuf::from(super::SCANCODE_LICENSES_DATA_PATH);
+    let Some(engine) = LicenseDetectionEngine::from_directory(&data_path).ok() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+    let text = format!("{}é", "a".repeat(MAX_DETECTION_SIZE - 1));
+
+    let detections = engine
+        .detect_with_kind(&text, false, false)
+        .expect("Detection should succeed for truncated multibyte content");
+
+    assert!(detections.is_empty());
+}

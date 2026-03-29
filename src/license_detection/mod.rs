@@ -98,6 +98,21 @@ const MAX_REGULAR_SEQ_CANDIDATES: usize = 70;
 const MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP: usize = 8;
 const MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP: usize = 2;
 
+fn truncate_detection_text(clean_text: &str) -> &str {
+    if clean_text.len() <= MAX_DETECTION_SIZE {
+        return clean_text;
+    }
+
+    log::warn!(
+        "Content size {} exceeds limit {}, truncating for detection",
+        clean_text.len(),
+        MAX_DETECTION_SIZE
+    );
+
+    let boundary = clean_text.floor_char_boundary(MAX_DETECTION_SIZE);
+    &clean_text[..boundary]
+}
+
 fn query_span_for_match(m: &LicenseMatch) -> Option<query::PositionSpan> {
     (m.end_token > m.start_token).then(|| query::PositionSpan::new(m.start_token, m.end_token - 1))
 }
@@ -517,16 +532,7 @@ impl LicenseDetectionEngine {
     ) -> Result<Vec<LicenseDetection>> {
         let clean_text = strip_utf8_bom_str(text);
 
-        let content = if clean_text.len() > MAX_DETECTION_SIZE {
-            log::warn!(
-                "Content size {} exceeds limit {}, truncating for detection",
-                clean_text.len(),
-                MAX_DETECTION_SIZE
-            );
-            &clean_text[..MAX_DETECTION_SIZE]
-        } else {
-            clean_text
-        };
+        let content = truncate_detection_text(clean_text);
 
         let mut query = Query::from_extracted_text(content, &self.index, binary_derived)?;
         let whole_query_run = query.whole_query_run();
@@ -689,16 +695,7 @@ impl LicenseDetectionEngine {
     ) -> Result<Vec<LicenseMatch>> {
         let clean_text = strip_utf8_bom_str(text);
 
-        let content = if clean_text.len() > MAX_DETECTION_SIZE {
-            log::warn!(
-                "Content size {} exceeds limit {}, truncating for detection",
-                clean_text.len(),
-                MAX_DETECTION_SIZE
-            );
-            &clean_text[..MAX_DETECTION_SIZE]
-        } else {
-            clean_text
-        };
+        let content = truncate_detection_text(clean_text);
 
         let mut query = Query::from_extracted_text(content, &self.index, binary_derived)?;
         let whole_query_run = query.whole_query_run();
