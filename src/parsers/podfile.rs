@@ -47,10 +47,7 @@ impl PackageParser for PodfileParser {
     const PACKAGE_TYPE: PackageType = PackageType::Cocoapods;
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| {
-            name.to_string_lossy().ends_with("Podfile")
-                && !name.to_string_lossy().ends_with("Podfile.lock")
-        })
+        path.file_name().is_some_and(|name| name == "Podfile")
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
@@ -190,7 +187,7 @@ fn pre_process(line: &str) -> String {
 
 crate::register_parser!(
     "CocoaPods Podfile",
-    &["**/Podfile", "**/*.podfile"],
+    &["**/Podfile"],
     "cocoapods",
     "Objective-C",
     Some("https://guides.cocoapods.org/using/the-podfile.html"),
@@ -205,6 +202,8 @@ mod tests {
         assert!(PodfileParser::is_match(Path::new("Podfile")));
         assert!(PodfileParser::is_match(Path::new("project/Podfile")));
         assert!(!PodfileParser::is_match(Path::new("Podfile.lock")));
+        assert!(!PodfileParser::is_match(Path::new("FooPodfile")));
+        assert!(!PodfileParser::is_match(Path::new("config.podfile")));
         assert!(!PodfileParser::is_match(Path::new("MyLib.podspec")));
         assert!(!PodfileParser::is_match(Path::new("MyLib.podspec.json")));
     }

@@ -1,5 +1,6 @@
 [
   {
+    "datasource_id": "conan_lock",
     "type": "conan",
     "primary_language": "C++",
     "parties": []

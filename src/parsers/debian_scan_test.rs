@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
+
     use super::super::scan_test_utils::scan_and_assemble;
 
     #[test]
@@ -45,6 +47,119 @@ mod tests {
             .find(|file| file.path.ends_with("/usr/share/doc/bash/copyright"))
             .unwrap();
         assert!(bash_file.for_packages.contains(&package.package_uid));
+        assert!(copyright_file.for_packages.contains(&package.package_uid));
+    }
+
+    #[test]
+    fn test_debian_source_scan_assembles_control_and_copyright() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let debian_dir = temp_dir.path().join("debian");
+        std::fs::create_dir_all(&debian_dir).unwrap();
+
+        std::fs::write(
+            debian_dir.join("control"),
+            "Source: samplepkg\nSection: utils\nPriority: optional\nMaintainer: Example Maintainer <maintainer@example.com>\nHomepage: https://example.test/samplepkg\n\nPackage: samplepkg\nArchitecture: amd64\nDepends: libc6 (>= 2.31), adduser\nDescription: sample Debian package\n sample package\n",
+        )
+        .unwrap();
+        std::fs::write(
+            debian_dir.join("copyright"),
+            "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n\nFiles: *\nCopyright: 2024 Example Maintainer\nLicense: MIT\n",
+        )
+        .unwrap();
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("samplepkg"))
+            .expect("debian source package should be assembled");
+
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::DebianControlInSource)
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::DebianCopyright)
+        );
+        assert!(result.dependencies.iter().any(|dep| {
+            dep.purl.as_deref() == Some("pkg:deb/debian/libc6")
+                && dep.for_package_uid.as_deref() == Some(package.package_uid.as_str())
+        }));
+
+        let control_file = files
+            .iter()
+            .find(|file| file.path.ends_with("/debian/control"))
+            .unwrap();
+        let copyright_file = files
+            .iter()
+            .find(|file| file.path.ends_with("/debian/copyright"))
+            .unwrap();
+        assert!(control_file.for_packages.contains(&package.package_uid));
+        assert!(copyright_file.for_packages.contains(&package.package_uid));
+    }
+
+    #[test]
+    fn test_debian_extracted_deb_scan_assigns_md5sum_file_references() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let control_dir = temp_dir
+            .path()
+            .join("example_1.0-1_amd64.deb-extract/control.tar.gz-extract");
+        let bin_dir = temp_dir
+            .path()
+            .join("example_1.0-1_amd64.deb-extract/usr/bin");
+        let doc_dir = temp_dir
+            .path()
+            .join("example_1.0-1_amd64.deb-extract/usr/share/doc/example");
+
+        std::fs::create_dir_all(&control_dir).unwrap();
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        std::fs::create_dir_all(&doc_dir).unwrap();
+
+        std::fs::write(
+            control_dir.join("control"),
+            "Package: example\nVersion: 1.0-1\nArchitecture: amd64\nMaintainer: Example Developer <dev@example.com>\nDescription: Example package\n example\n",
+        )
+        .unwrap();
+        std::fs::write(
+            control_dir.join("md5sums"),
+            "d41d8cd98f00b204e9800998ecf8427e  usr/bin/example\n9e107d9d372bb6826bd81d3542a419d6  usr/share/doc/example/copyright\n",
+        )
+        .unwrap();
+        std::fs::write(bin_dir.join("example"), "#!/bin/sh\n").unwrap();
+        std::fs::write(doc_dir.join("copyright"), "copyright text\n").unwrap();
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("example"))
+            .expect("extracted deb control + md5sums should assemble a package");
+
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::DebianControlExtractedDeb)
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::DebianMd5SumsInExtractedDeb)
+        );
+
+        let binary_file = files
+            .iter()
+            .find(|file| file.path.ends_with("/usr/bin/example"))
+            .unwrap();
+        let copyright_file = files
+            .iter()
+            .find(|file| file.path.ends_with("/usr/share/doc/example/copyright"))
+            .unwrap();
+        assert!(binary_file.for_packages.contains(&package.package_uid));
         assert!(copyright_file.for_packages.contains(&package.package_uid));
     }
 }

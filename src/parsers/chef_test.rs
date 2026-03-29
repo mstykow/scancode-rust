@@ -1,6 +1,6 @@
 //! Tests for Chef metadata.json and metadata.rb parsers.
 
-use crate::models::PackageType;
+use crate::models::{DatasourceId, PackageType};
 
 use std::path::PathBuf;
 
@@ -341,6 +341,10 @@ fn test_malformed_json() {
 
     // Should return default package data with just package_type set
     assert_eq!(package.package_type, Some(PackageType::Chef));
+    assert_eq!(
+        package.datasource_id,
+        Some(DatasourceId::ChefCookbookMetadataJson)
+    );
     assert_eq!(package.name, None);
     assert_eq!(package.version, None);
 
@@ -372,6 +376,18 @@ fn test_empty_strings_are_filtered() {
     assert_eq!(package.parties.len(), 0); // No parties since maintainer fields are empty
 
     std::fs::remove_file(&test_file).unwrap();
+}
+
+#[test]
+fn test_missing_metadata_rb_preserves_rb_datasource() {
+    let path = PathBuf::from("/nonexistent/metadata.rb");
+    let package = ChefMetadataRbParser::extract_first_package(&path);
+
+    assert_eq!(package.package_type, Some(PackageType::Chef));
+    assert_eq!(
+        package.datasource_id,
+        Some(DatasourceId::ChefCookbookMetadataRb)
+    );
 }
 
 #[test]

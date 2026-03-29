@@ -13,6 +13,7 @@ mod nested_merge;
 mod npm_resource_assign;
 mod npm_workspace_merge;
 mod nuget_cpm_resolve;
+mod python_requirements_assign;
 mod ruby_resource_assign;
 mod sibling_merge;
 mod swift_merge;

@@ -1417,6 +1417,11 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiSdistPkginfo)
+        );
     }
 
     #[test]
@@ -1530,6 +1535,8 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiWheel));
     }
 
     #[test]
@@ -1566,6 +1573,8 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiEgg));
     }
 
     #[test]
@@ -1575,6 +1584,8 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiEgg));
     }
 
     #[test]
@@ -1786,6 +1797,11 @@ Test package description.
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
         assert!(package_data.purl.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPipOriginJson)
+        );
     }
 
     #[test]
@@ -1931,6 +1947,11 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiInspectDeplock)
+        );
     }
 
     #[test]
@@ -1941,6 +1962,11 @@ Test package description.
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiInspectDeplock)
+        );
     }
 
     #[test]

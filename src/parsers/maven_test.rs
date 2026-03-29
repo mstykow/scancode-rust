@@ -423,6 +423,10 @@ mod tests {
         let package_data = MavenParser::extract_first_package(&manifest_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Maven));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::JavaJarManifest)
+        );
         assert_eq!(package_data.name, Some("spring-web".to_string()));
         assert_eq!(package_data.version, Some("5.3.20".to_string()));
 
@@ -450,6 +454,18 @@ mod tests {
         assert_eq!(package_data.parties.len(), 1);
         let vendor = &package_data.parties[0];
         assert_eq!(vendor.name, Some("Example Corp".to_string()));
+    }
+
+    #[test]
+    fn test_missing_manifest_mf_preserves_manifest_datasource() {
+        let manifest_path = PathBuf::from("/nonexistent/MANIFEST.MF");
+        let package_data = MavenParser::extract_first_package(&manifest_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::JavaJarManifest)
+        );
     }
 
     #[test]

@@ -723,7 +723,7 @@ impl PackageParser for MavenParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open pom.xml at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::MavenPom)];
             }
         };
 
@@ -731,7 +731,7 @@ impl PackageParser for MavenParser {
         reader.config_mut().trim_text(true);
 
         let mut buf = Vec::new();
-        let mut package_data = default_package_data();
+        let mut package_data = default_package_data(DatasourceId::MavenPom);
         package_data.package_type = Some(Self::PACKAGE_TYPE);
         package_data.primary_language = Some("Java".to_string());
         package_data.datasource_id = Some(DatasourceId::MavenPom);
@@ -1519,7 +1519,7 @@ impl PackageParser for MavenParser {
             package_data.version.as_deref(),
         ) {
             warn!("Skipping Maven template coordinates in {:?}", path);
-            return vec![default_package_data()];
+            return vec![default_package_data(DatasourceId::MavenPom)];
         }
 
         // Construct PURL from parsed data
@@ -1975,7 +1975,7 @@ fn parse_pom_properties(path: &Path) -> PackageData {
         }
     };
 
-    let mut package_data = default_package_data();
+    let mut package_data = default_package_data(DatasourceId::MavenPomProperties);
     package_data.package_type = Some(PackageType::Maven);
     package_data.primary_language = Some("Java".to_string());
     package_data.datasource_id = Some(DatasourceId::MavenPomProperties);
@@ -2051,11 +2051,11 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read MANIFEST.MF at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(DatasourceId::JavaJarManifest);
         }
     };
 
-    let mut package_data = default_package_data();
+    let mut package_data = default_package_data(DatasourceId::JavaJarManifest);
 
     // Parse manifest headers (RFC822-style with space continuations)
     let mut headers: Vec<(String, String)> = Vec::new();
@@ -2386,10 +2386,10 @@ pub(crate) fn extract_osgi_bundle_version(entry: &str) -> Option<String> {
     extract_osgi_directive(entry, "bundle-version")
 }
 
-fn default_package_data() -> PackageData {
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
         package_type: Some(PackageType::Maven),
-        datasource_id: Some(DatasourceId::MavenPom),
+        datasource_id: Some(datasource_id),
         ..Default::default()
     }
 }

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::Path;
 
     use super::super::scan_test_utils::{assert_dependency_present, scan_and_assemble};
@@ -65,6 +66,168 @@ mod tests {
                 .package_data
                 .iter()
                 .any(|pkg_data| pkg_data.datasource_id == Some(DatasourceId::BunLock))
+        );
+    }
+
+    #[test]
+    fn test_hidden_package_lock_scan_assembles_with_root_package() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("package.json"),
+            include_str!("../../testdata/assembly-golden/npm-basic/package.json"),
+        )
+        .expect("write package.json");
+        fs::write(
+            temp_dir.path().join(".package-lock.json"),
+            include_str!("../../testdata/assembly-golden/npm-basic/package-lock.json"),
+        )
+        .expect("write hidden package-lock");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-package"))
+            .expect("package should be assembled with hidden package-lock");
+
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::NpmPackageLockJson)
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:npm/express@4.18.0",
+            ".package-lock.json",
+        );
+
+        let hidden_lock = files
+            .iter()
+            .find(|file| file.path.ends_with("/.package-lock.json"))
+            .expect("hidden package-lock should be scanned");
+        assert!(hidden_lock.for_packages.contains(&package.package_uid));
+        assert!(
+            hidden_lock.package_data.iter().any(|pkg_data| {
+                pkg_data.datasource_id == Some(DatasourceId::NpmPackageLockJson)
+            })
+        );
+    }
+
+    #[test]
+    fn test_hidden_npm_shrinkwrap_scan_assembles_with_root_package() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("package.json"),
+            include_str!("../../testdata/assembly-golden/npm-basic/package.json"),
+        )
+        .expect("write package.json");
+        fs::write(
+            temp_dir.path().join(".npm-shrinkwrap.json"),
+            include_str!("../../testdata/assembly-golden/npm-basic/package-lock.json"),
+        )
+        .expect("write hidden shrinkwrap");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-package"))
+            .expect("package should be assembled with hidden shrinkwrap");
+
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::NpmPackageLockJson)
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:npm/express@4.18.0",
+            ".npm-shrinkwrap.json",
+        );
+
+        let hidden_lock = files
+            .iter()
+            .find(|file| file.path.ends_with("/.npm-shrinkwrap.json"))
+            .expect("hidden shrinkwrap should be scanned");
+        assert!(hidden_lock.for_packages.contains(&package.package_uid));
+        assert!(
+            hidden_lock.package_data.iter().any(|pkg_data| {
+                pkg_data.datasource_id == Some(DatasourceId::NpmPackageLockJson)
+            })
+        );
+    }
+
+    #[test]
+    fn test_pnpm_workspace_scan_keeps_root_package_with_shrinkwrap_yaml() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let packages_dir = temp_dir.path().join("packages");
+        let app_dir = packages_dir.join("app");
+
+        fs::create_dir_all(&app_dir).expect("create workspace member dir");
+        fs::write(
+            temp_dir.path().join("package.json"),
+            include_str!("../../testdata/assembly-golden/pnpm-workspace/package.json"),
+        )
+        .expect("write root package.json");
+        fs::write(
+            temp_dir.path().join("pnpm-workspace.yaml"),
+            include_str!("../../testdata/assembly-golden/pnpm-workspace/pnpm-workspace.yaml"),
+        )
+        .expect("write workspace yaml");
+        fs::write(
+            temp_dir.path().join("shrinkwrap.yaml"),
+            include_str!("../../testdata/pnpm/pnpm-v5.yaml"),
+        )
+        .expect("write shrinkwrap.yaml");
+        fs::write(
+            app_dir.join("package.json"),
+            r#"{
+  "name": "workspace-app",
+  "version": "0.2.0"
+}
+"#,
+        )
+        .expect("write member package.json");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let root_package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("my-pnpm-monorepo"))
+            .expect("publishable pnpm root package should be kept");
+        assert!(
+            root_package
+                .datasource_ids
+                .contains(&DatasourceId::PnpmLockYaml)
+        );
+        assert!(
+            root_package
+                .datasource_ids
+                .contains(&DatasourceId::PnpmWorkspaceYaml)
+        );
+
+        let shrinkwrap_file = files
+            .iter()
+            .find(|file| file.path.ends_with("/shrinkwrap.yaml"))
+            .expect("shrinkwrap.yaml should be scanned");
+        assert!(
+            shrinkwrap_file
+                .for_packages
+                .contains(&root_package.package_uid)
+        );
+        assert!(
+            shrinkwrap_file
+                .package_data
+                .iter()
+                .any(|pkg_data| { pkg_data.datasource_id == Some(DatasourceId::PnpmLockYaml) })
+        );
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:npm/%40babel/runtime@7.18.9",
+            "shrinkwrap.yaml",
         );
     }
 }

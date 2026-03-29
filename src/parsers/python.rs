@@ -138,7 +138,7 @@ impl PackageParser for PythonParser {
             {
                 extract_from_egg_archive(path)
             } else {
-                default_package_data()
+                default_package_data(path)
             },
         ]
     }
@@ -338,7 +338,7 @@ fn extract_from_pip_origin_json(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read pip cache origin.json at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -346,13 +346,13 @@ fn extract_from_pip_origin_json(path: &Path) -> PackageData {
         Ok(root) => root,
         Err(e) => {
             warn!("Failed to parse pip cache origin.json at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
     let Some(download_url) = root.get("url").and_then(|value| value.as_str()) else {
         warn!("No url found in pip cache origin.json at {:?}", path);
-        return default_package_data();
+        return default_package_data(path);
     };
 
     let sibling_wheel = find_sibling_cached_wheel(path);
@@ -367,7 +367,7 @@ fn extract_from_pip_origin_json(path: &Path) -> PackageData {
             "Failed to infer package name/version from pip cache origin.json at {:?}",
             path
         );
-        return default_package_data();
+        return default_package_data(path);
     };
 
     let (repository_homepage_url, repository_download_url, api_data_url, plain_purl) =
@@ -463,7 +463,7 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> Pac
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read metadata at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -677,7 +677,7 @@ fn extract_from_sdist_archive(path: &Path) -> PackageData {
                 "Failed to read metadata for sdist archive {:?}: {}",
                 path, e
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -687,11 +687,11 @@ fn extract_from_sdist_archive(path: &Path) -> PackageData {
             metadata.len(),
             MAX_ARCHIVE_SIZE
         );
-        return default_package_data();
+        return default_package_data(path);
     }
 
     let Some(format) = detect_python_sdist_archive_format(path) else {
-        return default_package_data();
+        return default_package_data(path);
     };
 
     let mut package_data = match format {
@@ -700,7 +700,7 @@ fn extract_from_sdist_archive(path: &Path) -> PackageData {
                 Ok(file) => file,
                 Err(e) => {
                     warn!("Failed to open sdist archive {:?}: {}", path, e);
-                    return default_package_data();
+                    return default_package_data(path);
                 }
             };
             let decoder = GzDecoder::new(file);
@@ -711,7 +711,7 @@ fn extract_from_sdist_archive(path: &Path) -> PackageData {
                 Ok(file) => file,
                 Err(e) => {
                     warn!("Failed to open sdist archive {:?}: {}", path, e);
-                    return default_package_data();
+                    return default_package_data(path);
                 }
             };
             let decoder = BzDecoder::new(file);
@@ -722,7 +722,7 @@ fn extract_from_sdist_archive(path: &Path) -> PackageData {
                 Ok(file) => file,
                 Err(e) => {
                     warn!("Failed to open sdist archive {:?}: {}", path, e);
-                    return default_package_data();
+                    return default_package_data(path);
                 }
             };
             let decoder = XzDecoder::new(file);
@@ -754,7 +754,7 @@ fn extract_from_tar_sdist_archive<R: Read>(
                 "Failed to read {} sdist archive {:?}: {}",
                 archive_type, path, e
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -788,7 +788,7 @@ fn extract_from_tar_sdist_archive<R: Read>(
                 "Total extracted size exceeds limit for {} sdist {:?}",
                 archive_type, path
             );
-            return default_package_data();
+            return default_package_data(path);
         }
 
         if compressed_size > 0 {
@@ -798,7 +798,7 @@ fn extract_from_tar_sdist_archive<R: Read>(
                     "Suspicious compression ratio in {} sdist {:?}: {:.2}:1",
                     archive_type, path, ratio
                 );
-                return default_package_data();
+                return default_package_data(path);
             }
         }
 
@@ -839,7 +839,7 @@ fn extract_from_zip_sdist_archive(path: &Path) -> PackageData {
         Ok(file) => file,
         Err(e) => {
             warn!("Failed to open zip sdist archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -847,13 +847,13 @@ fn extract_from_zip_sdist_archive(path: &Path) -> PackageData {
         Ok(archive) => archive,
         Err(e) => {
             warn!("Failed to read zip sdist archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
     let validated_entries = match collect_validated_zip_entries(&mut archive, path, "sdist zip") {
         Ok(entries) => entries,
-        Err(_) => return default_package_data(),
+        Err(_) => return default_package_data(path),
     };
 
     let mut entries = Vec::new();
@@ -879,7 +879,7 @@ fn is_relevant_sdist_text_entry(entry_path: &str) -> bool {
 fn build_sdist_package_data(path: &Path, entries: Vec<(String, String)>) -> PackageData {
     let Some((metadata_path, metadata_content)) = select_sdist_pkginfo_entry(path, &entries) else {
         warn!("No PKG-INFO file found in sdist archive {:?}", path);
-        return default_package_data();
+        return default_package_data(path);
     };
 
     let mut package_data =
@@ -1106,7 +1106,7 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
                 "Failed to read metadata for wheel archive {:?}: {}",
                 path, e
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1116,14 +1116,14 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
             metadata.len(),
             MAX_ARCHIVE_SIZE
         );
-        return default_package_data();
+        return default_package_data(path);
     }
 
     let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             warn!("Failed to open wheel archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1131,13 +1131,13 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         Ok(a) => a,
         Err(e) => {
             warn!("Failed to read wheel archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
     let validated_entries = match collect_validated_zip_entries(&mut archive, path, "wheel") {
         Ok(entries) => entries,
-        Err(_) => return default_package_data(),
+        Err(_) => return default_package_data(path),
     };
 
     let metadata_entry =
@@ -1145,7 +1145,7 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
             Some(entry) => entry,
             None => {
                 warn!("No METADATA file found in wheel archive {:?}", path);
-                return default_package_data();
+                return default_package_data(path);
             }
         };
 
@@ -1153,7 +1153,7 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read METADATA from {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1217,7 +1217,7 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         Ok(m) => m,
         Err(e) => {
             warn!("Failed to read metadata for egg archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1227,14 +1227,14 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
             metadata.len(),
             MAX_ARCHIVE_SIZE
         );
-        return default_package_data();
+        return default_package_data(path);
     }
 
     let file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             warn!("Failed to open egg archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1242,13 +1242,13 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         Ok(a) => a,
         Err(e) => {
             warn!("Failed to read egg archive {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
     let validated_entries = match collect_validated_zip_entries(&mut archive, path, "egg") {
         Ok(entries) => entries,
-        Err(_) => return default_package_data(),
+        Err(_) => return default_package_data(path),
     };
 
     let pkginfo_entry = match find_validated_zip_entry_by_any_suffix(
@@ -1258,7 +1258,7 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         Some(entry) => entry,
         None => {
             warn!("No PKG-INFO file found in egg archive {:?}", path);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1266,7 +1266,7 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read PKG-INFO from {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1963,7 +1963,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
                 "Failed to read or parse pyproject.toml at {:?}: {}",
                 path, e
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -1983,7 +1983,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
                     "No project or tool.poetry data found in pyproject.toml at {:?}",
                     path
                 );
-                return default_package_data();
+                return default_package_data(path);
             }
         } else if toml_content.get(FIELD_NAME).is_some() {
             // Other format with top-level fields
@@ -1991,12 +1991,12 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
                 Some(table) => table.clone(),
                 None => {
                     warn!("Failed to convert TOML content to table in {:?}", path);
-                    return default_package_data();
+                    return default_package_data(path);
                 }
             }
         } else {
             warn!("No project data found in pyproject.toml at {:?}", path);
-            return default_package_data();
+            return default_package_data(path);
         };
 
     let name = project_table
@@ -2625,7 +2625,7 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read setup.py at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -3803,7 +3803,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read pip-inspect.deplock at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -3814,7 +3814,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 "Failed to parse pip-inspect.deplock JSON at {:?}: {}",
                 path, e
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -3825,7 +3825,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 "No 'installed' array found in pip-inspect.deplock at {:?}",
                 path
             );
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -4093,7 +4093,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
         main_pkg.dependencies.extend(unresolved_dependencies);
         main_pkg
     } else {
-        default_package_data()
+        default_package_data(path)
     }
 }
 
@@ -4110,7 +4110,7 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read setup.cfg at {:?}: {}", path, e);
-            return default_package_data();
+            return default_package_data(path);
         }
     };
 
@@ -4639,8 +4639,44 @@ fn calculate_file_checksums(path: &Path) -> (Option<u64>, Option<String>) {
     (Some(size), Some(hash))
 }
 
-fn default_package_data() -> PackageData {
-    PackageData::default()
+fn default_package_data(path: &Path) -> PackageData {
+    PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        primary_language: Some("Python".to_string()),
+        datasource_id: infer_python_datasource_id(path),
+        ..Default::default()
+    }
+}
+
+fn infer_python_datasource_id(path: &Path) -> Option<DatasourceId> {
+    let file_name = path.file_name().and_then(|name| name.to_str());
+
+    match file_name {
+        Some("pyproject.toml") => Some(DatasourceId::PypiPyprojectToml),
+        Some("setup.py") => Some(DatasourceId::PypiSetupPy),
+        Some("setup.cfg") => Some(DatasourceId::PypiSetupCfg),
+        Some("PKG-INFO") => Some(DatasourceId::PypiSdistPkginfo),
+        Some("METADATA") => Some(DatasourceId::PypiWheelMetadata),
+        Some("pypi.json") => Some(DatasourceId::PypiJson),
+        Some("pip-inspect.deplock") => Some(DatasourceId::PypiInspectDeplock),
+        Some("origin.json") if is_pip_cache_origin_json(path) => {
+            Some(DatasourceId::PypiPipOriginJson)
+        }
+        _ if is_python_sdist_archive_path(path) => Some(DatasourceId::PypiSdistPkginfo),
+        _ if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("whl")) =>
+        {
+            Some(DatasourceId::PypiWheel)
+        }
+        _ if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("egg")) =>
+        {
+            Some(DatasourceId::PypiEgg)
+        }
+        _ => None,
+    }
 }
 
 crate::register_parser!(

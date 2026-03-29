@@ -1,5 +1,6 @@
 [
   {
+    "datasource_id": "conan_conanfile_txt",
     "type": "conan",
     "primary_language": "C++",
     "parties": []

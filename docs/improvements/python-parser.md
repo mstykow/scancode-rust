@@ -2,7 +2,7 @@
 
 ## Summary
 
-**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves a narrow class of imported sibling dunder values for `setup.py`, preserves more installed and source-package provenance, supports saved `pypi.json` payloads, recovers RFC822 dependency metadata that was previously missing, and can parse Python source distribution archives directly.
+**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves a narrow class of imported sibling dunder values for `setup.py`, preserves more installed and source-package provenance, supports saved `pypi.json` payloads, recovers RFC822 dependency metadata that was previously missing, can parse Python source distribution archives directly, and keeps parser identity visible when malformed Python package inputs degrade to empty fallback rows.
 
 ## What changed
 
@@ -31,6 +31,7 @@ Rust now treats several adjacent metadata files as part of the same Python packa
 - `License-File` headers are exposed as structured `file_references`
 - sibling `RECORD` and `installed-files.txt` files can feed scan-time file assignment for installed layouts
 - sibling `SOURCES.txt` can recover explicit file references for source layouts
+- `requirements/*.txt` files under a dedicated `requirements/` subdirectory can now attach their dependencies back to the nearest real Python project package instead of floating as unowned sidecar evidence
 - sibling `WHEEL` data enriches installed wheel metadata without creating duplicate package rows
 - pip wheel-cache `origin.json` files can preserve source archive provenance and merge with sibling cached wheels when the identities agree
 
@@ -62,7 +63,15 @@ Rust now parses Python source distribution archives directly instead of requirin
 - embedded `.egg-info/requires.txt` and `SOURCES.txt` sidecars can still recover dependency and file-reference data from archive-only scans
 - direct archive parsing intentionally reuses the existing `pypi_sdist_pkginfo` datasource because `PKG-INFO` remains the authoritative metadata surface inside the sdist
 
-### 9. Archive hardening for sdist / wheel / egg inputs
+### 9. Preserve parser identity on malformed Python package inputs
+
+When a recognized Python package surface cannot be read or parsed cleanly, Rust now keeps the parser identity on the fallback row instead of collapsing to a completely anonymous empty package.
+
+That now applies across several Python inputs that Provenant intentionally handles tolerantly, including pip cache `origin.json`, `pip-inspect.deplock`, sdist archives, wheels, eggs, and the other manifest-like surfaces routed through the shared Python fallback helper.
+
+This is an intentional improvement over the Python reference for hard parse failures: scan output remains explicit about which Python datasource was encountered even when metadata recovery stops at the warning boundary.
+
+### 10. Archive hardening for sdist / wheel / egg inputs
 
 - Zip-based Python archives now bind validation to the actual read path instead of validating first and then reopening suspicious metadata entries by name later.
 - Relevant zip entries are validated and then read by index with an explicit byte cap, which closes the gap where a suspicious `PKG-INFO` / `METADATA` entry could still be decompressed after preflight validation.
@@ -75,8 +84,9 @@ Rust now parses Python source distribution archives directly instead of requirin
 - **Safer metadata recovery**: narrow static fallbacks recover real values without broadening into execution-heavy parsing
 - **Richer installed-package provenance**: wheel, cache, and sidecar metadata all contribute to a clearer package story
 - **Broader input coverage**: saved API payloads, RFC822 metadata files, and direct sdist archives now produce useful package data instead of partial results
+- **More honest malformed-input output**: recognized Python package files still carry type and datasource identity when parsing fails, which makes degraded scan results easier to interpret
 - **Safer archive ingestion**: sdist, wheel, and egg parsing now enforce their archive safety policy where bytes are actually read, reducing exposure to suspicious metadata entries
 
 ## Coverage
 
-Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, direct sdist archive parsing, archive hardening for suspicious zip metadata entries, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.
+Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, `requirements/` subdirectory dependency attachment, direct sdist archive parsing, archive hardening for suspicious zip metadata entries, malformed-input fallback identity for pip cache / pip-inspect / archive surfaces, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.
