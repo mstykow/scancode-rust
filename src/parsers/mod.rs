@@ -301,6 +301,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use crate::models::{PackageData, PackageType};
+use crate::parsers::license_normalization::finalize_package_declared_license_references;
 
 thread_local! {
     static PARSER_DIAGNOSTIC_STACK: RefCell<Vec<Vec<String>>> = const { RefCell::new(Vec::new()) };
@@ -320,7 +321,13 @@ where
         stack.borrow_mut().push(Vec::new());
     });
 
-    let packages = extract();
+    let packages = extract()
+        .into_iter()
+        .map(|mut package| {
+            finalize_package_declared_license_references(&mut package);
+            package
+        })
+        .collect();
     let scan_errors =
         PARSER_DIAGNOSTIC_STACK.with(|stack| stack.borrow_mut().pop().unwrap_or_default());
 
@@ -420,6 +427,10 @@ pub trait PackageParser {
     fn extract_first_package(path: &Path) -> PackageData {
         Self::extract_packages(path)
             .into_iter()
+            .map(|mut package| {
+                finalize_package_declared_license_references(&mut package);
+                package
+            })
             .next()
             .unwrap_or_default()
     }

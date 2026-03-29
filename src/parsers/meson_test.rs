@@ -102,6 +102,14 @@ dependency('libarchive', version: ['>=3.0.0', '<4.0.0'])
                 }),
             Some(vec!["COPYING", "LICENSES/BSD"])
         );
+        let referenced_filenames = package_data.license_detections[0].matches[0]
+            .referenced_filenames
+            .as_ref()
+            .expect("referenced filenames should be present");
+        assert_eq!(
+            referenced_filenames,
+            &vec!["COPYING".to_string(), "LICENSES/BSD".to_string()]
+        );
 
         assert_eq!(package_data.dependencies.len(), 3);
 

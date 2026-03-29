@@ -475,7 +475,7 @@ impl PackageData {
 /// License detection result containing matched license expressions.
 ///
 /// Aggregates multiple license matches into a single SPDX license expression.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct LicenseDetection {
     pub license_expression: String,
     pub license_expression_spdx: String,

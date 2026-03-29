@@ -392,6 +392,27 @@ readme = "README.md"
     }
 
     #[test]
+    fn test_declared_license_detection_preserves_license_file_reference() {
+        let content = r#"
+[package]
+name = "test-package"
+version = "0.1.0"
+license = "MIT"
+license-file = "LICENSE.txt"
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        assert_eq!(package_data.license_detections.len(), 1);
+        let referenced_filenames = package_data.license_detections[0].matches[0]
+            .referenced_filenames
+            .as_ref()
+            .expect("referenced filenames should be present");
+        assert_eq!(referenced_filenames, &vec!["LICENSE.txt".to_string()]);
+    }
+
+    #[test]
     fn test_extract_build_dependencies() {
         let content = r#"
 [package]
