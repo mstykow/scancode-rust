@@ -117,6 +117,29 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_license_file_reference_from_dict() {
+        let content = r#"{
+            "name": "TestPod",
+            "version": "1.0.0",
+            "license": {
+                "type": "MIT",
+                "file": "LICENSE.txt"
+            }
+        }"#;
+
+        let (_temp_dir, file_path) = create_temp_podspec_json(content);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
+            package_data.license_detections[0].matches[0]
+                .referenced_filenames
+                .as_ref(),
+            Some(&vec!["LICENSE.txt".to_string()])
+        );
+    }
+
+    #[test]
     fn test_extract_source_git() {
         let content = r#"{
             "name": "TestPod",

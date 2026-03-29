@@ -341,6 +341,17 @@ mod tests {
         );
         assert_eq!(extra["license_type"], "file");
         assert_eq!(extra["license_file"], "COPYING.txt");
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
+            package_data.license_detections[0].license_expression,
+            "unknown-license-reference"
+        );
+        assert_eq!(
+            package_data.license_detections[0].matches[0]
+                .referenced_filenames
+                .as_ref(),
+            Some(&vec!["COPYING.txt".to_string()])
+        );
     }
 
     #[test]

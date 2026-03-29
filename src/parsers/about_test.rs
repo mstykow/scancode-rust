@@ -252,6 +252,11 @@ homepage_url: https://example.com/homepage
         assert_eq!(result.file_references[1].path, "apipkg.LICENSE");
         assert_eq!(result.file_references[1].path, "apipkg.LICENSE");
         assert_eq!(result.purl, Some("pkg:pypi/apipkg@1.4".to_string()));
+        let referenced_filenames = result.license_detections[0].matches[0]
+            .referenced_filenames
+            .as_ref()
+            .expect("referenced filenames should be present");
+        assert_eq!(referenced_filenames, &vec!["apipkg.LICENSE".to_string()]);
     }
 
     #[test]

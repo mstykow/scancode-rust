@@ -96,6 +96,15 @@ impl PackageParser for PodspecParser {
             .collect();
 
         let dependencies = extract_dependencies(&content);
+        let mut extra_data = serde_json::Map::new();
+        if let Some(raw_license) = extract_field(&content, &LICENSE_PATTERN)
+            && let Some(license_file) = extract_ruby_hash_file(&raw_license)
+        {
+            extra_data.insert(
+                "license_file".to_string(),
+                serde_json::Value::String(license_file),
+            );
+        }
         let repository_homepage_url = name
             .as_ref()
             .map(|n| format!("https://cocoapods.org/pods/{}", n));
@@ -168,7 +177,7 @@ impl PackageParser for PodspecParser {
             notice_text: None,
             source_packages: Vec::new(),
             file_references: Vec::new(),
-            extra_data: None,
+            extra_data: (!extra_data.is_empty()).then_some(extra_data.into_iter().collect()),
             dependencies,
             repository_homepage_url,
             repository_download_url,
@@ -232,6 +241,16 @@ fn normalize_podspec_declared_license(
     };
 
     normalize_spdx_declared_license(normalized_candidate.as_deref())
+}
+
+fn extract_ruby_hash_file(raw_license: &str) -> Option<String> {
+    let normalized = raw_license.replace("=>", "=");
+    let file_regex = Regex::new(r#":file\s*=\s*['\"]([^'\"]+)['\"]"#).ok()?;
+    file_regex
+        .captures(&normalized)
+        .and_then(|caps| caps.get(1))
+        .map(|value| value.as_str().trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn canonicalize_cocoapods_license_type(value: &str) -> String {
@@ -706,5 +725,29 @@ end
         assert_eq!(declared.as_deref(), Some("mit"));
         assert_eq!(declared_spdx.as_deref(), Some("MIT"));
         assert_eq!(detections.len(), 1);
+    }
+
+    #[test]
+    fn test_podspec_license_hash_preserves_license_file_reference() {
+        let content = r#"
+Pod::Spec.new do |s|
+  s.name = "Demo"
+  s.version = "1.0.0"
+  s.license = { :type => 'MIT', :file => 'LICENSE.txt' }
+end
+"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("Demo.podspec");
+        std::fs::write(&file_path, content).unwrap();
+
+        let package_data = PodspecParser::extract_first_package(&file_path);
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
+            package_data.license_detections[0].matches[0]
+                .referenced_filenames
+                .as_ref(),
+            Some(&vec!["LICENSE.txt".to_string()])
+        );
     }
 }
