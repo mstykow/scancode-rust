@@ -13,7 +13,7 @@ env:
 
 jobs:
   license-index:
-    name: Prepare Embedded License Index
+    name: Verify Embedded License Index
     runs-on: ubuntu-latest
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
@@ -31,13 +31,12 @@ jobs:
         with:
           shared-key: embedded-license-index
 
-      - name: Prepare embedded license index
-        uses: ./.github/actions/prepare-embedded-license-index
+      - name: Verify embedded license index
+        uses: ./.github/actions/verify-embedded-license-index
 
   rust-quality:
     name: Code Quality
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     steps:
@@ -45,9 +44,6 @@ jobs:
         with:
           submodules: recursive
           lfs: false
-
-      - name: Download embedded license index
-        uses: ./.github/actions/download-embedded-license-index
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.94.0
@@ -84,7 +80,6 @@ jobs:
   rust-scan-integration-tests:
     name: Scan and Integration Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     strategy:
@@ -100,9 +95,6 @@ jobs:
         with:
           submodules: recursive
           lfs: false
-
-      - name: Download embedded license index
-        uses: ./.github/actions/download-embedded-license-index
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.94.0
@@ -135,7 +127,6 @@ jobs:
   golden-tests:
     name: Golden Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     strategy:
@@ -171,9 +162,6 @@ jobs:
         with:
           submodules: recursive
           lfs: false
-
-      - name: Download embedded license index
-        uses: ./.github/actions/download-embedded-license-index
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.94.0

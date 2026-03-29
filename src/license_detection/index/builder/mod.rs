@@ -634,21 +634,15 @@ pub fn build_index_from_loaded(
     build_index(rules, licenses)
 }
 
-/// Build a `LicenseIndex` from loaded rules and licenses with pre-built automatons.
+/// Build a `LicenseIndex` from loaded rules and licenses.
 ///
-/// This is the embedded path that uses build-time serialized automatons,
-/// eliminating the runtime cost of automaton construction.
-///
-/// NOTE: This function is kept for potential future use by the xtask build process
-/// or for tests that need to build indexes dynamically. The main code path now uses
-/// the complete pre-built license index from `license_index.zst`.
+/// This is the common path used by both directory loading and the compact embedded
+/// loader snapshot.
 ///
 /// # Arguments
 /// * `loaded_rules` - Rules loaded from the loader stage
 /// * `loaded_licenses` - Licenses loaded from the loader stage
 /// * `with_deprecated` - If false, filter out deprecated entries before building
-/// * `rules_automaton` - Pre-built rules automaton from embedded data
-/// * `unknown_automaton` - Pre-built unknown automaton from embedded data
 /// * `pattern_id_to_rid` - Pre-built pattern ID to rule ID mapping
 ///
 /// # Returns
@@ -683,7 +677,7 @@ pub fn build_index_from_loaded_with_automatons(
     )
 }
 
-/// Build a `LicenseIndex` with pre-built automatons.
+/// Build a `LicenseIndex`.
 ///
 /// This is the core implementation that builds all index structures except
 /// the automatons, which are provided from embedded data.

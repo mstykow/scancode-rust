@@ -1,0 +1,45 @@
+name: Verify embedded license index
+description: Regenerate and verify the checked-in embedded license index artifact
+inputs:
+  artifact-path:
+    description: Path to the embedded license index in the repository
+    required: false
+    default: resources/license_detection/license_index.zst
+runs:
+  using: composite
+  steps:
+    - name: Capture checked-in license index metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        artifact="${{ inputs.artifact-path }}"
+        expected_oid=$(sha256sum "$artifact" | awk '{print $1}')
+        expected_size=$(wc -c < "$artifact" | tr -d '[:space:]')
+        echo "expected_oid=$expected_oid" >> "$GITHUB_ENV"
+        echo "expected_size=$expected_size" >> "$GITHUB_ENV"
+
+    - name: Regenerate embedded license index
+      shell: bash
+      run: cargo run --locked --manifest-path xtask/Cargo.toml --bin generate-index-artifact -- --output "${{ inputs.artifact-path }}"
+
+    - name: Verify generated index matches checked-in artifact bytes
+      shell: bash
+      run: |
+        set -euo pipefail
+        artifact="${{ inputs.artifact-path }}"
+        actual_oid=$(sha256sum "$artifact" | awk '{print $1}')
+        actual_size=$(wc -c < "$artifact" | tr -d '[:space:]')
+
+        if [[ "$actual_oid" != "$expected_oid" ]]; then
+          echo "Generated artifact sha256 does not match checked-in artifact"
+          echo "expected: $expected_oid"
+          echo "actual:   $actual_oid"
+          exit 1
+        fi
+
+        if [[ "$actual_size" != "$expected_size" ]]; then
+          echo "Generated artifact size does not match checked-in artifact"
+          echo "expected: $expected_size"
+          echo "actual:   $actual_size"
+          exit 1
+        fi

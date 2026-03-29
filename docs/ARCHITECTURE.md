@@ -729,8 +729,8 @@ For detailed documentation of the license detection pipeline, matching algorithm
 The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:
 
 - **Embedded artifact**: `resources/license_detection/license_index.zst`
-- **Format**: rkyv-serialized, zstd-compressed `EmbeddedLicenseIndex` data
-- **Contents**: A prebuilt archived index with rules, licenses, token metadata, and automaton inputs derived from the ScanCode rules dataset
+- **Format**: MessagePack-serialized, zstd-compressed `EmbeddedLoaderSnapshot` data
+- **Contents**: Sorted `LoadedRule` and `LoadedLicense` values derived from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
 
@@ -743,16 +743,15 @@ The license detection system uses a two-stage loading process:
 │                                                                 │
 │  Loader Stage (Embedded Artifact)                               │
 │  ┌────────────────────────────────────────────────────────┐     │
-│  │ • Decompress and access archived EmbeddedLicenseIndex  │     │
-│  │ • Validate schema and embedded artifact bytes          │     │
+│  │ • Decompress and deserialize EmbeddedLoaderSnapshot    │     │
+│  │ • Validate schema version                              │     │
 │  │ • No runtime filesystem access to ScanCode data        │     │
 │  └────────────────────────────────────────────────────────┘     │
 │                           │                                     │
 │                           ▼                                     │
 │  Build Stage (Runtime)                                          │
 │  ┌────────────────────────────────────────────────────────┐     │
-│  │ • Convert archived embedded rules → runtime Rule       │     │
-│  │ • Convert archived embedded licenses → runtime License │     │
+│  │ • Build runtime index from embedded rules/licenses     │     │
 │  │ • Apply deprecated filtering policy                    │     │
 │  │ • Synthesize license-derived rules                     │     │
 │  │ • Build LicenseIndex (token dict, automatons, maps)    │     │
@@ -766,13 +765,12 @@ The license detection system uses a two-stage loading process:
 
 - Parse the ScanCode rules and licenses dataset
 - Normalize rule/license data before embedding
-- Serialize archived `EmbeddedLicenseIndex` bytes
-- Compress the archived bytes for embedding
+- Serialize sorted `LoadedRule` / `LoadedLicense` snapshot bytes
+- Compress the serialized bytes for embedding
 
 **Loader-stage responsibilities** (runtime, file-local):
 
-- Validate the embedded artifact payload before decoding
-- Decompress and access archived embedded bytes
+- Decompress and deserialize the embedded loader snapshot
 - Reconstruct the runtime `LicenseIndex`
 - Build the SPDX mapping from the reconstructed index
 
@@ -816,7 +814,7 @@ git commit -m "chore: update embedded license data"
 
 The `reference/scancode-toolkit/` submodule is **optional for end users**. It's only needed for:
 
-1. **Developers updating embedded data**: Regenerating the license loader artifact
+1. **Developers updating embedded data**: Regenerating the compact embedded loader artifact
 2. **Custom license rules**: Using `--license-rules-path` to load custom rule sets
 3. **Parity testing**: Comparing Rust behavior against Python reference
 

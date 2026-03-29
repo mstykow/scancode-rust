@@ -1,0 +1,156 @@
+# ADR 0007: Embedded License Index Artifact Strategy
+
+**Status**: Accepted  
+**Authors**: Provenant team
+**Supersedes**: None
+
+## Context
+
+Provenant ships with a built-in license detection artifact that is compiled into the binary via
+`include_bytes!()` from `resources/license_detection/license_index.zst`.
+
+That path is not an incidental implementation detail. It is currently part of the project-wide
+contract across:
+
+- runtime loading in `src/license_detection/mod.rs`
+- embedded artifact validation and schema checks in `src/license_detection/embedded/index.rs`
+- release refresh flow in `release.sh`
+- CI artifact verification in `.github/actions/verify-embedded-license-index`
+- source packaging rules in `Cargo.toml`
+- embedded artifact regression tests in `src/license_detection/embedded_test.rs`
+
+The project previously moved from a compact embedded loader snapshot to a full prebuilt
+`LicenseIndex` artifact with prebuilt automatons. That full artifact improved startup time
+substantially, but it also introduced a 100+ MB tracked binary, Git LFS coupling, setup/release
+materialization complexity, and package-size incompatibility with crates.io publishing.
+
+During this review, we measured both architectures directly:
+
+- the full prebuilt artifact was about **117.7 MB**, and `cargo package --allow-dirty --no-verify`
+  produced a package that was **112.2 MiB compressed**, which is not publishable to crates.io
+- the earlier compact embedded loader snapshot was about **6.5 MB**, and the corresponding
+  historical package measured **7.2 MiB compressed**, which fits under crates.io's current limit
+
+That is well above crates.io's current **10 MB** package limit. So the project must separate two
+questions that are easy to conflate:
+
+1. what the best **repository/runtime/CI artifact contract** is
+2. how the project should eventually support **crates.io/source-package distribution**
+
+We needed a durable decision for the first question without pretending the second one is already
+solved.
+
+## Decision
+
+We keep a **single tracked canonical artifact path** for the embedded license data, but that path
+stores a **compact embedded loader snapshot**, not the full prebuilt runtime index.
+
+### Core rules
+
+1. **`resources/license_detection/license_index.zst` remains the canonical embedded artifact path.**
+   Runtime loading, tests, CI, and release automation may assume that path exists.
+
+2. **The checked-in artifact is the real compact artifact bytes, not LFS pointer metadata.**
+   Contributors should be able to clone, build, test, and package the project without a separate
+   artifact-materialization step.
+
+3. **The embedded artifact contains sorted `LoadedRule` and `LoadedLicense` snapshot data, not the
+   full prebuilt `LicenseIndex`.**
+   Runtime startup may rebuild the in-memory index from that snapshot.
+
+4. **Artifact updates remain deterministic and explicit.**
+   CI and release automation should regenerate the artifact from the pinned ScanCode inputs and
+   verify it matches the checked-in bytes.
+
+5. **A future optional local cache is allowed, but it is not part of the default distribution contract.**
+   Any user-local cache must be an opt-in acceleration layer on top of the compact embedded snapshot,
+   not a second required distribution mode.
+
+### Scope boundaries
+
+- This ADR governs the repository, runtime, CI, release, and source-package contract for the
+  embedded artifact.
+- This ADR rejects the oversized full prebuilt artifact model.
+- This ADR keeps one distribution model instead of splitting GitHub binaries and crates.io installs.
+- This ADR does not require implementing a user-local cache immediately.
+
+## Consequences
+
+### Benefits
+
+1. **Stable runtime contract**
+   - `include_bytes!()` continues to target one fixed path.
+   - The default license engine remains self-contained in built binaries.
+
+2. **Crates.io publishability returns**
+   - The embedded artifact stays small enough to fit inside a published crate.
+   - The project can keep one supported distribution mode across repo builds and published installs.
+
+3. **Simpler repository workflow**
+   - No Git LFS dependency for the embedded artifact.
+   - No pointer-materialization setup step or local git-index hacks to hide generated dirt.
+
+4. **Release consistency**
+   - License-data refresh stays an explicit, reviewable step tied to submodule updates and artifact
+     regeneration.
+
+### Trade-offs
+
+1. **Startup is slower than the full prebuilt artifact path**
+   - The runtime still needs to rebuild the in-memory `LicenseIndex` and automatons from the compact snapshot.
+
+2. **Tracked-path coupling remains broad**
+   - Runtime, tests, CI, docs, and release automation all depend on the canonical repo path.
+
+3. **Artifact maintenance still exists**
+   - Maintainers still need a deterministic regeneration flow when the ScanCode data changes.
+   - CI still needs to verify the checked-in artifact against regenerated bytes.
+
+## Alternatives Considered
+
+### 1. Full prebuilt embedded index artifact
+
+Rejected.
+
+This delivered the best startup time, but the artifact and package became too large for crates.io
+and pulled in LFS, pointer-materialization logic, and more workflow complexity than the startup win
+was worth.
+
+### 2. No embedded artifact at all
+
+Rejected for now.
+
+This would simplify source control further, but it would also remove the self-contained default
+installation story and force every user onto a directory/bootstrap path.
+
+### 3. Dual distribution model
+
+Rejected for now.
+
+Separate “full GitHub binary” and “slim crates.io” modes would restore publishability, but at the
+cost of extra product, release, CI, and documentation complexity.
+
+## Related ADRs
+
+- [ADR 0003: Golden Test Strategy](0003-golden-test-strategy.md) - Embedded artifact behavior is
+  locked down by reproducibility and golden-style regression tests
+- [ADR 0005: Auto-Generated Documentation](0005-auto-generated-docs.md) - The project already uses
+  generated artifacts and generated docs with explicit regeneration workflows
+- [ADR 0006: DatasourceId-Driven Multi-Pass Package Assembly](0006-datasourceid-driven-package-assembly.md)
+  - Example of a cross-cutting architectural contract that spans runtime, tests, and contributor workflows
+
+## References
+
+- [`Cargo.toml`](../../Cargo.toml) - source package includes the embedded artifact path
+- [`setup.sh`](../../setup.sh) - standard contributor setup flow
+- [`release.sh`](../../release.sh) - release-time regeneration and staging flow
+- [`xtask/src/bin/generate_index_artifact.rs`](../../xtask/src/bin/generate_index_artifact.rs) -
+  deterministic artifact generator
+- [`src/license_detection/mod.rs`](../../src/license_detection/mod.rs) - runtime `include_bytes!()` contract
+- [`src/license_detection/embedded/index.rs`](../../src/license_detection/embedded/index.rs) -
+  embedded artifact validation and loading
+- [`src/license_detection/embedded_test.rs`](../../src/license_detection/embedded_test.rs) -
+  artifact equality/existence/schema tests
+- [`.github/actions/verify-embedded-license-index/action.yml`](../../.github/actions/verify-embedded-license-index/action.yml) -
+  CI regeneration and checked-in artifact verification
+- [`docs/RELEASING.md`](../RELEASING.md) - maintainer release flow

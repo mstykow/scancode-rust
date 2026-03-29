@@ -32,9 +32,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::license_detection::embedded::index::{
-    embedded_index_artifact_setup_hint, load_license_index_from_bytes,
-};
+use crate::license_detection::embedded::index::load_license_index_from_bytes;
 use crate::license_detection::index::build_index_from_loaded;
 use crate::license_detection::query::Query;
 use crate::license_detection::rules::{
@@ -453,34 +451,10 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing the engine or an error
     pub fn from_embedded() -> Result<Self> {
-        use std::time::Instant;
-        let t0 = Instant::now();
-
         let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
-        eprintln!(
-            "[from_embedded] artifact_bytes.len() = {} MB",
-            artifact_bytes.len() / 1_000_000
-        );
-
-        let t1 = Instant::now();
-        let index = load_license_index_from_bytes(artifact_bytes).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load embedded license index: {} If you are working from a git checkout, {}.",
-                e,
-                embedded_index_artifact_setup_hint()
-            )
-        })?;
-        eprintln!(
-            "[from_embedded] load_license_index_from_bytes took {:?}",
-            t1.elapsed()
-        );
-
-        let t2 = Instant::now();
-        let result = Self::from_index(index);
-        eprintln!("[from_embedded] from_index took {:?}", t2.elapsed());
-
-        eprintln!("[from_embedded] TOTAL took {:?}", t0.elapsed());
-        result
+        let index = load_license_index_from_bytes(artifact_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to load embedded license index: {}", e))?;
+        Self::from_index(index)
     }
 
     /// Create a new license detection engine from a directory of license rules.

@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use provenant::license_detection::embedded::index::EmbeddedLicenseIndex;
-use provenant::license_detection::index::build_index_from_loaded;
+use provenant::license_detection::embedded::schema::{EmbeddedLoaderSnapshot, SCHEMA_VERSION};
 use provenant::license_detection::rules::{
     load_loaded_licenses_from_directory, load_loaded_rules_from_directory,
 };
@@ -13,7 +12,7 @@ use provenant::license_detection::rules::{
 #[derive(Parser, Debug)]
 #[command(
     name = "generate-index-artifact",
-    about = "Generate the full embedded license index from ScanCode rules and licenses"
+    about = "Generate the embedded license loader artifact from ScanCode rules and licenses"
 )]
 struct Args {
     #[arg(long, help = "Output path")]
@@ -56,16 +55,16 @@ fn main() -> Result<()> {
     loaded_rules.sort_by(|a, b| a.identifier.cmp(&b.identifier));
     loaded_licenses.sort_by(|a, b| a.key.cmp(&b.key));
 
-    println!("Building license index...");
-    let license_index = build_index_from_loaded(loaded_rules, loaded_licenses, false);
-
-    println!("Converting to embedded format...");
-    let embedded_index = EmbeddedLicenseIndex::from(&license_index);
+    let snapshot = EmbeddedLoaderSnapshot {
+        schema_version: SCHEMA_VERSION,
+        rules: loaded_rules,
+        licenses: loaded_licenses,
+    };
 
     println!("Serializing...");
-    let bytes = embedded_index
-        .serialize_to_bytes()
-        .context("Failed to serialize embedded license index")?;
+    let msgpack = rmp_serde::to_vec(&snapshot).context("Failed to serialize embedded artifact")?;
+    let bytes =
+        zstd::encode_all(&msgpack[..], 0).context("Failed to compress embedded artifact")?;
 
     println!("Total artifact size: {} bytes", bytes.len());
 

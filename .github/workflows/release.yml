@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   license-index:
-    name: Prepare Embedded License Index
+    name: Verify Embedded License Index
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,12 +33,11 @@ jobs:
         with:
           key: embedded-license-index
 
-      - name: Prepare embedded license index
-        uses: ./.github/actions/prepare-embedded-license-index
+      - name: Verify embedded license index
+        uses: ./.github/actions/verify-embedded-license-index
 
   build:
     name: Build ${{ matrix.target }}
-    needs: license-index
     strategy:
       fail-fast: false
       matrix:
@@ -74,9 +73,6 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           lfs: false
-
-      - name: Download embedded license index
-        uses: ./.github/actions/download-embedded-license-index
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606
