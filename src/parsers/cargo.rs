@@ -28,7 +28,10 @@ use std::path::Path;
 use toml::Value;
 
 use super::PackageParser;
-use super::license_normalization::normalize_spdx_declared_license;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, empty_declared_license_data,
+    normalize_spdx_expression,
+};
 
 const FIELD_PACKAGE: &str = "package";
 const FIELD_NAME: &str = "name";
@@ -83,8 +86,20 @@ impl PackageParser for CargoParser {
             .and_then(|p| p.get(FIELD_LICENSE))
             .and_then(|v| v.as_str())
             .map(String::from);
+        let file_references = extract_file_references(&toml_content);
         let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-            normalize_spdx_declared_license(raw_license.as_deref());
+            raw_license
+                .as_deref()
+                .and_then(normalize_spdx_expression)
+                .map(|normalized| {
+                    build_declared_license_data(
+                        normalized,
+                        DeclaredLicenseMatchMetadata::single_line(
+                            raw_license.as_deref().unwrap_or_default(),
+                        ),
+                    )
+                })
+                .unwrap_or_else(empty_declared_license_data);
 
         let extracted_license_statement = raw_license.clone();
 
@@ -131,8 +146,6 @@ impl PackageParser for CargoParser {
         let keywords = extract_keywords_and_categories(&toml_content);
 
         let extra_data = extract_extra_data(&toml_content);
-        let file_references = extract_file_references(&toml_content);
-
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,

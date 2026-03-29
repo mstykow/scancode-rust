@@ -899,6 +899,15 @@ Test package description.
         assert_eq!(package_data.file_references.len(), 2);
         assert_eq!(package_data.file_references[0].path, "LICENSE");
         assert_eq!(package_data.file_references[1].path, "COPYING.txt");
+
+        let referenced_filenames = package_data.license_detections[0].matches[0]
+            .referenced_filenames
+            .as_ref()
+            .expect("referenced filenames should be present");
+        assert_eq!(
+            referenced_filenames,
+            &vec!["LICENSE".to_string(), "COPYING.txt".to_string()]
+        );
     }
 
     #[test]
