@@ -37,7 +37,6 @@ jobs:
   rust-quality:
     name: Code Quality
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     steps:
@@ -81,7 +80,6 @@ jobs:
   rust-scan-integration-tests:
     name: Scan and Integration Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     strategy:
@@ -129,7 +127,6 @@ jobs:
   golden-tests:
     name: Golden Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    needs: license-index
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     strategy:
