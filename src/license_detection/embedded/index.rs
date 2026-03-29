@@ -16,6 +16,8 @@ use crate::license_detection::index::dictionary::{TokenDictionary, TokenId, Toke
 use crate::license_detection::models::{License, Rule, RuleKind};
 
 pub const SCHEMA_VERSION: u32 = 2;
+pub const EMBEDDED_LICENSE_INDEX_LFS_POINTER_PREFIX: &[u8] =
+    b"version https://git-lfs.github.com/spec/v1\n";
 
 pub type HighPostingsEntry = (u16, Vec<usize>);
 pub type HighPostingsByRidEntry = (usize, Vec<HighPostingsEntry>);
@@ -30,6 +32,28 @@ impl std::fmt::Display for SerializationError {
 }
 
 impl std::error::Error for SerializationError {}
+
+pub fn embedded_index_artifact_setup_hint() -> &'static str {
+    "Run ./setup.sh or cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact"
+}
+
+fn validate_embedded_artifact_bytes(bytes: &[u8]) -> Result<(), SerializationError> {
+    if bytes.is_empty() {
+        return Err(SerializationError(format!(
+            "Embedded license index artifact is empty. {}.",
+            embedded_index_artifact_setup_hint()
+        )));
+    }
+
+    if bytes.starts_with(EMBEDDED_LICENSE_INDEX_LFS_POINTER_PREFIX) {
+        return Err(SerializationError(format!(
+            "Embedded license index artifact is a Git LFS pointer, not the real generated artifact. {}.",
+            embedded_index_artifact_setup_hint()
+        )));
+    }
+
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
 pub struct EmbeddedRange {
@@ -626,6 +650,8 @@ impl EmbeddedLicenseIndex {
 }
 
 pub fn load_license_index_from_bytes(bytes: &[u8]) -> Result<LicenseIndex, SerializationError> {
+    validate_embedded_artifact_bytes(bytes)?;
+
     let decompressed = zstd::decode_all(bytes)
         .map_err(|e| SerializationError(format!("Failed to decompress license index: {}", e)))?;
 
@@ -953,5 +979,20 @@ mod tests {
             !license_index.pattern_id_to_rid.is_empty(),
             "Should have pattern_id_to_rid mapping"
         );
+    }
+
+    #[test]
+    fn test_load_license_index_from_bytes_rejects_git_lfs_pointer() {
+        let pointer =
+            b"version https://git-lfs.github.com/spec/v1\noid sha256:deadbeef\nsize 123\n";
+
+        let error = load_license_index_from_bytes(pointer).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("Git LFS pointer, not the real generated artifact")
+        );
+        assert!(error.to_string().contains("generate-index-artifact"));
     }
 }

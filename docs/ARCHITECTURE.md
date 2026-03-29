@@ -728,9 +728,9 @@ For detailed documentation of the license detection pipeline, matching algorithm
 
 The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:
 
-- **Embedded artifact**: `resources/license_detection/license_index.bincode.zst`
-- **Format**: bincode-serialized, zstd-compressed embedded index data
-- **Contents**: Parsed and normalized `LoadedRule` and `LoadedLicense` values from the ScanCode rules dataset
+- **Embedded artifact**: `resources/license_detection/license_index.zst`
+- **Format**: rkyv-serialized, zstd-compressed `EmbeddedLicenseIndex` data
+- **Contents**: A prebuilt archived index with rules, licenses, token metadata, and automaton inputs derived from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
 
@@ -743,17 +743,16 @@ The license detection system uses a two-stage loading process:
 │                                                                 │
 │  Loader Stage (Embedded Artifact)                               │
 │  ┌────────────────────────────────────────────────────────┐     │
-│  │ • Deserialize LoadedRule and LoadedLicense values      │     │
-│  │ • Already normalized (text trimmed, defaults applied)  │     │
-│  │ • Single-file transformations complete                 │     │
-│  │ • No filesystem access needed                          │     │
+│  │ • Decompress and access archived EmbeddedLicenseIndex  │     │
+│  │ • Validate schema and embedded artifact bytes          │     │
+│  │ • No runtime filesystem access to ScanCode data        │     │
 │  └────────────────────────────────────────────────────────┘     │
 │                           │                                     │
 │                           ▼                                     │
 │  Build Stage (Runtime)                                          │
 │  ┌────────────────────────────────────────────────────────┐     │
-│  │ • Convert LoadedRule → runtime Rule                    │     │
-│  │ • Convert LoadedLicense → runtime License              │     │
+│  │ • Convert archived embedded rules → runtime Rule       │     │
+│  │ • Convert archived embedded licenses → runtime License │     │
 │  │ • Apply deprecated filtering policy                    │     │
 │  │ • Synthesize license-derived rules                     │     │
 │  │ • Build LicenseIndex (token dict, automatons, maps)    │     │
@@ -763,13 +762,19 @@ The license detection system uses a two-stage loading process:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Loader-stage responsibilities** (file-local transformations):
+**Artifact-generation responsibilities** (performed when building `license_index.zst`):
 
-- Text trimming and normalization
-- Derive `identifier` from filename
-- Derive `rule_kind` from source booleans
-- URL merging for licenses
-- Fallback/default handling
+- Parse the ScanCode rules and licenses dataset
+- Normalize rule/license data before embedding
+- Serialize archived `EmbeddedLicenseIndex` bytes
+- Compress the archived bytes for embedding
+
+**Loader-stage responsibilities** (runtime, file-local):
+
+- Validate the embedded artifact payload before decoding
+- Decompress and access archived embedded bytes
+- Reconstruct the runtime `LicenseIndex`
+- Build the SPDX mapping from the reconstructed index
 
 **Build-stage responsibilities** (cross-file policies):
 
@@ -803,7 +808,7 @@ Maintainers can regenerate the embedded license artifact when the ScanCode rules
 cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
 
 # Commit the updated artifact
-git add resources/license_detection/license_index.bincode.zst
+git add resources/license_detection/license_index.zst
 git commit -m "chore: update embedded license data"
 ```
 

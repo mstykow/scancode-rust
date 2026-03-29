@@ -56,27 +56,28 @@ Arc<LicenseDetectionEngine> shared across scanner threads
 
 The binary includes a pre-built license index embedded at compile time:
 
-- **Location**: `resources/license_detection/license_index.bincode.zst`
-- **Format**: bincode serialization, zstd compression
-- **Contents**: `LoadedRule` and `LoadedLicense` values parsed from the ScanCode rules dataset
+- **Location**: `resources/license_detection/license_index.zst`
+- **Format**: rkyv serialization, zstd compression
+- **Contents**: archived `EmbeddedLicenseIndex` data derived from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
 
 The loading process is split into two distinct stages:
 
-**Loader Stage** (embedded in artifact):
+**Artifact Generation Stage** (when producing `license_index.zst`):
 
 - Parse `.RULE` and `.LICENSE` files
-- Normalize text and apply file-local transformations
-- Derive `identifier` from filename
-- Derive `rule_kind` from source booleans
-- Merge URLs for licenses
-- Serialize to `LoadedRule` / `LoadedLicense`
+- Normalize rule and license data for embedding
+- Build `EmbeddedLicenseIndex`
+- Serialize archived embedded data with rkyv
+- Compress the serialized bytes with zstd
 
 **Build Stage** (runtime):
 
-- Convert `LoadedRule` → runtime `Rule`
-- Convert `LoadedLicense` → runtime `License`
+- Validate the embedded artifact payload and schema version
+- Access archived embedded data from decompressed bytes
+- Convert embedded rules → runtime `Rule`
+- Convert embedded licenses → runtime `License`
 - Apply deprecated filtering policy
 - Synthesize license-derived rules
 - Build token dictionary and automatons
@@ -100,7 +101,7 @@ When the ScanCode rules dataset is updated, regenerate the embedded artifact:
 cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
 
 # Commit the updated artifact
-git add resources/license_detection/license_index.bincode.zst
+git add resources/license_detection/license_index.zst
 git commit -m "chore: update embedded license data"
 ```
 
