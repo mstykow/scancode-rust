@@ -1,6 +1,6 @@
 //! Unit tests for Conan parsers (conanfile.py, conanfile.txt, conan.lock)
 
-use crate::models::PackageType;
+use crate::models::{DatasourceId, PackageType};
 
 use std::path::PathBuf;
 
@@ -154,6 +154,7 @@ fn test_conanfile_py_invalid_python() {
     // Should return default package data on parse failure
     assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
+    assert_eq!(result.datasource_id, Some(DatasourceId::ConanConanFilePy));
 }
 
 #[test]
@@ -188,6 +189,7 @@ fn test_conanfile_txt_basic() {
 
     assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
+    assert_eq!(result.datasource_id, Some(DatasourceId::ConanConanFileTxt));
 }
 
 #[test]
@@ -207,4 +209,17 @@ fn test_conan_lock_basic() {
 
     assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
+    assert_eq!(result.datasource_id, Some(DatasourceId::ConanLock));
+}
+
+#[test]
+fn test_conan_lock_invalid_json_preserves_datasource() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let lock_path = temp_dir.path().join("conan.lock");
+    std::fs::write(&lock_path, "{ invalid json }").unwrap();
+
+    let result = ConanLockParser::extract_first_package(&lock_path);
+
+    assert_eq!(result.package_type, Some(PackageType::Conan));
+    assert_eq!(result.datasource_id, Some(DatasourceId::ConanLock));
 }

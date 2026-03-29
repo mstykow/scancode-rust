@@ -6,6 +6,7 @@ Provenant improves several npm and Yarn behaviors that are missing, incomplete, 
 
 - `package.json` now preserves npm `overrides` metadata.
 - `package.json` now preserves platform and compatibility metadata such as `os`, `cpu`, `libc`, `deprecated`, and `hasBin`.
+- malformed or unreadable `package.json` files now still emit an identified npm parser row instead of disappearing into anonymous fallback output.
 - Empty npm `name` and `version` values no longer generate synthetic registry URLs or dummy PURLs.
 - Scoped npm fallback URLs now use the correct registry path and tarball filename shape, and invalid `homepage`/blank `bugs` metadata is dropped instead of being kept as noisy values.
 - `package-lock.json` root package identity now falls back to the `packages[""]` entry, matching modern hidden-lockfile layouts.
@@ -48,17 +49,23 @@ Rust now keeps raw `package.json` compatibility metadata in `PackageData.extra_d
 
 These fields are useful even when dependency extraction is unchanged because they describe installation eligibility, host compatibility, and package lifecycle state that downstream tooling may need to inspect.
 
-### 4. Modern npm lockfile root fallback
+### 4. Preserve parser identity on malformed `package.json`
+
+When `package.json` cannot be read or parsed, Rust now still emits an empty parser row tagged as npm `package.json` data instead of returning an anonymous package record with no parser identity.
+
+This is intentionally more informative than the Python reference for hard parse failures: downstream output can still show that a package manifest was recognized, which parser handled it, and which datasource produced the warning.
+
+### 5. Modern npm lockfile root fallback
 
 For npm v2/v3 lockfiles, Rust now uses `packages[""]` as a fallback source for root `name` and `version`, which is important for hidden lockfiles and other modern layouts where top-level fields may be absent.
 
-### 5. Preserve non-version npm lockfile dependencies
+### 6. Preserve non-version npm lockfile dependencies
 
 Rust now keeps `link: true` dependencies from modern lockfiles as dependency records with unversioned npm PURLs and source-path metadata in `extra_data`, instead of silently dropping them.
 
 Rust also preserves non-version lockfile specs such as `file:`, `git+...`, tarball URLs, and `npm:` aliases as unpinned dependency requirements. This avoids emitting invalid versioned PURLs for source-based dependencies and prevents alias ranges like `npm:wrap-ansi@^7.0.0` from being misclassified as exact pinned versions.
 
-### 6. Correct directness, preserve Berry resolution metadata, and infer Yarn scope from sibling `package.json`
+### 7. Correct directness, preserve Berry resolution metadata, and infer Yarn scope from sibling `package.json`
 
 When a `yarn.lock` sits next to a `package.json`, Rust now uses the manifest to classify direct dependencies as:
 
@@ -73,13 +80,13 @@ For npm lockfiles, Rust also now marks nested duplicate packages under `node_mod
 
 For Yarn Berry lockfiles, Rust now also preserves richer resolver detail instead of collapsing non-`@npm:` locators to `*`. Raw lock metadata such as `resolution`, `languageName`, `linkType`, `bin`, `dependenciesMeta`, and lockfile `cacheKey` are kept in structured metadata, while protocol-backed locators such as `patch:` and `workspace:` keep their full reference in the resolved dependency requirement.
 
-### 7. Correct nested npm package ownership
+### 8. Correct nested npm package ownership
 
 Rust now assigns package-root resources for npm packages while skipping first-level `node_modules` for the parent package. Nested packages under `node_modules` therefore keep their own package identity instead of inheriting the parent package UID.
 
 This directly improves bundled-package scans and also ensures root-level Yarn PnP files such as `.pnp.cjs` attach to the correct package.
 
-### 8. Preserve workspace and unattached lockfile semantics
+### 9. Preserve workspace and unattached lockfile semantics
 
 Workspace assembly now accepts npm workspace declarations from array, string, or `{ "packages": [...] }` forms, which prevents valid monorepos from being skipped during assembly.
 
@@ -90,6 +97,7 @@ The assembly phase also sorts `datafile_paths`, `datasource_ids`, and `for_packa
 ## Primary Areas Affected
 
 - npm manifest parsing and metadata normalization
+- malformed npm manifest fallback identity
 - npm platform/compatibility metadata preservation
 - npm lockfile root identity and dependency-spec extraction
 - Yarn lockfile dependency-scope inference and Berry resolution-detail preservation
@@ -100,6 +108,7 @@ The assembly phase also sorts `datafile_paths`, `datasource_ids`, and `for_packa
 This enhancement set is covered by:
 
 - npm parser-focused unit tests
+- malformed `package.json` fallback tests
 - npm lockfile-focused unit tests
 - Yarn lockfile-focused unit tests
 - focused npm and Yarn parser/assembly tests for the affected behaviors

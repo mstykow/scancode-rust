@@ -87,7 +87,7 @@ impl PackageParser for ChefMetadataJsonParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read metadata.json at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ChefCookbookMetadataJson)];
             }
         };
 
@@ -183,10 +183,10 @@ fn read_json_file(path: &Path) -> Result<Value, String> {
     serde_json::from_str(&contents).map_err(|e| format!("Failed to parse JSON: {}", e))
 }
 
-fn default_package_data() -> PackageData {
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE),
-        datasource_id: Some(DatasourceId::ChefCookbookMetadataJson),
+        datasource_id: Some(datasource_id),
         ..Default::default()
     }
 }
@@ -222,7 +222,7 @@ impl PackageParser for ChefMetadataRbParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open metadata.rb at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ChefCookbookMetadataRb)];
             }
         };
 

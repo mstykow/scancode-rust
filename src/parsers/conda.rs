@@ -694,7 +694,17 @@ crate::register_parser!(
         "**/meta.yaml",
         "**/meta.yml",
         "**/environment.yml",
-        "**/conda.yaml"
+        "**/environment.yaml",
+        "**/env.yaml",
+        "**/env.yml",
+        "**/conda.yaml",
+        "**/conda.yml",
+        "**/*conda*.yaml",
+        "**/*conda*.yml",
+        "**/*env*.yaml",
+        "**/*env*.yml",
+        "**/*environment*.yaml",
+        "**/*environment*.yml"
     ],
     "conda",
     "Python",

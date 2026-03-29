@@ -393,7 +393,9 @@ fn extract_dependencies(
 
 fn default_package_data() -> PackageData {
     PackageData {
+        package_type: Some(BowerJsonParser::PACKAGE_TYPE),
         primary_language: Some("JavaScript".to_string()),
+        datasource_id: Some(DatasourceId::BowerJson),
         ..Default::default()
     }
 }

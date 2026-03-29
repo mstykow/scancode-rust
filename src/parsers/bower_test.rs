@@ -174,11 +174,12 @@ mod tests {
 
         // Should return default package data on error
         assert_eq!(package_data.name, None);
-        assert_eq!(package_data.package_type, None);
+        assert_eq!(package_data.package_type, Some(PackageType::Bower));
         assert_eq!(
             package_data.primary_language,
             Some("JavaScript".to_string())
         );
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::BowerJson));
 
         // Cleanup
         fs::remove_file(temp_file).ok();

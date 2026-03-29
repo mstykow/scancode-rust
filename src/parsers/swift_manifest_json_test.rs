@@ -239,7 +239,11 @@ mod tests {
         fs::write(&path, "not valid json").expect("Failed to write");
 
         let data = SwiftManifestJsonParser::extract_first_package(&path);
-        assert_eq!(data.package_type, None);
+        assert_eq!(data.package_type, Some(PackageType::Swift));
+        assert_eq!(
+            data.datasource_id,
+            Some(DatasourceId::SwiftPackageManifestJson)
+        );
         assert_eq!(data.name, None);
     }
 
@@ -247,7 +251,11 @@ mod tests {
     fn test_nonexistent_file_returns_default() {
         let path = PathBuf::from("/nonexistent/Package.swift.json");
         let data = SwiftManifestJsonParser::extract_first_package(&path);
-        assert_eq!(data.package_type, None);
+        assert_eq!(data.package_type, Some(PackageType::Swift));
+        assert_eq!(
+            data.datasource_id,
+            Some(DatasourceId::SwiftPackageManifestJson)
+        );
         assert_eq!(data.name, None);
     }
 

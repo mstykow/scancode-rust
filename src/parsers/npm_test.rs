@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::models::PackageType;
+    use crate::models::{DatasourceId, PackageType};
     use crate::parsers::{NpmParser, PackageParser};
     use serde_json::Value;
     use std::fs;
@@ -440,6 +440,11 @@ mod tests {
         // Should return default/empty package data
         assert_eq!(package_data_1.name, None);
         assert_eq!(package_data_1.version, None);
+        assert_eq!(package_data_1.package_type, Some(PackageType::Npm));
+        assert_eq!(
+            package_data_1.datasource_id,
+            Some(DatasourceId::NpmPackageJson)
+        );
         assert!(package_data_1.dependencies.is_empty());
 
         // Test with invalid JSON
@@ -450,6 +455,11 @@ mod tests {
         // Should return default/empty package data
         assert_eq!(package_data_2.name, None);
         assert_eq!(package_data_2.version, None);
+        assert_eq!(package_data_2.package_type, Some(PackageType::Npm));
+        assert_eq!(
+            package_data_2.datasource_id,
+            Some(DatasourceId::NpmPackageJson)
+        );
         assert!(package_data_2.dependencies.is_empty());
     }
 

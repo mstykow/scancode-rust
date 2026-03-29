@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::super::scan_test_utils::{assert_file_links_to_package, scan_and_assemble};
     use crate::models::{DatasourceId, PackageType};
 
@@ -173,5 +175,96 @@ mod tests {
             &package.package_uid,
             DatasourceId::PypiPipOriginJson,
         );
+    }
+
+    #[test]
+    fn test_python_pip_inspect_scan_assembles_with_pyproject() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("pyproject.toml"),
+            r#"[project]
+name = "univers"
+version = "0.0.0"
+"#,
+        )
+        .expect("write pyproject.toml");
+        fs::copy(
+            "testdata/python/pip-inspect/pip-inspect.deplock",
+            temp_dir.path().join("pip-inspect.deplock"),
+        )
+        .expect("copy pip-inspect fixture");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("univers"))
+            .expect("pyproject + pip-inspect should assemble univers package");
+
+        assert_eq!(package.package_type, Some(PackageType::Pypi));
+        assert_eq!(package.version.as_deref(), Some("0.0.0"));
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PypiInspectDeplock)
+        );
+        assert_file_links_to_package(
+            &files,
+            "/pip-inspect.deplock",
+            &package.package_uid,
+            DatasourceId::PypiInspectDeplock,
+        );
+    }
+
+    #[test]
+    fn test_python_requirements_subdir_scan_assigns_to_project_package() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        let requirements_dir = temp_dir.path().join("requirements");
+        fs::create_dir_all(&requirements_dir).expect("create requirements dir");
+
+        fs::write(
+            temp_dir.path().join("pyproject.toml"),
+            r#"[project]
+name = "req-demo"
+version = "1.0.0"
+"#,
+        )
+        .expect("write pyproject.toml");
+        fs::write(requirements_dir.join("dev.txt"), "pytest==8.3.5\n")
+            .expect("write requirements/dev.txt");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("req-demo"))
+            .expect("pyproject should assemble into a Python package");
+
+        assert_eq!(package.package_type, Some(PackageType::Pypi));
+        assert_eq!(package.version.as_deref(), Some("1.0.0"));
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PipRequirements)
+        );
+        assert!(
+            package
+                .datafile_paths
+                .iter()
+                .any(|path| path.ends_with("requirements/dev.txt"))
+        );
+        assert_file_links_to_package(
+            &files,
+            "/requirements/dev.txt",
+            &package.package_uid,
+            DatasourceId::PipRequirements,
+        );
+        assert!(result.dependencies.iter().any(|dep| {
+            dep.datafile_path.ends_with("requirements/dev.txt")
+                && dep.purl.is_some()
+                && dep.for_package_uid.as_deref() == Some(package.package_uid.as_str())
+        }));
     }
 }

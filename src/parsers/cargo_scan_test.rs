@@ -39,4 +39,27 @@ mod tests {
             DatasourceId::CargoLock,
         );
     }
+
+    #[test]
+    fn test_cargo_scan_assigns_workspace_resources_to_package() {
+        let (files, result) = scan_and_assemble(Path::new("testdata/assembly-golden/cargo-basic"));
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("test-crate"))
+            .expect("cargo package should be assembled");
+
+        let readme = files
+            .iter()
+            .find(|file| file.path.ends_with("/README.md"))
+            .expect("README should be scanned");
+        let lib_rs = files
+            .iter()
+            .find(|file| file.path.ends_with("/src/lib.rs"))
+            .expect("src/lib.rs should be scanned");
+
+        assert!(readme.for_packages.contains(&package.package_uid));
+        assert!(lib_rs.for_packages.contains(&package.package_uid));
+    }
 }

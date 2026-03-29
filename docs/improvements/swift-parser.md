@@ -2,7 +2,7 @@
 
 ## Summary
 
-**🐛 Bug Fix + 🔍 Enhanced Extraction**: Rust now assembles Swift package metadata with artifact-aware precedence instead of letting whichever Swift file happens to be present over- or under-assert top-level package identity.
+**🐛 Bug Fix + 🔍 Enhanced Extraction**: Rust now assembles Swift package metadata with artifact-aware precedence instead of letting whichever Swift file happens to be present over- or under-assert top-level package identity, and it preserves Swift parser identity on malformed manifest fallback rows.
 
 ## Problem surface
 
@@ -35,6 +35,9 @@ Rust applies Swift-specific assembly rules with five durable behaviors:
 5. **Nested-root resource isolation**
    Nested Swift package roots keep their own files, rather than being accidentally claimed by a parent package.
 
+6. **Identified malformed-manifest fallback**
+   When Swift manifest data cannot be read or parsed, Rust still emits a Swift manifest fallback row with Swift parser identity instead of an anonymous empty package record.
+
 ## Why this matters
 
 - **Correct top-level package identity**: Swift scans emit the intended root package instead of deriving it from the wrong artifact
@@ -42,6 +45,7 @@ Rust applies Swift-specific assembly rules with five durable behaviors:
 - **Less overstated intent**: manifest and lockfile artifacts stop claiming runtime/directness they cannot actually prove
 - **Safer package ownership**: nested Swift packages no longer inherit the wrong file assignments
 - **More useful partial scans**: resolved-only repositories still produce meaningful package results
+- **Clearer malformed-input output**: Swift manifest failures still point back to the Swift manifest parser and datasource instead of disappearing into untyped fallback output
 
 ## Relationship to `swift-show-dependencies-parser.md`
 

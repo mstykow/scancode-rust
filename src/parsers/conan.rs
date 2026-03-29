@@ -54,7 +54,7 @@ impl PackageParser for ConanFilePyParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ConanConanFilePy)];
             }
         };
 
@@ -62,7 +62,7 @@ impl PackageParser for ConanFilePyParser {
             Ok(statements) => parse_conanfile_py(&statements),
             Err(e) => {
                 warn!("Failed to parse Python AST in {}: {}", path.display(), e);
-                default_package_data()
+                default_package_data(DatasourceId::ConanConanFilePy)
             }
         }]
     }
@@ -78,7 +78,7 @@ fn parse_conanfile_py(statements: &[ast::Stmt]) -> PackageData {
         }
     }
 
-    default_package_data()
+    default_package_data(DatasourceId::ConanConanFilePy)
 }
 
 /// Check if class inherits from ConanFile
@@ -182,7 +182,7 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
         license_detections,
         extracted_license_statement: extracted_license,
         datasource_id: Some(DatasourceId::ConanConanFilePy),
-        ..default_package_data()
+        ..default_package_data(DatasourceId::ConanConanFilePy)
     }
 }
 
@@ -323,7 +323,7 @@ impl PackageParser for ConanfileTxtParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ConanConanFileTxt)];
             }
         };
 
@@ -334,7 +334,7 @@ impl PackageParser for ConanfileTxtParser {
             dependencies,
             primary_language: Some("C++".to_string()),
             datasource_id: Some(DatasourceId::ConanConanFileTxt),
-            ..default_package_data()
+            ..default_package_data(DatasourceId::ConanConanFileTxt)
         }]
     }
 }
@@ -357,7 +357,7 @@ impl PackageParser for ConanLockParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ConanLock)];
             }
         };
 
@@ -365,7 +365,7 @@ impl PackageParser for ConanLockParser {
             Ok(j) => j,
             Err(e) => {
                 warn!("Failed to parse JSON in {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::ConanLock)];
             }
         };
 
@@ -376,7 +376,7 @@ impl PackageParser for ConanLockParser {
             dependencies,
             primary_language: Some("C++".to_string()),
             datasource_id: Some(DatasourceId::ConanLock),
-            ..default_package_data()
+            ..default_package_data(DatasourceId::ConanLock)
         }]
     }
 }
@@ -481,10 +481,11 @@ fn parse_conan_lock(json: &Value) -> Vec<Dependency> {
     dependencies
 }
 
-fn default_package_data() -> PackageData {
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
         package_type: Some(ConanFilePyParser::PACKAGE_TYPE),
         primary_language: Some("C++".to_string()),
+        datasource_id: Some(datasource_id),
         ..Default::default()
     }
 }

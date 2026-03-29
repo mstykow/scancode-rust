@@ -16,6 +16,7 @@ enum FileReferenceResolverKind {
     About,
     AttachedManifest,
     CondaMeta,
+    DebianExtractedDeb,
     InstalledDb,
     PythonMetadata,
     RelativeToDatafileParent,
@@ -93,6 +94,10 @@ const FILE_REFERENCE_RESOLVER_CONFIGS: &[FileReferenceResolverConfig] = &[
         kind: FileReferenceResolverKind::CondaMeta,
     },
     FileReferenceResolverConfig {
+        datasource_ids: &[DatasourceId::DebianMd5SumsInExtractedDeb],
+        kind: FileReferenceResolverKind::DebianExtractedDeb,
+    },
+    FileReferenceResolverConfig {
         datasource_ids: INSTALLED_DB_DATASOURCE_IDS,
         kind: FileReferenceResolverKind::InstalledDb,
     },
@@ -143,6 +148,9 @@ pub fn resolve_file_references(
             }
             FileReferenceResolverKind::CondaMeta => {
                 resolve_conda_file_references(files, &path_index, package);
+            }
+            FileReferenceResolverKind::DebianExtractedDeb => {
+                resolve_debian_extracted_deb_file_references(files, &path_index, package)
             }
             FileReferenceResolverKind::InstalledDb => {
                 resolve_installed_db_file_references(files, &path_index, package, dependencies);
@@ -333,6 +341,60 @@ fn resolve_installed_db_file_references(
     {
         apply_rpm_namespace(files, package, dependencies, &namespace);
     }
+}
+
+fn resolve_debian_extracted_deb_file_references(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+) {
+    let Some(datafile_path) = package
+        .datafile_paths
+        .iter()
+        .find(|path| path.ends_with("/md5sums"))
+    else {
+        return;
+    };
+
+    let Some(md5sums_parent) = Path::new(datafile_path).parent() else {
+        return;
+    };
+    let Some(extracted_root) = md5sums_parent.parent() else {
+        return;
+    };
+    let root = extracted_root.to_string_lossy().to_string();
+
+    let Some(&file_idx) = path_index.get(datafile_path) else {
+        return;
+    };
+    let file_references: Vec<_> = files[file_idx]
+        .package_data
+        .iter()
+        .filter(|pkg_data| {
+            pkg_data.datasource_id == Some(DatasourceId::DebianMd5SumsInExtractedDeb)
+        })
+        .flat_map(|pkg_data| pkg_data.file_references.clone())
+        .collect();
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let resolved_path = if root.is_empty() {
+            file_ref.path.trim_start_matches('/').to_string()
+        } else {
+            format!("{}/{}", root, file_ref.path.trim_start_matches('/'))
+        };
+
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
 }
 
 fn resolve_python_metadata_file_references(

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::Path;
 
     use super::super::scan_test_utils::{
@@ -50,6 +51,38 @@ mod tests {
             "/site-packages/requests-2.32.3.dist-info/METADATA",
             &pypi_package.package_uid,
             DatasourceId::PypiWheelMetadata,
+        );
+    }
+
+    #[test]
+    fn test_conda_hyphenated_environment_alias_scans_and_assembles() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("conda-env.yaml"),
+            "name: alias-env\ndependencies:\n  - requests=2.32.3\n",
+        )
+        .expect("write conda-env.yaml");
+
+        let (files, result) = scan_and_assemble(temp_dir.path());
+
+        let package = result
+            .packages
+            .iter()
+            .find(|package| package.package_type == Some(PackageType::Conda))
+            .expect("conda alias environment should assemble a package");
+
+        assert_eq!(package.name.as_deref(), Some("alias-env"));
+        assert_eq!(package.datasource_ids, vec![DatasourceId::CondaYaml]);
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:conda/requests@2.32.3",
+            "conda-env.yaml",
+        );
+        assert_file_links_to_package(
+            &files,
+            "/conda-env.yaml",
+            &package.package_uid,
+            DatasourceId::CondaYaml,
         );
     }
 }

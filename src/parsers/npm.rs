@@ -606,7 +606,9 @@ fn extract_name_from_author_string(author_str: &str) -> Option<String> {
 
 fn default_package_data() -> PackageData {
     PackageData {
+        package_type: Some(NpmParser::PACKAGE_TYPE),
         primary_language: Some("JavaScript".to_string()),
+        datasource_id: Some(DatasourceId::NpmPackageJson),
         ..Default::default()
     }
 }

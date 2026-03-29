@@ -191,6 +191,14 @@ fn build_nested_dependency(tuple: DependencyTuple) -> Result<Dependency, String>
     })
 }
 
+crate::register_parser!(
+    "Hex mix.lock lockfile",
+    &["**/mix.lock"],
+    "hex",
+    "Elixir",
+    Some("https://hexdocs.pm/mix/Mix.Tasks.Deps.html"),
+);
+
 #[derive(Debug)]
 struct DependencyTuple {
     app_name: String,

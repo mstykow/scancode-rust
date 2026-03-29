@@ -99,7 +99,7 @@ impl PackageParser for SwiftManifestJsonParser {
                         "Failed to read or parse Swift manifest JSON at {:?}: {}",
                         path, e
                     );
-                    return vec![default_package_data()];
+                    return vec![default_package_data(path)];
                 }
             };
             parse_swift_manifest(&json_content)
@@ -112,7 +112,7 @@ impl PackageParser for SwiftManifestJsonParser {
                             "Swift toolchain generated invalid JSON for {:?}: {}",
                             path, e
                         );
-                        default_package_data()
+                        default_package_data(path)
                     }
                 },
                 Err(e) => {
@@ -122,11 +122,11 @@ impl PackageParser for SwiftManifestJsonParser {
                              To scan this file, manually run: swift package dump-package > Package.swift.json",
                         path, e
                     );
-                    default_package_data()
+                    default_package_data(path)
                 }
             }
         } else {
-            default_package_data()
+            default_package_data(path)
         }]
     }
 
@@ -695,8 +695,15 @@ fn write_cache_file(path: &Path, content: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn default_package_data() -> PackageData {
-    PackageData::default()
+fn default_package_data(path: &Path) -> PackageData {
+    let _ = path;
+
+    PackageData {
+        package_type: Some(SwiftManifestJsonParser::PACKAGE_TYPE),
+        primary_language: Some("Swift".to_string()),
+        datasource_id: Some(DatasourceId::SwiftPackageManifestJson),
+        ..Default::default()
+    }
 }
 
 crate::register_parser!(

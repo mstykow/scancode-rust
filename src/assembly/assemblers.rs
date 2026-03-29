@@ -5,7 +5,7 @@ use super::{
     AssemblerConfig, AssemblyMode, DirectoryMergeOutput, cargo_resource_assign,
     cargo_workspace_merge, composer_resource_assign, conda_rootfs_merge, file_ref_resolve,
     hackage_merge, npm_resource_assign, npm_workspace_merge, nuget_cpm_resolve,
-    ruby_resource_assign, swift_merge,
+    python_requirements_assign, ruby_resource_assign, swift_merge,
 };
 
 #[derive(Clone, Copy)]
@@ -19,6 +19,7 @@ pub(super) enum PostAssemblyPassKind {
     SwiftMerge,
     CondaRootfsMerge,
     NpmResourceAssign,
+    PythonRequirementsAssign,
     FileReferenceResolve,
     RpmYumdbMerge,
     NpmWorkspaceMerge,
@@ -43,6 +44,7 @@ pub(super) static POST_ASSEMBLY_PASSES: &[PostAssemblyPassKind] = &[
     PostAssemblyPassKind::SwiftMerge,
     PostAssemblyPassKind::CondaRootfsMerge,
     PostAssemblyPassKind::NpmResourceAssign,
+    PostAssemblyPassKind::PythonRequirementsAssign,
     PostAssemblyPassKind::FileReferenceResolve,
     PostAssemblyPassKind::RpmYumdbMerge,
     PostAssemblyPassKind::NpmWorkspaceMerge,
@@ -91,6 +93,13 @@ impl PostAssemblyPassKind {
             Self::NpmResourceAssign => {
                 npm_resource_assign::assign_npm_package_resources(files, packages)
             }
+            Self::PythonRequirementsAssign => {
+                python_requirements_assign::assign_python_requirements_to_projects(
+                    files,
+                    packages,
+                    dependencies,
+                )
+            }
             Self::FileReferenceResolve => {
                 file_ref_resolve::resolve_file_references(files, packages, dependencies)
             }
@@ -137,10 +146,13 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "package.json",
             "bun.lock",
             "bun.lockb",
+            ".package-lock.json",
             "package-lock.json",
+            ".npm-shrinkwrap.json",
             "npm-shrinkwrap.json",
             "yarn.lock",
             "pnpm-lock.yaml",
+            "shrinkwrap.yaml",
             "pnpm-workspace.yaml",
         ],
         mode: AssemblyMode::SiblingMerge,
@@ -301,6 +313,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "PKG-INFO",
             "METADATA",
             "pypi.json",
+            "pip-inspect.deplock",
             "requirements*.txt",
             "Pipfile",
             "Pipfile.lock",
@@ -349,7 +362,15 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "environment.yml",
             "environment.yaml",
             "conda.yaml",
+            "conda.yml",
+            "*conda*.yaml",
+            "*conda*.yml",
             "env.yaml",
+            "env.yml",
+            "*env*.yaml",
+            "*env*.yml",
+            "*environment*.yaml",
+            "*environment*.yml",
             "*.json",
         ],
         mode: AssemblyMode::SiblingMerge,
@@ -420,6 +441,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "project.lock.json",
             "packages.config",
             "packages.lock.json",
+            "*.packages.lock.json",
             "*.vbproj",
         ],
         mode: AssemblyMode::SiblingMerge,
@@ -476,7 +498,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // OCaml/opam ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::OpamFile],
-        sibling_file_patterns: &["opam"],
+        sibling_file_patterns: &["opam", "*.opam"],
         mode: AssemblyMode::SiblingMerge,
     },
     // RPM Mariner manifest
@@ -516,7 +538,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // Buck (build system)
     AssemblerConfig {
         datasource_ids: &[DatasourceId::BuckFile, DatasourceId::BuckMetadata],
-        sibling_file_patterns: &["BUCK", ".buckconfig"],
+        sibling_file_patterns: &["BUCK", "METADATA.bzl", ".buckconfig"],
         mode: AssemblyMode::SiblingMerge,
     },
     // Ant/Ivy (Java dependency management)
@@ -564,6 +586,14 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         mode: AssemblyMode::OnePerPackageData,
     },
     AssemblerConfig {
+        datasource_ids: &[
+            DatasourceId::DebianControlExtractedDeb,
+            DatasourceId::DebianMd5SumsInExtractedDeb,
+        ],
+        sibling_file_patterns: &["control", "md5sums"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
         datasource_ids: &[DatasourceId::AboutFile],
         sibling_file_patterns: &["*.ABOUT"],
         mode: AssemblyMode::OnePerPackageData,
@@ -609,10 +639,8 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::Axis2ModuleXml,
     DatasourceId::ClojureDepsEdn,
     DatasourceId::ClojureProjectClj,
-    DatasourceId::DebianControlExtractedDeb,
     DatasourceId::DebianInstalledFilesList,
     DatasourceId::DebianInstalledMd5Sums,
-    DatasourceId::DebianMd5SumsInExtractedDeb,
     DatasourceId::DebianSourceControlDsc,
     DatasourceId::Dockerfile,
     DatasourceId::HexMixLock,

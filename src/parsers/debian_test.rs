@@ -231,4 +231,28 @@ mod tests {
         let name3 = extract_package_name_from_deb_path(&path3);
         assert_eq!(name3, Some("complex-name".to_string()));
     }
+
+    #[test]
+    fn test_debian_control_missing_file_preserves_datasource() {
+        let path = PathBuf::from("/nonexistent/debian/control");
+        let package = DebianControlParser::extract_first_package(&path);
+
+        assert_eq!(package.package_type, Some(PackageType::Deb));
+        assert_eq!(
+            package.datasource_id,
+            Some(DatasourceId::DebianControlInSource)
+        );
+    }
+
+    #[test]
+    fn test_debian_installed_missing_file_preserves_datasource() {
+        let path = PathBuf::from("/nonexistent/var/lib/dpkg/status");
+        let package = DebianInstalledParser::extract_first_package(&path);
+
+        assert_eq!(package.package_type, Some(PackageType::Deb));
+        assert_eq!(
+            package.datasource_id,
+            Some(DatasourceId::DebianInstalledStatusDb)
+        );
+    }
 }

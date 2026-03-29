@@ -2,11 +2,12 @@
 
 ## Summary
 
-Rust now goes beyond the current Python ScanCode Conda handling in two concrete ways:
+Rust now goes beyond the current Python ScanCode Conda handling in several concrete ways:
 
 1. assembles `conda-meta/*.json` installed-package metadata together with sibling recipe `meta.yaml` data so installed files are assigned back to the Conda package
 2. resolves channel-prefix ambiguity by keeping symbolic channel names as PURL namespace while preserving URL-like channel prefixes separately as `channel_url`
 3. treats top-level `environment.yml` dependency strings as Conda requirements by default, reserving PyPI classification for the explicit nested `pip:` subsection
+4. keeps Conda environment filename aliases consistent across parser matching, assembly, and supported-format metadata
 
 ## Python Status
 
@@ -39,6 +40,11 @@ Rust now goes beyond the current Python ScanCode Conda handling in two concrete 
 - Only entries explicitly nested under a `pip:` subsection are classified as PyPI dependencies.
 - This avoids misclassifying ordinary Conda environment entries such as `numpy`, `pandas>=2`, or `magma-cuda101` as `pkg:pypi/...` simply because they are also valid Python-style requirement strings.
 
+### Environment filename alias parity
+
+- Rust now keeps Conda environment aliases aligned across parser matching, assembly, and generated supported-format docs.
+- That includes `.yml` / `.yaml` forms and hyphenated alias names such as `conda-env.yaml`, rather than recognizing them in parser-only code paths while leaving assembly and supported-format reporting behind.
+
 ## Coverage
 
-Coverage spans installed-package file assignment, `conda-meta` parsing, top-level environment dependency classification, and the distinction between symbolic channel names and URL-like channel prefixes.
+Coverage spans installed-package file assignment, `conda-meta` parsing, top-level environment dependency classification, environment filename alias parity, and the distinction between symbolic channel names and URL-like channel prefixes.

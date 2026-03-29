@@ -176,11 +176,16 @@ impl PackageParser for DebianControlParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read debian/control at {:?}: {}", path, e);
-                return Vec::new();
+                return vec![default_package_data(DatasourceId::DebianControlInSource)];
             }
         };
 
-        parse_debian_control(&content)
+        let packages = parse_debian_control(&content);
+        if packages.is_empty() {
+            vec![default_package_data(DatasourceId::DebianControlInSource)]
+        } else {
+            packages
+        }
     }
 }
 
@@ -203,11 +208,16 @@ impl PackageParser for DebianInstalledParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read dpkg/status at {:?}: {}", path, e);
-                return Vec::new();
+                return vec![default_package_data(DatasourceId::DebianInstalledStatusDb)];
             }
         };
 
-        parse_dpkg_status(&content)
+        let packages = parse_dpkg_status(&content);
+        if packages.is_empty() {
+            vec![default_package_data(DatasourceId::DebianInstalledStatusDb)]
+        } else {
+            packages
+        }
     }
 }
 
@@ -836,6 +846,22 @@ crate::register_parser!(
     Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
 );
 
+crate::register_parser!(
+    "Debian installed package database (dpkg status)",
+    &["**/var/lib/dpkg/status"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
+);
+
+crate::register_parser!(
+    "Debian distroless package database (status.d)",
+    &["**/var/lib/dpkg/status.d/*"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
+);
+
 // Note: DebianInstalledParser uses try_parse_installed for Vec<PackageData>,
 // but we register it for the single-package interface too.
 
@@ -865,6 +891,14 @@ impl PackageParser for DebianDscParser {
         vec![parse_dsc_content(&content)]
     }
 }
+
+crate::register_parser!(
+    "Debian source control file (.dsc)",
+    &["**/*.dsc"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
+);
 
 fn strip_pgp_signature(content: &str) -> String {
     let mut result = String::new();
@@ -1019,6 +1053,14 @@ impl PackageParser for DebianOrigTarParser {
     }
 }
 
+crate::register_parser!(
+    "Debian original source tarball",
+    &["**/*.orig.tar.*"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-source.html"),
+);
+
 /// Parser for Debian source package metadata tarballs (*.debian.tar.*)
 pub struct DebianDebianTarParser;
 
@@ -1048,6 +1090,14 @@ impl PackageParser for DebianDebianTarParser {
         )]
     }
 }
+
+crate::register_parser!(
+    "Debian source metadata tarball",
+    &["**/*.debian.tar.*"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-source.html"),
+);
 
 fn parse_source_tarball_filename(filename: &str, datasource_id: DatasourceId) -> PackageData {
     let without_tar_ext = filename
@@ -1120,6 +1170,14 @@ impl PackageParser for DebianInstalledListParser {
     }
 }
 
+crate::register_parser!(
+    "Debian installed files list",
+    &["**/var/lib/dpkg/info/*.list"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-files.html"),
+);
+
 /// Parser for Debian installed MD5 checksum files (*.md5sums)
 pub struct DebianInstalledMd5sumsParser;
 
@@ -1157,6 +1215,14 @@ impl PackageParser for DebianInstalledMd5sumsParser {
         )]
     }
 }
+
+crate::register_parser!(
+    "Debian installed package md5sums",
+    &["**/var/lib/dpkg/info/*.md5sums"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-files.html"),
+);
 
 const IGNORED_ROOT_DIRS: &[&str] = &["/.", "/bin", "/etc", "/lib", "/sbin", "/usr", "/var"];
 
@@ -1256,6 +1322,14 @@ impl PackageParser for DebianCopyrightParser {
         vec![parse_copyright_file(&content, package_name.as_deref())]
     }
 }
+
+crate::register_parser!(
+    "Debian machine-readable copyright file",
+    &["**/debian/copyright", "**/usr/share/doc/*/copyright"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/"),
+);
 
 fn extract_package_name_from_path(path: &Path) -> Option<String> {
     let components: Vec<_> = path.components().collect();
@@ -1611,6 +1685,14 @@ impl PackageParser for DebianDebParser {
         vec![parse_deb_filename(filename)]
     }
 }
+
+crate::register_parser!(
+    "Debian binary package archive (.deb)",
+    &["**/*.deb"],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-binary.html"),
+);
 
 fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
     use flate2::read::GzDecoder;

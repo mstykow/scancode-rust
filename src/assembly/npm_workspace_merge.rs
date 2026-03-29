@@ -606,9 +606,12 @@ fn hoist_root_dependencies(
         let datasource_id = match file_name {
             "bun.lock" => Some(DatasourceId::BunLock),
             "bun.lockb" => Some(DatasourceId::BunLockb),
+            ".package-lock.json" => Some(DatasourceId::NpmPackageLockJson),
             "package-lock.json" => Some(DatasourceId::NpmPackageLockJson),
+            ".npm-shrinkwrap.json" => Some(DatasourceId::NpmPackageLockJson),
             "yarn.lock" => Some(DatasourceId::YarnLock),
             "pnpm-lock.yaml" => Some(DatasourceId::PnpmLockYaml),
+            "shrinkwrap.yaml" => Some(DatasourceId::PnpmLockYaml),
             _ => None,
         };
 
