@@ -511,10 +511,10 @@ pub struct Match {
     pub rule_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub referenced_filenames: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text_diagnostics: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub referenced_filenames: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
