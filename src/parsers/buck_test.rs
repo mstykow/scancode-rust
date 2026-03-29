@@ -38,6 +38,16 @@ fn test_parse_buck_subdir_with_rule() {
     // This BUCK file has a cxx_binary rule with name="bin"
     assert_eq!(pkg.name, Some("bin".to_string()));
     assert_eq!(pkg.extracted_license_statement, Some("LICENSE".to_string()));
+    let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
+    assert_eq!(
+        extra.get("license_file").and_then(|v| v.as_str()),
+        Some("LICENSE")
+    );
+    let referenced_filenames = pkg.license_detections[0].matches[0]
+        .referenced_filenames
+        .as_ref()
+        .expect("referenced_filenames should be present");
+    assert_eq!(referenced_filenames, &vec!["LICENSE".to_string()]);
 }
 
 #[test]
@@ -226,6 +236,33 @@ METADATA = {
         pkg.extracted_license_statement,
         Some("MIT, Apache-2.0".to_string())
     );
+}
+
+#[test]
+fn test_metadata_bzl_splits_license_references_from_license_statements() {
+    let content = r#"
+METADATA = {
+    "name": "example",
+    "version": "1.0.0",
+    "licenses": ["MIT", "LICENSE.txt"],
+}
+"#;
+    let temp_dir = tempfile::tempdir().unwrap();
+    let metadata_path = temp_dir.path().join("METADATA.bzl");
+    std::fs::write(&metadata_path, content).unwrap();
+
+    let pkg = BuckMetadataBzlParser::extract_first_package(&metadata_path);
+    assert_eq!(pkg.extracted_license_statement.as_deref(), Some("MIT"));
+    let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
+    assert_eq!(
+        extra.get("license_file").and_then(|value| value.as_str()),
+        Some("LICENSE.txt")
+    );
+    let referenced_filenames = pkg.license_detections[0].matches[0]
+        .referenced_filenames
+        .as_ref()
+        .expect("referenced_filenames should be present");
+    assert_eq!(referenced_filenames, &vec!["LICENSE.txt".to_string()]);
 }
 
 #[test]

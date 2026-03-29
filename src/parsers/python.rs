@@ -55,7 +55,10 @@ use toml::map::Map as TomlMap;
 use zip::ZipArchive;
 
 use super::PackageParser;
-use super::license_normalization::normalize_spdx_declared_license;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, normalize_spdx_declared_license,
+    normalize_spdx_expression,
+};
 
 // Field constants for pyproject.toml
 const FIELD_PROJECT: &str = "project";
@@ -1653,8 +1656,21 @@ fn build_package_data_from_rfc822(
     }
 
     let (keywords, license_classifiers) = split_classifiers(&classifiers);
+    let referenced_license_files: Vec<&str> = license_files.iter().map(String::as_str).collect();
     let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-        normalize_spdx_declared_license(license_expression.as_deref());
+        license_expression
+            .as_deref()
+            .and_then(normalize_spdx_expression)
+            .map(|normalized| {
+                build_declared_license_data(
+                    normalized,
+                    DeclaredLicenseMatchMetadata::single_line(
+                        license_expression.as_deref().unwrap_or_default(),
+                    )
+                    .with_referenced_filenames(&referenced_license_files),
+                )
+            })
+            .unwrap_or_else(|| normalize_spdx_declared_license(license_expression.as_deref()));
 
     let extracted_license_statement = license_expression
         .clone()

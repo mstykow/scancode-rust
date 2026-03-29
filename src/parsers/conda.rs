@@ -200,6 +200,12 @@ impl PackageParser for CondaMetaYamlParser {
             .and_then(|a| a.get("dev_url"))
             .and_then(|v| v.as_str())
             .map(String::from);
+        let license_file = about
+            .and_then(|a| a.get("license_file"))
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(String::from);
 
         // Extract dependencies from requirements sections
         let mut dependencies = Vec::new();
@@ -249,6 +255,12 @@ impl PackageParser for CondaMetaYamlParser {
         pkg.vcs_url = vcs_url;
         pkg.sha256 = sha256;
         pkg.dependencies = dependencies;
+        if let Some(license_file) = license_file {
+            extra_data.insert(
+                "license_file".to_string(),
+                serde_json::Value::String(license_file),
+            );
+        }
         if !extra_data.is_empty() {
             pkg.extra_data = Some(extra_data);
         }
