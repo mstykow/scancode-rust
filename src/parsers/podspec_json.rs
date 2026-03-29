@@ -130,6 +130,19 @@ impl PackageParser for PodspecJsonParser {
             extra_data.insert(FIELD_DEPENDENCIES.to_string(), deps.clone());
         }
 
+        if let Some(license_file) = json_content
+            .get(FIELD_LICENSE)
+            .and_then(|license| license.as_object())
+            .and_then(|license| license.get("file"))
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty())
+        {
+            extra_data.insert(
+                "license_file".to_string(),
+                Value::String(license_file.trim().to_string()),
+            );
+        }
+
         // Store full JSON in extra_data
         extra_data.insert("podspec.json".to_string(), json_content.clone());
 
