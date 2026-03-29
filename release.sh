@@ -43,12 +43,12 @@ if [ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]; then
     cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact
     
     if [ -n "$EXECUTE_FLAG" ]; then
-        git add reference/scancode-toolkit resources/license_detection/license_index.bincode.zst
+        git add reference/scancode-toolkit resources/license_detection/license_index.zst
         git commit -m "chore: update license rules/licenses to latest"
         echo "✅ Committed license data update"
     else
         echo "ℹ️  License data would be updated (dry-run mode)"
-        git restore reference/scancode-toolkit resources/license_detection/license_index.bincode.zst
+        git restore reference/scancode-toolkit resources/license_detection/license_index.zst
     fi
 else
     echo "✅ License data already up to date"

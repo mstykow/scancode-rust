@@ -5,93 +5,20 @@
 //! ensure deterministic serialization, and byte vectors for automatons.
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::license_detection::automaton::Automaton;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{TokenDictionary, TokenId, TokenKind};
-use crate::license_detection::models::{License, Rule};
+use crate::license_detection::models::{License, Rule, RuleKind};
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 pub type HighPostingsEntry = (u16, Vec<usize>);
 pub type HighPostingsByRidEntry = (usize, Vec<HighPostingsEntry>);
-
-// This struct and its methods will be used by the xtask build process
-// and runtime index loading in upcoming phases.
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializedLicenseIndex {
-    pub schema_version: u32,
-    pub data: Vec<u8>,
-}
-
-// These methods will be used by the xtask build process and runtime index loading.
-#[allow(dead_code)]
-impl SerializedLicenseIndex {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
-        let serialized =
-            bincode::serde::encode_to_vec(self, bincode::config::standard()).map_err(|e| {
-                SerializationError(format!("Failed to serialize SerializedLicenseIndex: {}", e))
-            })?;
-        Ok(serialized)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, SerializationError> {
-        let (index, _): (Self, _) =
-            bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(|e| {
-                SerializationError(format!(
-                    "Failed to deserialize SerializedLicenseIndex: {}",
-                    e
-                ))
-            })?;
-        Ok(index)
-    }
-
-    pub fn decompress(&self) -> Result<EmbeddedLicenseIndex, SerializationError> {
-        let decompressed = zstd::decode_all(&self.data[..]).map_err(|e| {
-            SerializationError(format!("Failed to decompress license index: {}", e))
-        })?;
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard()).map_err(
-                |e| {
-                    SerializationError(format!("Failed to deserialize EmbeddedLicenseIndex: {}", e))
-                },
-            )?;
-        Ok(index)
-    }
-
-    pub fn decompress_from_bytes(bytes: &[u8]) -> Result<EmbeddedLicenseIndex, SerializationError> {
-        let serialized: SerializedLicenseIndex =
-            bincode::serde::decode_from_slice(bytes, bincode::config::standard())
-                .map_err(|e| {
-                    SerializationError(format!(
-                        "Failed to deserialize SerializedLicenseIndex: {}",
-                        e
-                    ))
-                })?
-                .0;
-
-        if serialized.schema_version != SCHEMA_VERSION {
-            return Err(SerializationError(format!(
-                "Schema version mismatch: expected {}, got {}",
-                SCHEMA_VERSION, serialized.schema_version
-            )));
-        }
-
-        let decompressed = zstd::decode_all(&serialized.data[..]).map_err(|e| {
-            SerializationError(format!("Failed to decompress license index: {}", e))
-        })?;
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard()).map_err(
-                |e| {
-                    SerializationError(format!("Failed to deserialize EmbeddedLicenseIndex: {}", e))
-                },
-            )?;
-        Ok(index)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SerializationError(pub String);
@@ -104,19 +31,190 @@ impl std::fmt::Display for SerializationError {
 
 impl std::error::Error for SerializationError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
+pub struct EmbeddedRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl From<Range<usize>> for EmbeddedRange {
+    fn from(range: Range<usize>) -> Self {
+        Self {
+            start: range.start,
+            end: range.end,
+        }
+    }
+}
+
+impl From<EmbeddedRange> for Range<usize> {
+    fn from(embedded: EmbeddedRange) -> Self {
+        embedded.start..embedded.end
+    }
+}
+
+impl From<ArchivedEmbeddedRange> for EmbeddedRange {
+    fn from(archived: ArchivedEmbeddedRange) -> Self {
+        Self {
+            start: u32::from(archived.start) as usize,
+            end: u32::from(archived.end) as usize,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
 pub struct EmbeddedTokenMetadata {
     pub kind: TokenKind,
     pub is_digit_only: bool,
     pub is_short_or_digit: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
 pub struct EmbeddedTokenDictionary {
     pub tokens_to_ids: Vec<(String, u16)>,
     pub token_metadata: Vec<Option<EmbeddedTokenMetadata>>,
     pub len_legalese: usize,
     pub next_id: u16,
+}
+
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
+pub struct EmbeddedRule {
+    pub identifier: String,
+    pub license_expression: String,
+    pub text: String,
+    pub tokens: Vec<u16>,
+    pub rule_kind: RuleKind,
+    pub is_false_positive: bool,
+    pub is_required_phrase: bool,
+    pub is_from_license: bool,
+    pub relevance: u8,
+    pub minimum_coverage: Option<u8>,
+    pub has_stored_minimum_coverage: bool,
+    pub is_continuous: bool,
+    pub required_phrase_spans: Vec<EmbeddedRange>,
+    pub stopwords_by_pos: Vec<(usize, usize)>,
+    pub referenced_filenames: Option<Vec<String>>,
+    pub ignorable_urls: Option<Vec<String>>,
+    pub ignorable_emails: Option<Vec<String>>,
+    pub ignorable_copyrights: Option<Vec<String>>,
+    pub ignorable_holders: Option<Vec<String>>,
+    pub ignorable_authors: Option<Vec<String>>,
+    pub language: Option<String>,
+    pub notes: Option<String>,
+    pub length_unique: usize,
+    pub high_length_unique: usize,
+    pub high_length: usize,
+    pub min_matched_length: usize,
+    pub min_high_matched_length: usize,
+    pub min_matched_length_unique: usize,
+    pub min_high_matched_length_unique: usize,
+    pub is_small: bool,
+    pub is_tiny: bool,
+    pub starts_with_license: bool,
+    pub ends_with_license: bool,
+    pub is_deprecated: bool,
+    pub spdx_license_key: Option<String>,
+    pub other_spdx_license_keys: Vec<String>,
+}
+
+impl From<&Rule> for EmbeddedRule {
+    fn from(rule: &Rule) -> Self {
+        let mut stopwords_by_pos: Vec<(usize, usize)> = rule
+            .stopwords_by_pos
+            .iter()
+            .map(|(k, v)| (*k, *v))
+            .collect();
+        stopwords_by_pos.sort_by_key(|(k, _)| *k);
+
+        Self {
+            identifier: rule.identifier.clone(),
+            license_expression: rule.license_expression.clone(),
+            text: rule.text.clone(),
+            tokens: rule.tokens.iter().map(|t| t.raw()).collect(),
+            rule_kind: rule.rule_kind,
+            is_false_positive: rule.is_false_positive,
+            is_required_phrase: rule.is_required_phrase,
+            is_from_license: rule.is_from_license,
+            relevance: rule.relevance,
+            minimum_coverage: rule.minimum_coverage,
+            has_stored_minimum_coverage: rule.has_stored_minimum_coverage,
+            is_continuous: rule.is_continuous,
+            required_phrase_spans: rule
+                .required_phrase_spans
+                .iter()
+                .map(|r| EmbeddedRange::from(r.clone()))
+                .collect(),
+            stopwords_by_pos,
+            referenced_filenames: rule.referenced_filenames.clone(),
+            ignorable_urls: rule.ignorable_urls.clone(),
+            ignorable_emails: rule.ignorable_emails.clone(),
+            ignorable_copyrights: rule.ignorable_copyrights.clone(),
+            ignorable_holders: rule.ignorable_holders.clone(),
+            ignorable_authors: rule.ignorable_authors.clone(),
+            language: rule.language.clone(),
+            notes: rule.notes.clone(),
+            length_unique: rule.length_unique,
+            high_length_unique: rule.high_length_unique,
+            high_length: rule.high_length,
+            min_matched_length: rule.min_matched_length,
+            min_high_matched_length: rule.min_high_matched_length,
+            min_matched_length_unique: rule.min_matched_length_unique,
+            min_high_matched_length_unique: rule.min_high_matched_length_unique,
+            is_small: rule.is_small,
+            is_tiny: rule.is_tiny,
+            starts_with_license: rule.starts_with_license,
+            ends_with_license: rule.ends_with_license,
+            is_deprecated: rule.is_deprecated,
+            spdx_license_key: rule.spdx_license_key.clone(),
+            other_spdx_license_keys: rule.other_spdx_license_keys.clone(),
+        }
+    }
+}
+
+impl From<EmbeddedRule> for Rule {
+    fn from(embedded: EmbeddedRule) -> Self {
+        Self {
+            identifier: embedded.identifier,
+            license_expression: embedded.license_expression,
+            text: embedded.text,
+            tokens: embedded.tokens.into_iter().map(TokenId::new).collect(),
+            rule_kind: embedded.rule_kind,
+            is_false_positive: embedded.is_false_positive,
+            is_required_phrase: embedded.is_required_phrase,
+            is_from_license: embedded.is_from_license,
+            relevance: embedded.relevance,
+            minimum_coverage: embedded.minimum_coverage,
+            has_stored_minimum_coverage: embedded.has_stored_minimum_coverage,
+            is_continuous: embedded.is_continuous,
+            required_phrase_spans: embedded
+                .required_phrase_spans
+                .into_iter()
+                .map(Range::from)
+                .collect(),
+            stopwords_by_pos: embedded.stopwords_by_pos.into_iter().collect(),
+            referenced_filenames: embedded.referenced_filenames,
+            ignorable_urls: embedded.ignorable_urls,
+            ignorable_emails: embedded.ignorable_emails,
+            ignorable_copyrights: embedded.ignorable_copyrights,
+            ignorable_holders: embedded.ignorable_holders,
+            ignorable_authors: embedded.ignorable_authors,
+            language: embedded.language,
+            notes: embedded.notes,
+            length_unique: embedded.length_unique,
+            high_length_unique: embedded.high_length_unique,
+            high_length: embedded.high_length,
+            min_matched_length: embedded.min_matched_length,
+            min_high_matched_length: embedded.min_high_matched_length,
+            min_matched_length_unique: embedded.min_matched_length_unique,
+            min_high_matched_length_unique: embedded.min_high_matched_length_unique,
+            is_small: embedded.is_small,
+            is_tiny: embedded.is_tiny,
+            starts_with_license: embedded.starts_with_license,
+            ends_with_license: embedded.ends_with_license,
+            is_deprecated: embedded.is_deprecated,
+            spdx_license_key: embedded.spdx_license_key,
+            other_spdx_license_keys: embedded.other_spdx_license_keys,
+        }
+    }
 }
 
 impl From<&TokenDictionary> for EmbeddedTokenDictionary {
@@ -178,13 +276,28 @@ impl From<EmbeddedTokenDictionary> for TokenDictionary {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl From<&ArchivedEmbeddedTokenDictionary> for TokenDictionary {
+    fn from(archived: &ArchivedEmbeddedTokenDictionary) -> Self {
+        let embedded: EmbeddedTokenDictionary =
+            rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
+        embedded.into()
+    }
+}
+
+impl From<&ArchivedEmbeddedRule> for Rule {
+    fn from(archived: &ArchivedEmbeddedRule) -> Self {
+        let embedded: EmbeddedRule = rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
+        embedded.into()
+    }
+}
+
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize, Serialize, Deserialize)]
 pub struct EmbeddedLicenseIndex {
     pub schema_version: u32,
     pub dictionary: EmbeddedTokenDictionary,
     pub len_legalese: usize,
     pub rid_by_hash: Vec<([u8; 20], usize)>,
-    pub rules_by_rid: Vec<Rule>,
+    pub rules_by_rid: Vec<EmbeddedRule>,
     pub tids_by_rid: Vec<Vec<u16>>,
     pub rules_automaton: Vec<u8>,
     pub unknown_automaton: Vec<u8>,
@@ -309,7 +422,7 @@ impl From<&LicenseIndex> for EmbeddedLicenseIndex {
             dictionary,
             len_legalese: index.len_legalese,
             rid_by_hash,
-            rules_by_rid: index.rules_by_rid.clone(),
+            rules_by_rid: index.rules_by_rid.iter().map(EmbeddedRule::from).collect(),
             tids_by_rid,
             rules_automaton,
             unknown_automaton,
@@ -328,153 +441,153 @@ impl From<&LicenseIndex> for EmbeddedLicenseIndex {
     }
 }
 
-impl TryFrom<EmbeddedLicenseIndex> for LicenseIndex {
+impl TryFrom<&ArchivedEmbeddedLicenseIndex> for LicenseIndex {
     type Error = SerializationError;
 
-    fn try_from(embedded: EmbeddedLicenseIndex) -> Result<Self, Self::Error> {
-        use std::time::Instant;
-        let t0 = Instant::now();
-
-        if embedded.schema_version != SCHEMA_VERSION {
+    fn try_from(archived: &ArchivedEmbeddedLicenseIndex) -> Result<Self, Self::Error> {
+        if u32::from(archived.schema_version) != SCHEMA_VERSION {
             return Err(SerializationError(format!(
                 "Schema version mismatch: expected {}, got {}",
-                SCHEMA_VERSION, embedded.schema_version
+                SCHEMA_VERSION,
+                u32::from(archived.schema_version)
             )));
         }
 
-        let dictionary = TokenDictionary::from(embedded.dictionary);
-        let t1 = Instant::now();
-        eprintln!(
-            "    [try_from] TokenDictionary::from took {:?}",
-            t1.duration_since(t0)
-        );
+        let dictionary = TokenDictionary::from(&archived.dictionary);
 
-        let rid_by_hash: HashMap<[u8; 20], usize> = embedded.rid_by_hash.into_iter().collect();
-        let t2 = Instant::now();
-        eprintln!(
-            "    [try_from] rid_by_hash.collect took {:?}",
-            t2.duration_since(t1)
-        );
+        let rid_by_hash: HashMap<[u8; 20], usize> = archived
+            .rid_by_hash
+            .iter()
+            .map(|entry| (entry.0, u32::from(entry.1) as usize))
+            .collect();
 
-        let tids_by_rid: Vec<Vec<TokenId>> = embedded
+        let tids_by_rid: Vec<Vec<TokenId>> = archived
             .tids_by_rid
-            .into_iter()
-            .map(|tids| tids.into_iter().map(TokenId::new).collect())
+            .iter()
+            .map(|tids| {
+                tids.iter()
+                    .map(|tid| TokenId::new(u16::from(*tid)))
+                    .collect()
+            })
             .collect();
-        let t3 = Instant::now();
-        eprintln!(
-            "    [try_from] tids_by_rid took {:?}",
-            t3.duration_since(t2)
-        );
 
-        let rules_automaton = Automaton::deserialize_unchecked(&embedded.rules_automaton);
-        let t4 = Instant::now();
-        eprintln!(
-            "    [try_from] rules_automaton.deserialize took {:?}",
-            t4.duration_since(t3)
-        );
+        let rules_automaton = Automaton::deserialize_unchecked(archived.rules_automaton.as_slice());
 
-        let unknown_automaton = Automaton::deserialize_unchecked(&embedded.unknown_automaton);
-        let t5 = Instant::now();
-        eprintln!(
-            "    [try_from] unknown_automaton.deserialize took {:?}",
-            t5.duration_since(t4)
-        );
+        let unknown_automaton =
+            Automaton::deserialize_unchecked(archived.unknown_automaton.as_slice());
 
-        let sets_by_rid: HashMap<usize, HashSet<TokenId>> = embedded
+        let sets_by_rid: HashMap<usize, HashSet<TokenId>> = archived
             .sets_by_rid
-            .into_iter()
-            .map(|(rid, tokens)| (rid, tokens.into_iter().map(TokenId::new).collect()))
+            .iter()
+            .map(|entry| {
+                (
+                    u32::from(entry.0) as usize,
+                    entry
+                        .1
+                        .iter()
+                        .map(|tid| TokenId::new(u16::from(*tid)))
+                        .collect(),
+                )
+            })
             .collect();
-        let t6 = Instant::now();
-        eprintln!(
-            "    [try_from] sets_by_rid took {:?}",
-            t6.duration_since(t5)
-        );
 
-        let msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = embedded
+        let msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = archived
             .msets_by_rid
-            .into_iter()
-            .map(|(rid, entries)| {
+            .iter()
+            .map(|entry| {
                 (
-                    rid,
-                    entries
-                        .into_iter()
-                        .map(|(tid, count)| (TokenId::new(tid), count as usize))
+                    u32::from(entry.0) as usize,
+                    entry
+                        .1
+                        .iter()
+                        .map(|pair| (TokenId::new(u16::from(pair.0)), u16::from(pair.1) as usize))
                         .collect(),
                 )
             })
             .collect();
-        let t7 = Instant::now();
-        eprintln!(
-            "    [try_from] msets_by_rid took {:?}",
-            t7.duration_since(t6)
-        );
 
-        let high_sets_by_rid: HashMap<usize, HashSet<TokenId>> = embedded
+        let high_sets_by_rid: HashMap<usize, HashSet<TokenId>> = archived
             .high_sets_by_rid
-            .into_iter()
-            .map(|(rid, tokens)| (rid, tokens.into_iter().map(TokenId::new).collect()))
-            .collect();
-        let t8 = Instant::now();
-        eprintln!(
-            "    [try_from] high_sets_by_rid took {:?}",
-            t8.duration_since(t7)
-        );
-
-        let high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = embedded
-            .high_postings_by_rid
-            .into_iter()
-            .map(|(rid, entries)| {
+            .iter()
+            .map(|entry| {
                 (
-                    rid,
-                    entries
-                        .into_iter()
-                        .map(|(tid, positions)| (TokenId::new(tid), positions))
+                    u32::from(entry.0) as usize,
+                    entry
+                        .1
+                        .iter()
+                        .map(|tid| TokenId::new(u16::from(*tid)))
                         .collect(),
                 )
             })
             .collect();
-        let t9 = Instant::now();
-        eprintln!(
-            "    [try_from] high_postings_by_rid took {:?}",
-            t9.duration_since(t8)
-        );
 
-        let false_positive_rids: HashSet<usize> =
-            embedded.false_positive_rids.into_iter().collect();
-
-        let approx_matchable_rids: HashSet<usize> =
-            embedded.approx_matchable_rids.into_iter().collect();
-
-        let licenses_by_key: HashMap<String, License> =
-            embedded.licenses_by_key.into_iter().collect();
-        let t10 = Instant::now();
-        eprintln!(
-            "    [try_from] licenses_by_key took {:?}",
-            t10.duration_since(t9)
-        );
-
-        let rid_by_spdx_key: HashMap<String, usize> =
-            embedded.rid_by_spdx_key.into_iter().collect();
-
-        let rids_by_high_tid: HashMap<TokenId, HashSet<usize>> = embedded
-            .rids_by_high_tid
-            .into_iter()
-            .map(|(tid, rids)| (TokenId::new(tid), rids.into_iter().collect()))
+        let high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = archived
+            .high_postings_by_rid
+            .iter()
+            .map(|entry| {
+                (
+                    u32::from(entry.0) as usize,
+                    entry
+                        .1
+                        .iter()
+                        .map(|pair| {
+                            (
+                                TokenId::new(u16::from(pair.0)),
+                                pair.1.iter().map(|p| u32::from(*p) as usize).collect(),
+                            )
+                        })
+                        .collect(),
+                )
+            })
             .collect();
-        let t11 = Instant::now();
-        eprintln!(
-            "    [try_from] rids_by_high_tid took {:?}",
-            t11.duration_since(t10)
-        );
-        eprintln!("    [try_from] TOTAL took {:?}", t11.duration_since(t0));
+
+        let false_positive_rids: HashSet<usize> = archived
+            .false_positive_rids
+            .iter()
+            .map(|v| u32::from(*v) as usize)
+            .collect();
+
+        let approx_matchable_rids: HashSet<usize> = archived
+            .approx_matchable_rids
+            .iter()
+            .map(|v| u32::from(*v) as usize)
+            .collect();
+
+        let licenses_by_key: HashMap<String, License> = archived
+            .licenses_by_key
+            .iter()
+            .map(|entry| {
+                (
+                    entry.0.as_str().to_string(),
+                    rkyv::deserialize::<_, rkyv::rancor::Error>(&entry.1).unwrap(),
+                )
+            })
+            .collect();
+
+        let rid_by_spdx_key: HashMap<String, usize> = archived
+            .rid_by_spdx_key
+            .iter()
+            .map(|entry| (entry.0.as_str().to_string(), u32::from(entry.1) as usize))
+            .collect();
+
+        let rids_by_high_tid: HashMap<TokenId, HashSet<usize>> = archived
+            .rids_by_high_tid
+            .iter()
+            .map(|entry| {
+                (
+                    TokenId::new(u16::from(entry.0)),
+                    entry.1.iter().map(|v| u32::from(*v) as usize).collect(),
+                )
+            })
+            .collect();
+
+        let rules_by_rid: Vec<Rule> = archived.rules_by_rid.iter().map(Rule::from).collect();
 
         Ok(LicenseIndex {
             dictionary,
-            len_legalese: embedded.len_legalese,
+            len_legalese: u32::from(archived.len_legalese) as usize,
             rid_by_hash,
-            rules_by_rid: embedded.rules_by_rid,
+            rules_by_rid,
             tids_by_rid,
             rules_automaton,
             unknown_automaton,
@@ -485,77 +598,46 @@ impl TryFrom<EmbeddedLicenseIndex> for LicenseIndex {
             false_positive_rids,
             approx_matchable_rids,
             licenses_by_key,
-            pattern_id_to_rid: embedded.pattern_id_to_rid,
+            pattern_id_to_rid: archived
+                .pattern_id_to_rid
+                .iter()
+                .map(|v| v.iter().map(|p| u32::from(*p) as usize).collect())
+                .collect(),
             rid_by_spdx_key,
-            unknown_spdx_rid: embedded.unknown_spdx_rid,
+            unknown_spdx_rid: match &archived.unknown_spdx_rid {
+                rkyv::option::ArchivedOption::Some(v) => Some(u32::from(*v) as usize),
+                rkyv::option::ArchivedOption::None => None,
+            },
             rids_by_high_tid,
         })
     }
 }
 
-// This method will be used by the xtask build process in upcoming phases.
-#[allow(dead_code)]
+// This method is used by the xtask build process.
 impl EmbeddedLicenseIndex {
-    pub fn serialize(&self) -> Result<SerializedLicenseIndex, SerializationError> {
-        let bincode_data = bincode::serde::encode_to_vec(self, bincode::config::standard())
-            .map_err(|e| {
-                SerializationError(format!("Failed to serialize EmbeddedLicenseIndex: {}", e))
-            })?;
-
-        let compressed = zstd::encode_all(&bincode_data[..], 0)
-            .map_err(|e| SerializationError(format!("Failed to compress license index: {}", e)))?;
-
-        Ok(SerializedLicenseIndex {
-            schema_version: SCHEMA_VERSION,
-            data: compressed,
-        })
-    }
-
     pub fn serialize_to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
-        let bincode_data = bincode::serde::encode_to_vec(self, bincode::config::standard())
-            .map_err(|e| {
-                SerializationError(format!("Failed to serialize EmbeddedLicenseIndex: {}", e))
-            })?;
+        let rkyv_data = rkyv::to_bytes::<rkyv::rancor::Error>(self).map_err(|e| {
+            SerializationError(format!("Failed to serialize EmbeddedLicenseIndex: {}", e))
+        })?;
 
-        zstd::encode_all(&bincode_data[..], 0)
+        zstd::encode_all(&rkyv_data[..], 0)
             .map_err(|e| SerializationError(format!("Failed to compress license index: {}", e)))
     }
+}
 
-    pub fn deserialize_from_bytes(bytes: &[u8]) -> Result<Self, SerializationError> {
-        use std::time::Instant;
-        let t0 = Instant::now();
+pub fn load_license_index_from_bytes(bytes: &[u8]) -> Result<LicenseIndex, SerializationError> {
+    let decompressed = zstd::decode_all(bytes)
+        .map_err(|e| SerializationError(format!("Failed to decompress license index: {}", e)))?;
 
-        let decompressed = zstd::decode_all(bytes).map_err(|e| {
-            SerializationError(format!("Failed to decompress license index: {}", e))
+    let archived: &ArchivedEmbeddedLicenseIndex =
+        rkyv::access::<_, rkyv::rancor::Error>(&decompressed).map_err(|e| {
+            SerializationError(format!(
+                "Failed to access archived EmbeddedLicenseIndex: {}",
+                e
+            ))
         })?;
-        let t1 = Instant::now();
-        eprintln!(
-            "  [deserialize_from_bytes] zstd::decode_all took {:?}",
-            t1.duration_since(t0)
-        );
-        eprintln!(
-            "  [deserialize_from_bytes] decompressed size: {} MB",
-            decompressed.len() / 1_000_000
-        );
 
-        let (index, _): (Self, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard()).map_err(
-                |e| {
-                    SerializationError(format!("Failed to deserialize EmbeddedLicenseIndex: {}", e))
-                },
-            )?;
-        let t2 = Instant::now();
-        eprintln!(
-            "  [deserialize_from_bytes] bincode::decode took {:?}",
-            t2.duration_since(t1)
-        );
-        eprintln!(
-            "  [deserialize_from_bytes] TOTAL took {:?}",
-            t2.duration_since(t0)
-        );
-
-        Ok(index)
-    }
+    LicenseIndex::try_from(archived)
 }
 
 #[cfg(test)]
@@ -693,8 +775,8 @@ mod tests {
         let original = create_test_license_index();
 
         let embedded = EmbeddedLicenseIndex::from(&original);
-
-        let restored = LicenseIndex::try_from(embedded).expect("Should deserialize");
+        let bytes = embedded.serialize_to_bytes().expect("Should serialize");
+        let restored = load_license_index_from_bytes(&bytes).expect("Should deserialize");
 
         assert_eq!(restored.len_legalese, original.len_legalese);
         assert_eq!(restored.rid_by_hash.len(), original.rid_by_hash.len());
@@ -735,18 +817,13 @@ mod tests {
     }
 
     #[test]
-    fn test_serialized_license_index_roundtrip() {
+    fn test_embedded_license_index_bytes_roundtrip() {
         let original = create_test_license_index();
 
         let embedded = EmbeddedLicenseIndex::from(&original);
-        let serialized = embedded.serialize().expect("Should serialize");
+        let bytes = embedded.serialize_to_bytes().expect("Should serialize");
 
-        let bytes = serialized.to_bytes().expect("Should convert to bytes");
-        let restored_serialized =
-            SerializedLicenseIndex::from_bytes(&bytes).expect("Should parse bytes");
-
-        let restored_embedded = restored_serialized.decompress().expect("Should decompress");
-        let restored = LicenseIndex::try_from(restored_embedded).expect("Should deserialize");
+        let restored = load_license_index_from_bytes(&bytes).expect("Should deserialize");
 
         assert_eq!(restored.len_legalese, original.len_legalese);
         assert_eq!(restored.rid_by_hash.len(), original.rid_by_hash.len());
@@ -762,7 +839,12 @@ mod tests {
         let mut embedded = EmbeddedLicenseIndex::from(&create_test_license_index());
         embedded.schema_version = 999;
 
-        let result = LicenseIndex::try_from(embedded);
+        let rkyv_bytes =
+            rkyv::to_bytes::<rkyv::rancor::Error>(&embedded).expect("Should serialize");
+        let archived: &ArchivedEmbeddedLicenseIndex =
+            rkyv::access::<_, rkyv::rancor::Error>(&rkyv_bytes).expect("Should access");
+
+        let result = LicenseIndex::try_from(archived);
         assert!(result.is_err());
         assert!(result.unwrap_err().0.contains("Schema version mismatch"));
     }
@@ -838,10 +920,8 @@ mod tests {
         let embedded1 = EmbeddedLicenseIndex::from(&index);
         let embedded2 = EmbeddedLicenseIndex::from(&index);
 
-        let bytes1 =
-            bincode::serde::encode_to_vec(&embedded1, bincode::config::standard()).unwrap();
-        let bytes2 =
-            bincode::serde::encode_to_vec(&embedded2, bincode::config::standard()).unwrap();
+        let bytes1 = embedded1.serialize_to_bytes().unwrap();
+        let bytes2 = embedded2.serialize_to_bytes().unwrap();
 
         assert_eq!(bytes1, bytes2, "Serialization should be deterministic");
 
@@ -852,18 +932,10 @@ mod tests {
     #[test]
     fn test_load_embedded_license_index_artifact() {
         let artifact_bytes =
-            include_bytes!("../../../resources/license_detection/license_index.bincode.zst");
+            include_bytes!("../../../resources/license_detection/license_index.zst");
 
-        let embedded = EmbeddedLicenseIndex::deserialize_from_bytes(artifact_bytes)
-            .expect("Should deserialize EmbeddedLicenseIndex");
-
-        assert_eq!(
-            embedded.schema_version, SCHEMA_VERSION,
-            "Embedded schema version should match"
-        );
-
-        let license_index =
-            LicenseIndex::try_from(embedded).expect("Should convert to LicenseIndex");
+        let license_index = load_license_index_from_bytes(artifact_bytes)
+            .expect("Should load LicenseIndex from bytes");
 
         assert!(
             !license_index.rules_by_rid.is_empty(),

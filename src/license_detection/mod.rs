@@ -32,8 +32,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::license_detection::embedded::index::EmbeddedLicenseIndex;
-use crate::license_detection::index::{LicenseIndex, build_index_from_loaded};
+use crate::license_detection::embedded::index::load_license_index_from_bytes;
+use crate::license_detection::index::build_index_from_loaded;
 use crate::license_detection::query::Query;
 use crate::license_detection::rules::{
     load_loaded_licenses_from_directory, load_loaded_rules_from_directory,
@@ -454,32 +454,23 @@ impl LicenseDetectionEngine {
         use std::time::Instant;
         let t0 = Instant::now();
 
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
         eprintln!(
             "[from_embedded] artifact_bytes.len() = {} MB",
             artifact_bytes.len() / 1_000_000
         );
 
         let t1 = Instant::now();
-        let embedded = EmbeddedLicenseIndex::deserialize_from_bytes(artifact_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded index: {}", e))?;
+        let index = load_license_index_from_bytes(artifact_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to load license index: {}", e))?;
         eprintln!(
-            "[from_embedded] deserialize_from_bytes took {:?}",
+            "[from_embedded] load_license_index_from_bytes took {:?}",
             t1.elapsed()
         );
 
         let t2 = Instant::now();
-        let index = LicenseIndex::try_from(embedded)
-            .map_err(|e| anyhow::anyhow!("Failed to convert embedded index: {}", e))?;
-        eprintln!(
-            "[from_embedded] LicenseIndex::try_from took {:?}",
-            t2.elapsed()
-        );
-
-        let t3 = Instant::now();
         let result = Self::from_index(index);
-        eprintln!("[from_embedded] from_index took {:?}", t3.elapsed());
+        eprintln!("[from_embedded] from_index took {:?}", t2.elapsed());
 
         eprintln!("[from_embedded] TOTAL took {:?}", t0.elapsed());
         result

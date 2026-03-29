@@ -7,7 +7,7 @@
 //! - Packaging (verify artifact is loadable)
 
 use super::*;
-use crate::license_detection::embedded::index::{EmbeddedLicenseIndex, SCHEMA_VERSION};
+use crate::license_detection::embedded::index::SCHEMA_VERSION;
 use crate::license_detection::{SCANCODE_LICENSES_LICENSES_PATH, SCANCODE_LICENSES_RULES_PATH};
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
@@ -206,6 +206,7 @@ limitations under the License."#;
 
 mod determinism {
     use super::*;
+    use crate::license_detection::embedded::index::EmbeddedLicenseIndex;
 
     #[test]
     fn test_compression_is_deterministic() {
@@ -239,7 +240,7 @@ mod determinism {
         let generated_bytes = embedded.serialize_to_bytes().expect("Should serialize");
 
         let checked_in_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+            include_bytes!("../../resources/license_detection/license_index.zst");
 
         assert_eq!(
             generated_bytes.as_slice(),
@@ -278,7 +279,7 @@ mod packaging {
 
     #[test]
     fn test_embedded_artifact_exists() {
-        let artifact_path = PathBuf::from("resources/license_detection/license_index.bincode.zst");
+        let artifact_path = PathBuf::from("resources/license_detection/license_index.zst");
 
         assert!(
             artifact_path.exists(),
@@ -303,71 +304,76 @@ mod packaging {
 
     #[test]
     fn test_embedded_artifact_schema_version() {
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
 
         let decompressed =
             zstd::decode_all(&artifact_bytes[..]).expect("Should decompress artifact");
 
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
-                .expect("Should deserialize artifact");
+        let archived: &rkyv::Archived<
+            crate::license_detection::embedded::index::EmbeddedLicenseIndex,
+        > = rkyv::access::<_, rkyv::rancor::Error>(&decompressed)
+            .expect("Should access archived artifact");
 
         assert_eq!(
-            index.schema_version, SCHEMA_VERSION,
+            u32::from(archived.schema_version),
+            SCHEMA_VERSION,
             "Embedded artifact should have current schema version"
         );
     }
 
     #[test]
     fn test_embedded_artifact_has_non_empty_rules() {
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
 
         let decompressed =
             zstd::decode_all(&artifact_bytes[..]).expect("Should decompress artifact");
 
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
-                .expect("Should deserialize artifact");
+        let archived: &rkyv::Archived<
+            crate::license_detection::embedded::index::EmbeddedLicenseIndex,
+        > = rkyv::access::<_, rkyv::rancor::Error>(&decompressed)
+            .expect("Should access archived artifact");
 
         assert!(
-            !index.rules_by_rid.is_empty(),
+            !archived.rules_by_rid.is_empty(),
             "Embedded artifact should have rules"
         );
     }
 
     #[test]
     fn test_embedded_artifact_has_non_empty_licenses() {
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
 
         let decompressed =
             zstd::decode_all(&artifact_bytes[..]).expect("Should decompress artifact");
 
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
-                .expect("Should deserialize artifact");
+        let archived: &rkyv::Archived<
+            crate::license_detection::embedded::index::EmbeddedLicenseIndex,
+        > = rkyv::access::<_, rkyv::rancor::Error>(&decompressed)
+            .expect("Should access archived artifact");
 
         assert!(
-            !index.licenses_by_key.is_empty(),
+            !archived.licenses_by_key.is_empty(),
             "Embedded artifact should have licenses"
         );
     }
 
     #[test]
     fn test_embedded_artifact_rules_sorted() {
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
 
         let decompressed =
             zstd::decode_all(&artifact_bytes[..]).expect("Should decompress artifact");
 
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
-                .expect("Should deserialize artifact");
+        let archived: &rkyv::Archived<
+            crate::license_detection::embedded::index::EmbeddedLicenseIndex,
+        > = rkyv::access::<_, rkyv::rancor::Error>(&decompressed)
+            .expect("Should access archived artifact");
 
-        let identifiers: Vec<_> = index.rules_by_rid.iter().map(|r| &r.identifier).collect();
+        let identifiers: Vec<_> = archived
+            .rules_by_rid
+            .iter()
+            .map(|r| r.identifier.as_str())
+            .collect();
 
         let mut sorted_identifiers = identifiers.clone();
         sorted_identifiers.sort();
@@ -380,17 +386,21 @@ mod packaging {
 
     #[test]
     fn test_embedded_artifact_licenses_sorted() {
-        let artifact_bytes =
-            include_bytes!("../../resources/license_detection/license_index.bincode.zst");
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index.zst");
 
         let decompressed =
             zstd::decode_all(&artifact_bytes[..]).expect("Should decompress artifact");
 
-        let (index, _): (EmbeddedLicenseIndex, _) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
-                .expect("Should deserialize artifact");
+        let archived: &rkyv::Archived<
+            crate::license_detection::embedded::index::EmbeddedLicenseIndex,
+        > = rkyv::access::<_, rkyv::rancor::Error>(&decompressed)
+            .expect("Should access archived artifact");
 
-        let keys: Vec<_> = index.licenses_by_key.iter().map(|(k, _)| k).collect();
+        let keys: Vec<_> = archived
+            .licenses_by_key
+            .iter()
+            .map(|entry| entry.0.as_str())
+            .collect();
 
         let mut sorted_keys = keys.clone();
         sorted_keys.sort();

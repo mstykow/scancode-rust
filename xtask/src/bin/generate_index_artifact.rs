@@ -34,7 +34,7 @@ fn main() -> Result<()> {
 
     let output_path = args
         .output
-        .unwrap_or_else(|| PathBuf::from("resources/license_detection/license_index.bincode.zst"));
+        .unwrap_or_else(|| PathBuf::from("resources/license_detection/license_index.zst"));
     let rules_dir = args.rules.unwrap_or_else(|| {
         PathBuf::from(provenant::license_detection::SCANCODE_LICENSES_RULES_PATH)
     });
