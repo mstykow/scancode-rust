@@ -68,7 +68,7 @@ cargo build --release
 
 Cargo places the compiled binary under `target/release/`.
 
-> **Note**: The binary includes a built-in license index. In a git checkout, the checked-in artifact can initially be a Git LFS pointer rather than the real generated binary; `./setup.sh` now detects that case and regenerates the embedded index automatically. The `reference/scancode-toolkit/` submodule is still only needed for developers updating the embedded license data, working with helper scripts that depend on it, or using custom license rules.
+> **Note**: The binary includes a built-in compact license index. The `reference/scancode-toolkit/` submodule is only needed for developers updating the embedded license data, working with helper scripts that depend on it, or using custom license rules.
 
 ## Usage
 
@@ -160,13 +160,13 @@ cargo build
 cargo test
 ```
 
-If you see an embedded license-index error mentioning a Git LFS pointer, re-run:
+The embedded license index is checked into the repository directly. Most contributors only need:
 
 ```sh
 ./setup.sh
 ```
 
-or regenerate directly with:
+Use the generator only when intentionally refreshing embedded license data:
 
 ```sh
 cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact

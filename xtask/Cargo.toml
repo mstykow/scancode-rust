@@ -19,7 +19,6 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 url = { workspace = true }
 zstd = { workspace = true }
-rkyv = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

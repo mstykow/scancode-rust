@@ -57,8 +57,8 @@ Arc<LicenseDetectionEngine> shared across scanner threads
 The binary includes a pre-built license index embedded at compile time:
 
 - **Location**: `resources/license_detection/license_index.zst`
-- **Format**: rkyv serialization, zstd compression
-- **Contents**: archived `EmbeddedLicenseIndex` data derived from the ScanCode rules dataset
+- **Format**: MessagePack serialization, zstd compression
+- **Contents**: sorted `LoadedRule` and `LoadedLicense` values derived from the ScanCode rules dataset
 
 ### Loader/Build Stage Separation
 
@@ -68,16 +68,15 @@ The loading process is split into two distinct stages:
 
 - Parse `.RULE` and `.LICENSE` files
 - Normalize rule and license data for embedding
-- Build `EmbeddedLicenseIndex`
-- Serialize archived embedded data with rkyv
+- Sort embedded rules and licenses deterministically
+- Serialize the embedded loader snapshot with MessagePack
 - Compress the serialized bytes with zstd
 
 **Build Stage** (runtime):
 
 - Validate the embedded artifact payload and schema version
-- Access archived embedded data from decompressed bytes
-- Convert embedded rules → runtime `Rule`
-- Convert embedded licenses → runtime `License`
+- Deserialize the embedded loader snapshot
+- Convert embedded rules/licenses into the runtime `LicenseIndex`
 - Apply deprecated filtering policy
 - Synthesize license-derived rules
 - Build token dictionary and automatons
@@ -86,7 +85,7 @@ The loading process is split into two distinct stages:
 This separation enables:
 
 - Self-contained binaries with no external dependencies
-- Faster startup (no YAML/frontmatter parsing at runtime)
+- Self-contained startup without filesystem parsing of the ScanCode rules directory at runtime
 - Consistent rule loading across all installations
 
 ### Regenerating the Embedded Artifact

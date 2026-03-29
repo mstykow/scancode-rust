@@ -89,15 +89,10 @@ impl Automaton {
         FindOverlappingIter::new(&self.inner, haystack)
     }
 
-    /// Serialize the automaton to bytes.
-    pub fn serialize(&self) -> Vec<u8> {
-        self.inner.serialize()
-    }
-
     /// Deserialize an automaton from bytes.
     ///
     /// # Safety
-    /// The bytes must be valid serialized data from `serialize()`.
+    /// The bytes must be valid serialized data from the underlying daachorse automaton.
     pub fn deserialize_unchecked(bytes: &[u8]) -> Self {
         let (ac, _) = unsafe { DoubleArrayAhoCorasick::deserialize_unchecked(bytes) };
         Self { inner: ac }
@@ -309,7 +304,7 @@ mod tests {
         let patterns: Vec<&[u8]> = vec![b"hello", b"world", b"test"];
         let ac1 = Automaton::build(&patterns);
 
-        let serialized = ac1.serialize();
+        let serialized = ac1.inner.serialize();
         let ac2 = Automaton::deserialize_unchecked(&serialized);
 
         let haystack = b"hello world test";

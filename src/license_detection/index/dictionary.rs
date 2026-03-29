@@ -7,23 +7,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TokenId(u16);
 
 impl TokenId {
@@ -85,37 +69,13 @@ impl PartialOrd<TokenId> for u16 {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TokenKind {
     Legalese,
     Regular,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KnownToken {
     pub id: TokenId,
     pub kind: TokenKind,
@@ -123,26 +83,14 @@ pub struct KnownToken {
     pub is_short_or_digit: bool,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    Archive,
-    RkyvSerialize,
-    RkyvDeserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum QueryToken {
     Known(KnownToken),
     Unknown,
     Stopword,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Archive, RkyvSerialize, RkyvDeserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TokenMetadata {
     pub kind: TokenKind,
     pub is_digit_only: bool,
@@ -331,41 +279,11 @@ impl TokenDictionary {
         self.tokens_to_ids.iter()
     }
 
-    /// Get an iterator over all token string and ID pairs (for serialization).
-    pub fn tokens_to_ids_iter(&self) -> impl Iterator<Item = (&String, TokenId)> {
-        self.tokens_to_ids.iter().map(|(s, tid)| (s, *tid))
-    }
-
-    /// Get the metadata slice for serialization.
-    pub fn metadata_slice(&self) -> &[Option<TokenMetadata>] {
-        &self.token_metadata
-    }
-
-    /// Get the next token ID to assign (for serialization).
-    pub const fn next_id_raw(&self) -> u16 {
-        self.next_id.raw()
-    }
-
     /// Get the number of tokens in the dictionary.
     // This method will be used by the embedded index roundtrip tests in upcoming phases.
     #[allow(dead_code)]
     pub fn tokens_to_ids_len(&self) -> usize {
         self.tokens_to_ids.len()
-    }
-
-    /// Create a TokenDictionary from its constituent parts (for deserialization).
-    pub fn from_parts(
-        tokens_to_ids: HashMap<String, TokenId>,
-        token_metadata: Vec<Option<TokenMetadata>>,
-        len_legalese: usize,
-        next_id: TokenId,
-    ) -> Self {
-        Self {
-            tokens_to_ids,
-            token_metadata,
-            len_legalese,
-            next_id,
-        }
     }
 }
 

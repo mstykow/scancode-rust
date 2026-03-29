@@ -1,18 +1,10 @@
-name: Prepare embedded license index
-description: Regenerate, verify, and upload the embedded license index artifact
+name: Verify embedded license index
+description: Regenerate and verify the checked-in embedded license index artifact
 inputs:
-  artifact-name:
-    description: Workflow artifact name for the generated embedded license index
-    required: false
-    default: embedded-license-index
   artifact-path:
     description: Path to the embedded license index in the repository
     required: false
     default: resources/license_detection/license_index.zst
-  retention-days:
-    description: Artifact retention in days
-    required: false
-    default: "1"
 runs:
   using: composite
   steps:
@@ -21,8 +13,8 @@ runs:
       run: |
         set -euo pipefail
         artifact="${{ inputs.artifact-path }}"
-        expected_oid=$(grep '^oid sha256:' "$artifact" | cut -d: -f2)
-        expected_size=$(grep '^size ' "$artifact" | awk '{print $2}')
+        expected_oid=$(sha256sum "$artifact" | awk '{print $1}')
+        expected_size=$(wc -c < "$artifact" | tr -d '[:space:]')
         echo "expected_oid=$expected_oid" >> "$GITHUB_ENV"
         echo "expected_size=$expected_size" >> "$GITHUB_ENV"
 
@@ -30,7 +22,7 @@ runs:
       shell: bash
       run: cargo run --locked --manifest-path xtask/Cargo.toml --bin generate-index-artifact -- --output "${{ inputs.artifact-path }}"
 
-    - name: Verify generated index matches checked-in artifact metadata
+    - name: Verify generated index matches checked-in artifact bytes
       shell: bash
       run: |
         set -euo pipefail
@@ -39,23 +31,15 @@ runs:
         actual_size=$(wc -c < "$artifact" | tr -d '[:space:]')
 
         if [[ "$actual_oid" != "$expected_oid" ]]; then
-          echo "Generated artifact sha256 does not match checked-in LFS pointer metadata"
+          echo "Generated artifact sha256 does not match checked-in artifact"
           echo "expected: $expected_oid"
           echo "actual:   $actual_oid"
           exit 1
         fi
 
         if [[ "$actual_size" != "$expected_size" ]]; then
-          echo "Generated artifact size does not match checked-in LFS pointer metadata"
+          echo "Generated artifact size does not match checked-in artifact"
           echo "expected: $expected_size"
           echo "actual:   $actual_size"
           exit 1
         fi
-
-    - name: Upload embedded license index
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-      with:
-        name: ${{ inputs.artifact-name }}
-        path: ${{ inputs.artifact-path }}
-        if-no-files-found: error
-        retention-days: ${{ inputs.retention-days }}
