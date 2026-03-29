@@ -403,6 +403,27 @@ dependencies:
     }
 
     #[test]
+    fn test_extract_meta_yaml_abeona_preserves_license_file_reference() {
+        let path = PathBuf::from("testdata/conda/meta-yaml/abeona/meta.yaml");
+        let package_data = CondaMetaYamlParser::extract_first_package(&path);
+
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("extra_data should exist");
+        assert_eq!(
+            extra_data.get("license_file").and_then(|v| v.as_str()),
+            Some("LICENSE")
+        );
+
+        let referenced_filenames = package_data.license_detections[0].matches[0]
+            .referenced_filenames
+            .as_ref()
+            .expect("referenced_filenames should be present");
+        assert_eq!(referenced_filenames, &vec!["LICENSE".to_string()]);
+    }
+
+    #[test]
     fn test_extract_environment_yaml_ringer() {
         let path = PathBuf::from("testdata/conda/conda-yaml/ringer/environment.yaml");
         let package_data = CondaEnvironmentYmlParser::extract_first_package(&path);

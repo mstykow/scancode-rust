@@ -179,6 +179,68 @@ enum MetadataValue {
     List(Vec<String>),
 }
 
+fn split_buck_license_values(values: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut statements = Vec::new();
+    let mut references = Vec::new();
+
+    for value in values {
+        if is_probable_local_license_reference(value) {
+            references.push(value.clone());
+        } else {
+            statements.push(value.clone());
+        }
+    }
+
+    (statements, references)
+}
+
+fn is_probable_local_license_reference(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    lower.contains('/')
+        || lower.contains('\\')
+        || lower.starts_with("license")
+        || lower.starts_with("licence")
+        || lower.starts_with("copying")
+        || lower.starts_with("notice")
+        || lower.starts_with("copyright")
+        || lower.ends_with(".txt")
+        || lower.ends_with(".md")
+        || lower.ends_with(".rst")
+        || lower.ends_with(".html")
+}
+
+fn insert_license_reference_extra_data(
+    extra_data: &mut HashMap<String, serde_json::Value>,
+    references: &[String],
+) {
+    match references {
+        [] => {}
+        [reference] => {
+            extra_data.insert(
+                "license_file".to_string(),
+                serde_json::Value::String(reference.clone()),
+            );
+        }
+        _ => {
+            extra_data.insert(
+                "license_files".to_string(),
+                serde_json::Value::Array(
+                    references
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            );
+        }
+    }
+}
+
 /// Build PackageData from extracted metadata fields
 fn build_package_from_metadata(fields: HashMap<String, MetadataValue>) -> PackageData {
     let mut pkg = PackageData {
@@ -186,6 +248,7 @@ fn build_package_from_metadata(fields: HashMap<String, MetadataValue>) -> Packag
         datasource_id: Some(DatasourceId::BuckMetadata),
         ..Default::default()
     };
+    let mut license_references = Vec::new();
 
     // Extract name
     if let Some(MetadataValue::String(s)) = fields.get("name") {
@@ -206,7 +269,16 @@ fn build_package_from_metadata(fields: HashMap<String, MetadataValue>) -> Packag
 
     // Extract licenses (licenses or license_expression)
     if let Some(MetadataValue::List(licenses)) = fields.get("licenses") {
-        pkg.extracted_license_statement = Some(licenses.join(", "));
+        let (license_statements, references) = split_buck_license_values(licenses);
+        license_references = references;
+        let extracted_license_statement = if !license_statements.is_empty() {
+            Some(license_statements.join(", "))
+        } else if !license_references.is_empty() {
+            Some(license_references.join(", "))
+        } else {
+            None
+        };
+        pkg.extracted_license_statement = extracted_license_statement;
     } else if let Some(MetadataValue::String(s)) = fields.get("license_expression") {
         pkg.extracted_license_statement = Some(s.clone());
     }
@@ -264,6 +336,7 @@ fn build_package_from_metadata(fields: HashMap<String, MetadataValue>) -> Packag
             serde_json::Value::String(s.clone()),
         );
     }
+    insert_license_reference_extra_data(&mut extra_data, &license_references);
     if !extra_data.is_empty() {
         pkg.extra_data = Some(extra_data);
     }
@@ -362,11 +435,25 @@ fn extract_from_call(call: &ast::ExprCall) -> Option<PackageData> {
     }
 
     let package_name = name?;
+    let (license_statements, license_references) = licenses
+        .as_deref()
+        .map(split_buck_license_values)
+        .unwrap_or_default();
+    let extracted_license_statement = if !license_statements.is_empty() {
+        Some(license_statements.join(", "))
+    } else if !license_references.is_empty() {
+        Some(license_references.join(", "))
+    } else {
+        None
+    };
+    let mut extra_data = HashMap::new();
+    insert_license_reference_extra_data(&mut extra_data, &license_references);
 
     Some(PackageData {
         package_type: Some(BuckBuildParser::PACKAGE_TYPE),
         name: Some(package_name),
-        extracted_license_statement: licenses.map(|l| l.join(", ")),
+        extracted_license_statement,
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
         datasource_id: Some(DatasourceId::BuckFile),
         ..Default::default()
     })

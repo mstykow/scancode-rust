@@ -7,7 +7,7 @@ use crate::license_detection::expression::{
     LicenseExpression, parse_expression, simplify_expression,
 };
 use crate::license_detection::index::LicenseIndex;
-use crate::models::{LicenseDetection, Match};
+use crate::models::{LicenseDetection, Match, PackageData};
 use crate::utils::spdx::{ExpressionRelation, combine_license_expressions_with_relation};
 
 pub(crate) const PARSER_DECLARED_MATCHER: &str = "parser-declared-license";
@@ -48,6 +48,7 @@ pub(crate) struct DeclaredLicenseMatchMetadata<'a> {
     pub(crate) matched_text: &'a str,
     pub(crate) start_line: usize,
     pub(crate) end_line: usize,
+    pub(crate) referenced_filenames: Option<&'a [&'a str]>,
 }
 
 impl<'a> DeclaredLicenseMatchMetadata<'a> {
@@ -56,7 +57,13 @@ impl<'a> DeclaredLicenseMatchMetadata<'a> {
             matched_text,
             start_line,
             end_line,
+            referenced_filenames: None,
         }
+    }
+
+    pub(crate) fn with_referenced_filenames(mut self, referenced_filenames: &'a [&'a str]) -> Self {
+        self.referenced_filenames = Some(referenced_filenames);
+        self
     }
 
     pub(crate) fn single_line(matched_text: &'a str) -> Self {
@@ -215,11 +222,155 @@ pub(crate) fn build_declared_license_detection(
             rule_identifier: None,
             rule_url: None,
             matched_text: Some(metadata.matched_text.to_string()),
-            referenced_filenames: None,
+            referenced_filenames: metadata
+                .referenced_filenames
+                .map(|filenames| filenames.iter().map(|name| (*name).to_string()).collect()),
             matched_text_diagnostics: None,
         }],
         detection_log: vec![],
         identifier: None,
+    }
+}
+
+pub(crate) fn finalize_package_declared_license_references(package_data: &mut PackageData) {
+    let referenced_filenames = collect_declared_license_reference_filenames(package_data);
+    if referenced_filenames.is_empty() {
+        return;
+    }
+
+    if attach_referenced_filenames_to_detections(
+        &mut package_data.license_detections,
+        &referenced_filenames,
+    ) || attach_referenced_filenames_to_detections(
+        &mut package_data.other_license_detections,
+        &referenced_filenames,
+    ) {
+        return;
+    }
+
+    let referenced_filename_slices: Vec<&str> =
+        referenced_filenames.iter().map(String::as_str).collect();
+
+    if let (Some(declared), Some(declared_spdx)) = (
+        package_data.declared_license_expression.clone(),
+        package_data.declared_license_expression_spdx.clone(),
+    ) {
+        let metadata = DeclaredLicenseMatchMetadata::single_line(
+            package_data
+                .extracted_license_statement
+                .as_deref()
+                .unwrap_or_default(),
+        )
+        .with_referenced_filenames(&referenced_filename_slices);
+        let (_, _, detections) =
+            build_declared_license_data_from_pair(declared, declared_spdx, metadata);
+        package_data.license_detections = detections;
+        return;
+    }
+
+    if let Some(statement) = package_data.extracted_license_statement.as_deref() {
+        if let Some(normalized) = normalize_spdx_expression(statement) {
+            let (_, _, detections) = build_declared_license_data(
+                normalized,
+                DeclaredLicenseMatchMetadata::single_line(statement)
+                    .with_referenced_filenames(&referenced_filename_slices),
+            );
+            package_data.license_detections = detections;
+            package_data.declared_license_expression = package_data
+                .license_detections
+                .first()
+                .map(|detection| detection.license_expression.clone());
+            package_data.declared_license_expression_spdx = package_data
+                .license_detections
+                .first()
+                .map(|detection| detection.license_expression_spdx.clone());
+            return;
+        }
+
+        package_data.declared_license_expression = Some("unknown-license-reference".to_string());
+        package_data.declared_license_expression_spdx =
+            Some("LicenseRef-scancode-unknown-license-reference".to_string());
+        package_data.license_detections = vec![LicenseDetection {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            matches: vec![Match {
+                license_expression: "unknown-license-reference".to_string(),
+                license_expression_spdx: "LicenseRef-scancode-unknown-license-reference"
+                    .to_string(),
+                from_file: None,
+                start_line: 1,
+                end_line: 1,
+                matcher: Some(PARSER_DECLARED_MATCHER.to_string()),
+                score: 100.0,
+                matched_length: Some(statement.split_whitespace().count()),
+                match_coverage: Some(100.0),
+                rule_relevance: Some(100),
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: Some(statement.to_string()),
+                referenced_filenames: Some(referenced_filenames),
+                matched_text_diagnostics: None,
+            }],
+            detection_log: vec![],
+            identifier: None,
+        }];
+    }
+}
+
+fn attach_referenced_filenames_to_detections(
+    detections: &mut [LicenseDetection],
+    referenced_filenames: &[String],
+) -> bool {
+    if detections.is_empty() {
+        return false;
+    }
+
+    for detection in detections {
+        for detection_match in &mut detection.matches {
+            if detection_match.referenced_filenames.is_none() {
+                detection_match.referenced_filenames = Some(referenced_filenames.to_vec());
+            }
+        }
+    }
+    true
+}
+
+fn collect_declared_license_reference_filenames(package_data: &PackageData) -> Vec<String> {
+    let mut references = Vec::new();
+
+    if let Some(extra_data) = package_data.extra_data.as_ref() {
+        collect_reference_strings(extra_data.get("license_file"), &mut references);
+        collect_reference_strings(extra_data.get("notice_file"), &mut references);
+        collect_reference_strings(extra_data.get("license_files"), &mut references);
+        collect_reference_strings(extra_data.get("notice_files"), &mut references);
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    references
+        .into_iter()
+        .filter(|reference| seen.insert(reference.clone()))
+        .collect()
+}
+
+fn collect_reference_strings(value: Option<&serde_json::Value>, references: &mut Vec<String>) {
+    let Some(value) = value else {
+        return;
+    };
+
+    match value {
+        serde_json::Value::String(value) => {
+            if !value.trim().is_empty() {
+                references.push(value.trim().to_string());
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                if let Some(value) = value.as_str().filter(|value| !value.trim().is_empty()) {
+                    references.push(value.trim().to_string());
+                }
+            }
+        }
+        _ => {}
     }
 }
 
