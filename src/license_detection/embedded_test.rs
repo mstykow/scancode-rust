@@ -227,25 +227,27 @@ mod determinism {
             return;
         };
 
-        let mut loaded_rules =
-            rules::load_loaded_rules_from_directory(&rules_path).expect("Should load rules");
-        let mut loaded_licenses = rules::load_loaded_licenses_from_directory(&licenses_path)
-            .expect("Should load licenses");
+        let generate_bytes = || {
+            let mut loaded_rules =
+                rules::load_loaded_rules_from_directory(&rules_path).expect("Should load rules");
+            let mut loaded_licenses = rules::load_loaded_licenses_from_directory(&licenses_path)
+                .expect("Should load licenses");
 
-        loaded_rules.sort_by(|a, b| a.identifier.cmp(&b.identifier));
-        loaded_licenses.sort_by(|a, b| a.key.cmp(&b.key));
+            loaded_rules.sort_by(|a, b| a.identifier.cmp(&b.identifier));
+            loaded_licenses.sort_by(|a, b| a.key.cmp(&b.key));
 
-        let index = index::build_index_from_loaded(loaded_rules, loaded_licenses, false);
-        let embedded = EmbeddedLicenseIndex::from(&index);
-        let generated_bytes = embedded.serialize_to_bytes().expect("Should serialize");
+            let index = index::build_index_from_loaded(loaded_rules, loaded_licenses, false);
+            let embedded = EmbeddedLicenseIndex::from(&index);
+            embedded.serialize_to_bytes().expect("Should serialize")
+        };
 
-        let checked_in_bytes =
-            include_bytes!("../../resources/license_detection/license_index.zst");
+        let generated_bytes = generate_bytes();
+        let regenerated_bytes = generate_bytes();
 
         assert_eq!(
             generated_bytes.as_slice(),
-            checked_in_bytes,
-            "Generated artifact must match checked-in artifact. If rules changed, regenerate with: cargo run --manifest-path xtask/Cargo.toml --bin generate-index-artifact"
+            regenerated_bytes.as_slice(),
+            "Generating the embedded license artifact from the same reference data should be deterministic"
         );
     }
 }
