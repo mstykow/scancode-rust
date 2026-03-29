@@ -31,7 +31,10 @@ use std::str::FromStr;
 use url::Url;
 
 use super::PackageParser;
-use super::license_normalization::normalize_spdx_declared_license;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, normalize_spdx_declared_license,
+    normalize_spdx_expression,
+};
 
 const FIELD_TYPE: &str = "type";
 const FIELD_PURL: &str = "purl";
@@ -174,8 +177,22 @@ impl PackageParser for AboutFileParser {
             .get(FIELD_LICENSE_EXPRESSION)
             .and_then(|v| v.as_str())
             .map(String::from);
+        let file_references = extract_file_references(&yaml);
         let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-            normalize_spdx_declared_license(extracted_license_statement.as_deref());
+            extracted_license_statement
+                .as_deref()
+                .and_then(normalize_spdx_expression)
+                .map(|normalized| {
+                    build_declared_license_data(
+                        normalized,
+                        DeclaredLicenseMatchMetadata::single_line(
+                            extracted_license_statement.as_deref().unwrap_or_default(),
+                        ),
+                    )
+                })
+                .unwrap_or_else(|| {
+                    normalize_spdx_declared_license(extracted_license_statement.as_deref())
+                });
 
         let vcs_url = yaml
             .get(Value::String("vcs_url".to_string()))
@@ -216,8 +233,6 @@ impl PackageParser for AboutFileParser {
         let parties = extract_owner_party(&yaml);
 
         // File references
-        let file_references = extract_file_references(&yaml);
-
         vec![PackageData {
             package_type: Some(package_type),
             namespace,

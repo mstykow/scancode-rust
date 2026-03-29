@@ -29,6 +29,11 @@ const SCANCODE_LICENSE_URL_BASE: &str =
     "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses";
 const LICENSEDB_URL_BASE: &str = "https://scancode-licensedb.aboutcode.org";
 const SPDX_LICENSE_URL_BASE: &str = "https://spdx.org/licenses";
+const INHERIT_LICENSE_FROM_PACKAGE_REFERENCE: &str = "INHERIT_LICENSE_FROM_PACKAGE";
+const DETECTION_LOG_UNKNOWN_REFERENCE_IN_FILE_TO_PACKAGE: &str =
+    "unknown-reference-in-file-to-package";
+const DETECTION_LOG_UNKNOWN_REFERENCE_IN_FILE_TO_NONEXISTENT_PACKAGE: &str =
+    "unknown-reference-in-file-to-nonexistent-package";
 use crate::scanner;
 #[cfg(test)]
 use crate::utils::generated::generated_code_hints;
@@ -76,6 +81,7 @@ pub(crate) struct CreateOutputContext<'a> {
 struct ResolvedReferenceTarget {
     path: String,
     detections: Vec<LicenseDetection>,
+    preserve_match_from_file: bool,
 }
 
 struct ClassificationContext {
@@ -327,30 +333,12 @@ pub(crate) fn collect_top_level_license_detections(
     unique_detections
 }
 
-pub(crate) fn apply_local_file_reference_following(files: &mut [FileInfo], packages: &[Package]) {
-    for _ in 0..5 {
-        let snapshot = build_reference_follow_snapshot(files, packages);
-        let mut modified = false;
-
-        for file in files
-            .iter_mut()
-            .filter(|file| file.file_type == FileType::File)
-        {
-            if follow_references_for_file(file, &snapshot) {
-                modified = true;
-            }
-        }
-
-        if !modified {
-            break;
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct ReferenceFollowSnapshot {
     files_by_path: HashMap<String, ResolvedReferenceTarget>,
+    package_targets_by_uid: HashMap<String, ResolvedReferenceTarget>,
     package_manifest_dirs_by_uid: HashMap<String, Vec<String>>,
+    root_license_targets_by_root: HashMap<String, Vec<ResolvedReferenceTarget>>,
     root_paths: Vec<String>,
 }
 
@@ -367,8 +355,34 @@ fn build_reference_follow_snapshot(
                 ResolvedReferenceTarget {
                     path: file.path.clone(),
                     detections: file.license_detections.clone(),
+                    preserve_match_from_file: false,
                 },
             )
+        })
+        .collect();
+
+    let package_targets_by_uid = packages
+        .iter()
+        .filter_map(|package| {
+            let package_expression = combine_detection_expressions(&package.license_detections)?;
+            if !is_resolved_package_context_expression(&package_expression) {
+                return None;
+            }
+
+            let path = package
+                .datafile_paths
+                .first()
+                .cloned()
+                .unwrap_or_else(|| package.package_uid.clone());
+
+            Some((
+                package.package_uid.clone(),
+                ResolvedReferenceTarget {
+                    path,
+                    detections: package.license_detections.clone(),
+                    preserve_match_from_file: true,
+                },
+            ))
         })
         .collect();
 
@@ -387,11 +401,107 @@ fn build_reference_follow_snapshot(
         })
         .collect();
 
+    let root_paths = top_level_root_paths(files);
+    let root_license_targets_by_root = build_root_license_targets(files, &root_paths);
+
     ReferenceFollowSnapshot {
         files_by_path,
+        package_targets_by_uid,
         package_manifest_dirs_by_uid,
-        root_paths: top_level_root_paths(files),
+        root_license_targets_by_root,
+        root_paths,
     }
+}
+
+fn build_root_license_targets(
+    files: &[FileInfo],
+    root_paths: &[String],
+) -> HashMap<String, Vec<ResolvedReferenceTarget>> {
+    let mut targets_by_root = HashMap::new();
+
+    for root in root_paths {
+        let mut targets: Vec<_> = files
+            .iter()
+            .filter(|file| is_root_license_target(file, root))
+            .filter_map(|file| {
+                let expression = combine_detection_expressions(&file.license_detections)?;
+                if !is_resolved_package_context_expression(&expression) {
+                    return None;
+                }
+
+                Some(ResolvedReferenceTarget {
+                    path: file.path.clone(),
+                    detections: file.license_detections.clone(),
+                    preserve_match_from_file: false,
+                })
+            })
+            .collect();
+
+        targets.sort_by(|left, right| {
+            root_license_candidate_priority(&left.path)
+                .cmp(&root_license_candidate_priority(&right.path))
+                .then_with(|| left.path.cmp(&right.path))
+        });
+
+        if !targets.is_empty() {
+            targets_by_root.insert(root.clone(), targets);
+        }
+    }
+
+    targets_by_root
+}
+
+fn is_root_license_target(file: &FileInfo, root: &str) -> bool {
+    if file.file_type != FileType::File
+        || file.license_detections.is_empty()
+        || !is_legal_file(file)
+    {
+        return false;
+    }
+
+    let path = Path::new(&file.path);
+    let relative = if root.is_empty() {
+        path
+    } else {
+        match path.strip_prefix(root) {
+            Ok(relative) => relative,
+            Err(_) => return false,
+        }
+    };
+
+    relative.components().count() == 1
+}
+
+fn root_license_candidate_priority(path: &str) -> usize {
+    let name = Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if name.starts_with("license") || name.starts_with("licence") {
+        0
+    } else if name.starts_with("copying") {
+        1
+    } else if name.starts_with("notice") {
+        2
+    } else if name.starts_with("copyright") {
+        3
+    } else {
+        4
+    }
+}
+
+fn combine_detection_expressions(detections: &[LicenseDetection]) -> Option<String> {
+    combine_license_expressions(
+        detections
+            .iter()
+            .map(|detection| detection.license_expression.clone()),
+    )
+}
+
+fn is_resolved_package_context_expression(expression: &str) -> bool {
+    !expression.contains("unknown-license-reference") && !expression.contains("free-unknown")
 }
 
 fn top_level_root_paths(files: &[FileInfo]) -> Vec<String> {
@@ -439,6 +549,58 @@ fn follow_references_for_file(file: &mut FileInfo, snapshot: &ReferenceFollowSna
         }
     }
 
+    for package_data in &mut file.package_data {
+        for detection in &mut package_data.license_detections {
+            if apply_reference_following_to_detection(
+                detection,
+                &current_path,
+                &package_uids,
+                snapshot,
+            ) {
+                modified = true;
+            }
+        }
+        for detection in &mut package_data.other_license_detections {
+            if apply_reference_following_to_detection(
+                detection,
+                &current_path,
+                &package_uids,
+                snapshot,
+            ) {
+                modified = true;
+            }
+        }
+
+        if modified {
+            package_data.declared_license_expression = combine_license_expressions(
+                package_data
+                    .license_detections
+                    .iter()
+                    .map(|detection| detection.license_expression.clone()),
+            );
+            package_data.declared_license_expression_spdx = combine_license_expressions(
+                package_data
+                    .license_detections
+                    .iter()
+                    .filter(|detection| !detection.license_expression_spdx.is_empty())
+                    .map(|detection| detection.license_expression_spdx.clone()),
+            );
+            package_data.other_license_expression = combine_license_expressions(
+                package_data
+                    .other_license_detections
+                    .iter()
+                    .map(|detection| detection.license_expression.clone()),
+            );
+            package_data.other_license_expression_spdx = combine_license_expressions(
+                package_data
+                    .other_license_detections
+                    .iter()
+                    .filter(|detection| !detection.license_expression_spdx.is_empty())
+                    .map(|detection| detection.license_expression_spdx.clone()),
+            );
+        }
+    }
+
     if modified {
         file.license_expression = combine_license_expressions(
             file.license_detections
@@ -450,27 +612,141 @@ fn follow_references_for_file(file: &mut FileInfo, snapshot: &ReferenceFollowSna
     modified
 }
 
+pub(crate) fn apply_package_reference_following(files: &mut [FileInfo], packages: &mut [Package]) {
+    for _ in 0..5 {
+        let snapshot = build_reference_follow_snapshot(files, packages);
+        let mut modified = false;
+
+        for file in files
+            .iter_mut()
+            .filter(|file| file.file_type == FileType::File)
+        {
+            if follow_references_for_file(file, &snapshot) {
+                modified = true;
+            }
+        }
+
+        if sync_packages_from_followed_package_data(files, packages) {
+            modified = true;
+        }
+
+        if !modified {
+            break;
+        }
+    }
+}
+
+pub(crate) fn sync_packages_from_followed_package_data(
+    files: &[FileInfo],
+    packages: &mut [Package],
+) -> bool {
+    let package_data_by_path: HashMap<_, _> = files
+        .iter()
+        .filter(|file| !file.package_data.is_empty())
+        .map(|file| (file.path.clone(), file.package_data.clone()))
+        .collect();
+
+    let mut modified = false;
+
+    for package in packages {
+        for datafile_path in &package.datafile_paths {
+            if let Some(package_datas) = package_data_by_path.get(datafile_path)
+                && let Some(package_data) = package_datas.iter().find(|package_data| {
+                    package_data.purl.as_ref().is_some_and(|purl| {
+                        package
+                            .purl
+                            .as_ref()
+                            .is_some_and(|pkg_purl| pkg_purl == purl)
+                    }) || (package_data.name == package.name
+                        && package_data.version == package.version)
+                        || package_datas.len() == 1
+                })
+            {
+                let changed = package.license_detections != package_data.license_detections
+                    || package.other_license_detections != package_data.other_license_detections
+                    || package.declared_license_expression
+                        != package_data.declared_license_expression
+                    || package.declared_license_expression_spdx
+                        != package_data.declared_license_expression_spdx
+                    || package.other_license_expression != package_data.other_license_expression
+                    || package.other_license_expression_spdx
+                        != package_data.other_license_expression_spdx;
+                if changed {
+                    package.license_detections = package_data.license_detections.clone();
+                    package.other_license_detections =
+                        package_data.other_license_detections.clone();
+                    package.declared_license_expression =
+                        package_data.declared_license_expression.clone();
+                    package.declared_license_expression_spdx =
+                        package_data.declared_license_expression_spdx.clone();
+                    package.other_license_expression =
+                        package_data.other_license_expression.clone();
+                    package.other_license_expression_spdx =
+                        package_data.other_license_expression_spdx.clone();
+                    modified = true;
+                }
+                break;
+            }
+        }
+    }
+
+    modified
+}
+
 fn apply_reference_following_to_detection(
     detection: &mut LicenseDetection,
     current_path: &str,
     package_uids: &[String],
     snapshot: &ReferenceFollowSnapshot,
 ) -> bool {
+    if has_resolved_referenced_file(detection, current_path) {
+        return false;
+    }
+
     let referenced_filenames = referenced_filenames_from_detection(detection);
-    if referenced_filenames.is_empty() || has_resolved_referenced_file(detection, current_path) {
+    if !referenced_filenames.is_empty() {
+        let referenced_targets: Vec<_> = referenced_filenames
+            .iter()
+            .filter_map(|referenced_filename| {
+                resolve_referenced_resource(
+                    referenced_filename,
+                    current_path,
+                    package_uids,
+                    snapshot,
+                )
+            })
+            .collect();
+        if referenced_targets.is_empty() {
+            return false;
+        }
+
+        return apply_resolved_reference_targets(
+            detection,
+            current_path,
+            referenced_targets,
+            DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE,
+        );
+    }
+
+    if !inherits_license_from_package(detection) {
         return false;
     }
 
-    let referenced_targets: Vec<_> = referenced_filenames
-        .iter()
-        .filter_map(|referenced_filename| {
-            resolve_referenced_resource(referenced_filename, current_path, package_uids, snapshot)
-        })
-        .collect();
-    if referenced_targets.is_empty() {
+    let Some((referenced_targets, detection_log)) =
+        resolve_package_reference_targets(current_path, package_uids, snapshot)
+    else {
         return false;
-    }
+    };
 
+    apply_resolved_reference_targets(detection, current_path, referenced_targets, detection_log)
+}
+
+fn apply_resolved_reference_targets(
+    detection: &mut LicenseDetection,
+    current_path: &str,
+    referenced_targets: Vec<ResolvedReferenceTarget>,
+    detection_log: &str,
+) -> bool {
     let referenced_license_expression =
         combine_license_expressions(referenced_targets.iter().flat_map(|target| {
             target
@@ -487,7 +763,13 @@ fn apply_reference_following_to_detection(
         for referenced_detection in &target.detections {
             let mut internal = public_detection_to_internal(referenced_detection);
             for match_item in &mut internal.matches {
-                match_item.from_file = Some(target.path.clone());
+                if target.preserve_match_from_file {
+                    match_item
+                        .from_file
+                        .get_or_insert_with(|| target.path.clone());
+                } else {
+                    match_item.from_file = Some(target.path.clone());
+                }
             }
             internal_detection.matches.extend(internal.matches);
         }
@@ -500,8 +782,7 @@ fn apply_reference_following_to_detection(
         determine_license_expression(&matches_for_expression).ok();
     internal_detection.license_expression_spdx =
         determine_spdx_expression(&matches_for_expression).ok();
-    internal_detection.detection_log =
-        vec![DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE.to_string()];
+    internal_detection.detection_log = vec![detection_log.to_string()];
     let mut public_detection = internal_detection_to_public(internal_detection);
     public_detection.identifier = None;
     crate::models::file_info::enrich_license_detection_provenance(
@@ -523,10 +804,24 @@ fn referenced_filenames_from_detection(detection: &LicenseDetection) -> Vec<Stri
                 .unwrap_or_default()
         })
         .map(|name| normalize_referenced_filename(&name))
-        .filter(|name| !name.is_empty())
+        .filter(|name| !name.is_empty() && name != INHERIT_LICENSE_FROM_PACKAGE_REFERENCE)
         .collect::<HashSet<_>>()
         .into_iter()
         .collect()
+}
+
+fn inherits_license_from_package(detection: &LicenseDetection) -> bool {
+    detection.matches.iter().any(|detection_match| {
+        detection_match
+            .referenced_filenames
+            .as_ref()
+            .is_some_and(|filenames| {
+                filenames.iter().any(|filename| {
+                    normalize_referenced_filename(filename)
+                        == INHERIT_LICENSE_FROM_PACKAGE_REFERENCE
+                })
+            })
+    })
 }
 
 fn has_resolved_referenced_file(detection: &LicenseDetection, current_path: &str) -> bool {
@@ -583,6 +878,75 @@ fn resolve_referenced_resource(
     candidates
         .into_iter()
         .find_map(|candidate| snapshot.files_by_path.get(&candidate).cloned())
+}
+
+fn resolve_package_reference_targets(
+    current_path: &str,
+    package_uids: &[String],
+    snapshot: &ReferenceFollowSnapshot,
+) -> Option<(Vec<ResolvedReferenceTarget>, &'static str)> {
+    if let Some(targets) = resolve_package_context_target(package_uids, snapshot) {
+        return Some((targets, DETECTION_LOG_UNKNOWN_REFERENCE_IN_FILE_TO_PACKAGE));
+    }
+
+    resolve_root_package_context_target(current_path, snapshot).map(|targets| {
+        (
+            targets,
+            DETECTION_LOG_UNKNOWN_REFERENCE_IN_FILE_TO_NONEXISTENT_PACKAGE,
+        )
+    })
+}
+
+fn resolve_package_context_target(
+    package_uids: &[String],
+    snapshot: &ReferenceFollowSnapshot,
+) -> Option<Vec<ResolvedReferenceTarget>> {
+    let mut targets = Vec::new();
+
+    for package_uid in package_uids {
+        if let Some(target) = snapshot.package_targets_by_uid.get(package_uid) {
+            targets.push(target.clone());
+        }
+    }
+
+    collapse_equivalent_reference_targets(targets)
+}
+
+fn resolve_root_package_context_target(
+    current_path: &str,
+    snapshot: &ReferenceFollowSnapshot,
+) -> Option<Vec<ResolvedReferenceTarget>> {
+    let root = snapshot
+        .root_paths
+        .iter()
+        .filter(|root| path_is_within_root(current_path, root))
+        .max_by_key(|root| root.len())?;
+
+    let targets = snapshot.root_license_targets_by_root.get(root)?.clone();
+    collapse_equivalent_reference_targets(targets)
+}
+
+fn collapse_equivalent_reference_targets(
+    targets: Vec<ResolvedReferenceTarget>,
+) -> Option<Vec<ResolvedReferenceTarget>> {
+    if targets.is_empty() {
+        return None;
+    }
+
+    let expressions: HashSet<_> = targets
+        .iter()
+        .filter_map(|target| combine_detection_expressions(&target.detections))
+        .collect();
+
+    if expressions.len() != 1 {
+        return None;
+    }
+
+    targets.into_iter().next().map(|target| vec![target])
+}
+
+fn path_is_within_root(path: &str, root: &str) -> bool {
+    root.is_empty() || path == root || path.starts_with(&format!("{root}/"))
 }
 
 fn join_reference_candidate(base: &str, referenced_filename: &str) -> String {
