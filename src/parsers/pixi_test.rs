@@ -200,6 +200,28 @@ python = "3.11.*"
     }
 
     #[test]
+    fn test_extract_from_pixi_toml_preserves_license_file_reference() {
+        let content = r#"
+[workspace]
+name = "pixi-demo"
+version = "1.2.3"
+license = "MIT"
+license-file = "LICENSE"
+"#;
+
+        let (_temp_dir, path) = create_temp_file("pixi.toml", content);
+        let package_data = PixiTomlParser::extract_first_package(&path);
+
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
+            package_data.license_detections[0].matches[0]
+                .referenced_filenames
+                .as_ref(),
+            Some(&vec!["LICENSE".to_string()])
+        );
+    }
+
+    #[test]
     fn test_extract_from_pixi_lock_v6() {
         let content = r#"
 version = 6
