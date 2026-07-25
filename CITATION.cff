@@ -5,7 +5,7 @@ version: "1.0.3"
 type: software
 license: Apache-2.0
 repository-code: "https://github.com/getprovenant/provenant"
-url: "https://getprovenant.github.io"
+url: "https://getprovenant.dev"
 authors:
   - name: "The Provenant contributors"
 abstract: >-

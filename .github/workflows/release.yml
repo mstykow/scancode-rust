@@ -280,8 +280,8 @@ jobs:
           # Point the image landing-page/documentation labels at the website;
           # org.opencontainers.image.source stays the repo (auto-derived).
           labels: |
-            org.opencontainers.image.url=https://getprovenant.github.io
-            org.opencontainers.image.documentation=https://getprovenant.github.io
+            org.opencontainers.image.url=https://getprovenant.dev
+            org.opencontainers.image.documentation=https://getprovenant.dev
 
       - name: Build and push multi-arch image
         id: build
