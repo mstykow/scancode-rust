@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Provenant contributors
 // SPDX-License-Identifier: Apache-2.0
 
-//! Weekly ScanCode -> Provenant issue triage, driven by a GitHub Models LLM.
+//! Weekly ScanCode -> Provenant issue triage, driven by an LLM.
 //!
 //! The tool is deliberately thin: it fetches recent ScanCode issues, exposes a
 //! `run_provenant` tool (real scans against the built binary) plus a
@@ -9,16 +9,16 @@
 //! "New license request:" noise, classifying, deciding what to reproduce, and
 //! writing the verdict table.
 //!
-//! The tool uses two independent credentials, because a single GitHub token
-//! cannot satisfy both jobs when the repo lives in an org without a GitHub
-//! Models entitlement:
-//!   * GitHub Models inference needs a token carrying a `models:read`
-//!     entitlement. On an org-owned repo the built-in GITHUB_TOKEN resolves
-//!     against the org (403 on scheduled runs when the org has no Models
-//!     entitlement), so the inference token is read from `MODELS_TOKEN` -- a
-//!     personal fine-grained PAT whose resource owner is a user with a personal
-//!     Models entitlement. It falls back to GITHUB_TOKEN/GH_TOKEN/`gh auth
-//!     token` for local runs.
+//! Inference targets any OpenAI-compatible `/chat/completions` endpoint, so the
+//! provider is configuration rather than code. The default is the Gemini API's
+//! OpenAI-compatibility layer, whose free tier covers this workload (a handful
+//! of calls once a week) with a wide margin.
+//!
+//! Two independent credentials are in play, because inference and the GitHub
+//! REST calls are unrelated services:
+//!   * Inference uses `TRIAGE_API_KEY`, sent as a bearer token to
+//!     `TRIAGE_API_BASE` (default: the Gemini compatibility base URL). Moving
+//!     providers is a change to those two values plus the model, not to code.
 //!   * The GitHub REST calls (fetching upstream issues, opening findings) run
 //!     through the `gh` CLI, which uses the built-in GITHUB_TOKEN/GH_TOKEN.
 //!
@@ -37,7 +37,10 @@ use serde_json::{Value, json};
 
 const SCANCODE_REPO: &str = "aboutcode-org/scancode-toolkit";
 const TRIAGE_LABEL: &str = "scancode-triage";
-const MODELS_ENDPOINT: &str = "https://models.github.ai/inference/chat/completions";
+// Default inference base URL: the Gemini API's OpenAI-compatibility layer.
+// Override via TRIAGE_API_BASE to reach any other OpenAI-compatible provider
+// (e.g. https://api.groq.com/openai/v1).
+const DEFAULT_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const THROTTLE: Duration = Duration::from_secs(6); // space requests within rate limits
 const MAX_TURNS: usize = 6; // tool-loop backstop per issue
 const TOOL_RESULT_CHARS: usize = 2500; // cap tool output fed back to the model
@@ -87,7 +90,7 @@ PV`, `not relevant`, `needs manual check`; <evidence> is a terse note (what the 
 scan showed, which parser already exists, or why not relevant). No other text.";
 
 #[derive(Parser)]
-#[command(about = "Weekly ScanCode -> Provenant issue triage via GitHub Models")]
+#[command(about = "Weekly ScanCode -> Provenant issue triage")]
 struct Args {
     /// YYYY-MM-DD lower bound on issue creation date (default: --days ago)
     #[arg(long)]
@@ -101,7 +104,7 @@ struct Args {
     /// Provenant repo root (for list_parsers)
     #[arg(long = "repo-root", default_value = ".")]
     repo_root: PathBuf,
-    /// GitHub Models model id (env: SCANCODE_TRIAGE_MODEL)
+    /// Model id (env: SCANCODE_TRIAGE_MODEL)
     #[arg(long)]
     model: Option<String>,
     /// Cap candidates triaged (0 = no cap)
@@ -200,14 +203,15 @@ fn main() -> Result<()> {
     if llm_errors > 0 {
         bail!(
             "{llm_errors} candidate(s) could not be triaged: the model call failed \
-             for them (check MODELS_TOKEN and its Models entitlement)"
+             for them (check TRIAGE_API_KEY, TRIAGE_API_BASE and the configured model)"
         );
     }
     Ok(())
 }
 
 fn run(args: &Args, model: &str, since: &str) -> Result<(String, Vec<Finding>, usize)> {
-    let token = models_token()?;
+    let token = api_key()?;
+    let endpoint = chat_completions_url();
     let client = reqwest::blocking::Client::builder()
         .user_agent("provenant-triage")
         .build()?;
@@ -238,7 +242,8 @@ fn run(args: &Args, model: &str, since: &str) -> Result<(String, Vec<Finding>, u
             issue.number,
             truncate(&issue.title, 60)
         );
-        let Triaged { row, llm_error } = triage_one_issue(&client, &token, model, args, issue);
+        let Triaged { row, llm_error } =
+            triage_one_issue(&client, &endpoint, &token, model, args, issue);
         if llm_error {
             llm_errors += 1;
         }
@@ -317,6 +322,7 @@ fn assemble_report(
 /// whether the model call failed (vs. a genuine verdict).
 fn triage_one_issue(
     client: &reqwest::blocking::Client,
+    endpoint: &str,
     token: &str,
     model: &str,
     args: &Args,
@@ -350,7 +356,7 @@ fn triage_one_issue(
     ];
 
     for _turn in 0..MAX_TURNS {
-        let resp = match call_model(client, token, model, &messages) {
+        let resp = match call_model(client, endpoint, token, model, &messages) {
             Ok(v) => v,
             Err(e) => {
                 return Triaged {
@@ -452,6 +458,7 @@ fn tools() -> Value {
 
 fn call_model(
     client: &reqwest::blocking::Client,
+    endpoint: &str,
     token: &str,
     model: &str,
     messages: &[Value],
@@ -465,7 +472,7 @@ fn call_model(
     let body = serde_json::to_vec(&payload)?;
     for attempt in 0..5u64 {
         let resp = client
-            .post(MODELS_ENDPOINT)
+            .post(endpoint)
             .header("Authorization", format!("Bearer {token}"))
             .header("Content-Type", "application/json")
             .body(body.clone())
@@ -674,32 +681,36 @@ fn list_parsers(repo_root: &Path) -> Vec<String> {
     names.into_iter().collect()
 }
 
-// ---- GitHub (via gh CLI) ---------------------------------------------------
+// ---- Inference endpoint and credential -------------------------------------
 
-/// Resolve the token used for GitHub Models inference. Prefers the dedicated
-/// `MODELS_TOKEN` (a personal PAT carrying a Models entitlement, kept separate
-/// from the org GITHUB_TOKEN used for REST calls), then falls back to
-/// GITHUB_TOKEN/GH_TOKEN/`gh auth token` for local runs.
-fn models_token() -> Result<String> {
-    for var in ["MODELS_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"] {
-        if let Ok(v) = std::env::var(var)
-            && !v.is_empty()
-        {
-            return Ok(v);
-        }
-    }
-    let out = Command::new("gh")
-        .args(["auth", "token"])
-        .output()
-        .context("running `gh auth token`")?;
-    if !out.status.success() {
-        bail!(
-            "no Models token (MODELS_TOKEN/GITHUB_TOKEN/GH_TOKEN unset and \
-             `gh auth token` failed)"
-        );
-    }
-    Ok(String::from_utf8(out.stdout)?.trim().to_string())
+/// Resolve the inference API key. `TRIAGE_API_KEY` is the only source: this is
+/// a model-provider credential with nothing in common with the GitHub token
+/// used for REST calls, so falling back to a GitHub credential would only turn
+/// a missing-key mistake into a 401 from the provider.
+fn api_key() -> Result<String> {
+    std::env::var("TRIAGE_API_KEY")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| {
+            anyhow!(
+                "TRIAGE_API_KEY is unset: set it to an API key for TRIAGE_API_BASE \
+                 (default: the Gemini API OpenAI-compatibility layer)"
+            )
+        })
 }
+
+/// Build the chat-completions URL from the configured base. `TRIAGE_API_BASE`
+/// holds the OpenAI-compatible base (no `/chat/completions` suffix), so
+/// switching providers stays a configuration change.
+fn chat_completions_url() -> String {
+    let base = std::env::var("TRIAGE_API_BASE")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
+    format!("{}/chat/completions", base.trim().trim_end_matches('/'))
+}
+
+// ---- GitHub (via gh CLI) ---------------------------------------------------
 
 fn fetch_issues(since: &str) -> Result<Vec<Issue>> {
     let out = Command::new("gh")

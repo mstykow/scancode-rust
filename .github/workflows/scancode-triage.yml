@@ -4,9 +4,9 @@
 name: ScanCode weekly triage
 
 # Weekly triage of upstream ScanCode Toolkit issues for relevance to Provenant.
-# Uses GitHub Models (free tier) for the judgment and a freshly built binary for
-# ground-truth reproduction. Each actionable finding becomes a deduplicated
-# Provenant issue; the full run summary lives in this workflow's run output.
+# An LLM makes the judgment and a freshly built binary provides ground-truth
+# reproduction. Each actionable finding becomes a deduplicated Provenant issue;
+# the full run summary lives in this workflow's run output.
 on:
   schedule:
     - cron: "0 8 * * 1" # Mondays 08:00 UTC
@@ -16,10 +16,15 @@ on:
         description: "Issue-creation window in days"
         required: false
         default: "8"
+      dry_run:
+        description: "Triage and report only; do not open issues"
+        type: boolean
+        required: false
+        default: false
 
 # GITHUB_TOKEN needs issues:write to open per-finding issues (contents:read for
-# checkout). Models inference does NOT use GITHUB_TOKEN -- it uses MODELS_TOKEN
-# (see the Run triage step) because this org has no Models entitlement.
+# checkout). Inference does NOT use GITHUB_TOKEN -- it uses TRIAGE_API_KEY (see
+# the Run triage step), a third-party model-provider credential.
 permissions:
   contents: read
   issues: write
@@ -50,22 +55,33 @@ jobs:
           # findings) via the org repo's own issues:write/contents:read.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GitHub Models inference needs a separate credential: on this org-owned
-          # repo the built-in GITHUB_TOKEN resolves against the org, which has no
-          # Models entitlement (403 on scheduled runs). MODELS_TOKEN is a personal
-          # fine-grained PAT (resource owner = a user, Models: read only) carrying
-          # a personal Models entitlement. See docs in the triage tool.
-          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          # Inference needs its own credential: a model-provider API key, wholly
+          # unrelated to GITHUB_TOKEN. The tool defaults to the Gemini API's
+          # OpenAI-compatibility layer, whose free tier covers a few calls a week.
+          # Set TRIAGE_API_BASE to move to any other OpenAI-compatible provider
+          # (e.g. https://api.groq.com/openai/v1) without a code change.
+          TRIAGE_API_KEY: ${{ secrets.TRIAGE_API_KEY }}
+          TRIAGE_API_BASE: ${{ vars.TRIAGE_API_BASE }}
           # Passed via env (never interpolated into the run script) so a dispatch
           # input cannot break out of the shell command. The tool also validates
           # it is a positive integer.
           TRIAGE_DAYS: ${{ github.event.inputs.days || '8' }}
+          # Lets a manual run exercise the full path (including inference and the
+          # tool-loop) without side effects -- useful when validating a provider
+          # or model change. Empty on scheduled runs, which always post.
+          TRIAGE_DRY_RUN: ${{ github.event.inputs.dry_run }}
           # Set the model in repo Settings -> Variables (SCANCODE_TRIAGE_MODEL).
-          # It is required — the tool errors out if it is unset.
+          # It is required — the tool errors out if it is unset. Must name a
+          # model the configured provider serves.
           SCANCODE_TRIAGE_MODEL: ${{ vars.SCANCODE_TRIAGE_MODEL }}
         run: |
+          post_args=(--post-to "${GITHUB_REPOSITORY}")
+          if [ "${TRIAGE_DRY_RUN}" = "true" ]; then
+            echo "Dry run: findings will be reported but no issues opened."
+            post_args=()
+          fi
           ./target/release/scancode-triage \
             --days "${TRIAGE_DAYS}" \
             --binary target/release/provenant \
             --repo-root . \
-            --post-to "${{ github.repository }}"
+            "${post_args[@]}"
