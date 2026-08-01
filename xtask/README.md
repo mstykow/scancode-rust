@@ -30,7 +30,7 @@ cargo run --manifest-path xtask/Cargo.toml --bin <command> -- ...
 | `generate-index-artifact`         | Regenerate the embedded license index artifact from ScanCode rules and licenses.                                                            |
 | `generate-sbom-examples`          | Regenerate the checked-in SBOM examples under `examples/sbom/` from pinned upstream targets.                                                |
 | `classify-rule-overmatch`         | Classify upstream license rules by overmatch-risk class and rank un-covered overlay candidates.                                             |
-| `scancode-triage`                 | Weekly triage of upstream ScanCode issues for Provenant relevance, via GitHub Models with real reproduction scans.                          |
+| `scancode-triage`                 | Weekly triage of upstream ScanCode issues for Provenant relevance, LLM-judged with real reproduction scans.                                 |
 
 ## `benchmark-target`
 
@@ -661,21 +661,33 @@ cargo run --manifest-path xtask/Cargo.toml --bin classify-rule-overmatch -- --js
 
 `scancode-triage` checks recent [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit)
 issues for ones that also affect Provenant and are worth fixing. The binary does
-the plumbing; a [GitHub Models](https://docs.github.com/github-models) LLM does
-the judgment. It is normally run on a weekly schedule by
+the plumbing; an LLM does the judgment. It is normally run on a weekly schedule by
 [`.github/workflows/scancode-triage.yml`](../.github/workflows/scancode-triage.yml),
 but is a plain xtask bin you can also run locally.
 
-### Model and token
+### Provider, model, and key
 
-- Inference runs on GitHub Models via a GitHub token that carries `models:read`
-  (in CI, the built-in `GITHUB_TOKEN` with `permissions: models: read`; locally,
-  `gh auth token`).
+Inference goes to any OpenAI-compatible `/chat/completions` endpoint, so the
+provider is configuration rather than code.
+
+- `TRIAGE_API_KEY` (**required**) is the provider API key, sent as a bearer
+  token. It is unrelated to `GITHUB_TOKEN`, which only drives the `gh` CLI calls
+  that fetch upstream issues and open findings.
+- `TRIAGE_API_BASE` (optional) is the OpenAI-compatible base URL, without the
+  `/chat/completions` suffix. It defaults to the Gemini API compatibility layer,
+  `https://generativelanguage.googleapis.com/v1beta/openai`. Point it at another
+  provider (for example `https://api.groq.com/openai/v1`) to switch without a
+  code change.
 - The model is **required and has no built-in default**: supply it via `--model`
   or the `SCANCODE_TRIAGE_MODEL` env var. In CI it comes from the
   `SCANCODE_TRIAGE_MODEL` repository variable (Settings → Variables); the tool
-  errors out if it is unset. Choose a model whose free-tier limits cover a weekly
-  run.
+  errors out if it is unset. It must name a model the configured provider serves,
+  and whose free-tier limits cover a weekly run — the job makes only a handful of
+  calls per week, so free tiers have ample headroom.
+
+In CI, `TRIAGE_API_KEY` is a repository secret and `TRIAGE_API_BASE` an optional
+repository variable. Switching providers means updating those plus
+`SCANCODE_TRIAGE_MODEL`.
 
 ### Usage
 
@@ -683,15 +695,15 @@ but is a plain xtask bin you can also run locally.
 cargo run --manifest-path xtask/Cargo.toml --bin scancode-triage -- --help
 
 # Report to stdout over the last N days (requires target/release/provenant built):
-SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
+TRIAGE_API_KEY=<key> SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
   --bin scancode-triage -- --days 8 --binary target/release/provenant
 
 # Cheap check over a few recent candidates:
-SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
+TRIAGE_API_KEY=<key> SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
   --bin scancode-triage -- --days 21 --max-issues 5 --binary target/release/provenant
 
 # Open a deduplicated Provenant issue per actionable finding:
-SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
+TRIAGE_API_KEY=<key> SCANCODE_TRIAGE_MODEL=<model-id> cargo run --release --manifest-path xtask/Cargo.toml \
   --bin scancode-triage -- --days 8 --binary target/release/provenant --post-to <owner>/<repo>
 ```
 
@@ -701,7 +713,7 @@ CLI arguments:
 - `--since YYYY-MM-DD`: explicit lower bound on issue creation date.
 - `--binary PATH`: the provenant binary used for reproduction scans (default `target/release/provenant`).
 - `--repo-root PATH`: Provenant repo root, used by the `list_parsers` tool.
-- `--model ID`: GitHub Models model id (env `SCANCODE_TRIAGE_MODEL`).
+- `--model ID`: model id (env `SCANCODE_TRIAGE_MODEL`).
 - `--max-issues N`: cap candidates triaged (`0` = no cap).
 - `--out PATH`: also write the run summary to a file (it is always printed to stdout).
 - `--post-to owner/name`: open a deduplicated issue per actionable finding in that repo.
