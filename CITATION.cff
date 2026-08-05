@@ -7,6 +7,10 @@ license: Apache-2.0
 repository-code: "https://github.com/getprovenant/provenant"
 url: "https://getprovenant.dev"
 authors:
+  - given-names: Maxim
+    family-names: Stykow
+  - given-names: Adrian
+    family-names: Braemer
   - name: "The Provenant contributors"
 abstract: >-
   Rust scanner for ScanCode-compatible workflows, licenses,
