@@ -475,16 +475,18 @@ fn parse_conan_reference(ref_str: &str) -> Option<Dependency> {
         }
     });
 
-    let purl = if let Some(v) = version.as_deref() {
-        PackageUrl::new("conan", name)
-            .map(|mut p| {
+    // A range constraint is not a PURL version, so ranged and bare references
+    // both fall through to a name-only PURL and keep the constraint in
+    // `extracted_requirement`.
+    let purl = version
+        .as_deref()
+        .and_then(|v| {
+            PackageUrl::new("conan", name).ok().map(|mut p| {
                 let _ = p.with_version(v);
                 p.to_string()
             })
-            .unwrap_or_else(|_| format!("pkg:conan/{}", name))
-    } else {
-        format!("pkg:conan/{}", name)
-    };
+        })
+        .unwrap_or_else(|| format!("pkg:conan/{}", name));
 
     let is_pinned = version_spec
         .as_ref()

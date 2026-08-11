@@ -723,7 +723,7 @@ fn build_poetry_group_dependency(
     let pinned_version = version_spec
         .as_deref()
         .and_then(extract_exact_pinned_version);
-    let purl = build_python_dependency_purl(&normalized_name, pinned_version.as_deref())?;
+    let purl = build_python_dependency_purl(&normalized_name, pinned_version.as_deref());
 
     let mut extra_data = HashMap::new();
     if let Some(marker) = marker {
@@ -737,7 +737,7 @@ fn build_poetry_group_dependency(
     }
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: version_spec,
         scope: scope.map(|value| value.to_string()),
         is_runtime: Some(!is_optional),
@@ -779,7 +779,7 @@ fn build_pyproject_array_dependency(
         .as_deref()
         .and_then(extract_exact_pinned_version);
 
-    let purl = build_python_dependency_purl(&name, pinned_version.as_deref())?;
+    let purl = build_python_dependency_purl(&name, pinned_version.as_deref());
 
     let mut extra_data = HashMap::new();
     if let Some(marker) = parsed.marker {
@@ -795,7 +795,7 @@ fn build_pyproject_array_dependency(
     let extracted_requirement = parsed.specifiers.or(parsed.url);
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: extracted_requirement.clone(),
         scope: scope.map(|s| s.to_string()),
         is_runtime: Some(!is_optional),

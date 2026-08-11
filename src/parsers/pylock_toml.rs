@@ -734,23 +734,11 @@ fn build_pypi_urls(
 }
 
 fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
-    if let Ok(mut purl) = PackageUrl::new(PylockTomlParser::PACKAGE_TYPE.as_str(), name) {
-        if let Some(version) = version
-            && purl.with_version(version).is_err()
-        {
-            return None;
-        }
-        return Some(truncate_field(purl.to_string()));
+    let mut purl = PackageUrl::new(PylockTomlParser::PACKAGE_TYPE.as_str(), name).ok()?;
+    if let Some(version) = version {
+        purl.with_version(version).ok()?;
     }
-
-    let mut purl = format!("pkg:pypi/{}", name);
-    if let Some(version) = version
-        && !version.is_empty()
-    {
-        purl.push('@');
-        purl.push_str(version);
-    }
-    Some(truncate_field(purl))
+    Some(truncate_field(purl.to_string()))
 }
 
 fn toml_value_to_json(value: &TomlValue) -> JsonValue {

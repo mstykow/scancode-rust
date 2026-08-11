@@ -3140,6 +3140,42 @@ install_requires =
     }
 
     #[test]
+    fn test_setup_cfg_dependency_name_that_is_not_a_distribution_name_yields_no_purl() {
+        // `install_requires` is free-form text, so a name containing `/` reached
+        // the PURL verbatim as `pkg:pypi/a/b@2.0` — which no PURL parser accepts,
+        // since pypi prohibits a namespace. The raw text stays in
+        // `extracted_requirement`, so nothing is lost by declining the PURL.
+        let content = r#"
+[metadata]
+name = test-package
+version = 1.0.0
+
+[options]
+install_requires =
+    a/b==2.0
+    requests>=2.0
+"#;
+
+        let (_temp_dir, file_path) = create_temp_file(content, "setup.cfg");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        let invalid = package_data
+            .dependencies
+            .iter()
+            .find(|dependency| dependency.extracted_requirement.as_deref() == Some("a/b==2.0"))
+            .expect("the unparsable requirement should still be reported");
+        assert_eq!(invalid.purl, None);
+
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dependency| { dependency.purl.as_deref() == Some("pkg:pypi/requests") }),
+            "the valid requirement in the same file must be unaffected"
+        );
+    }
+
+    #[test]
     fn test_setup_cfg_dependency_preserves_pinned_version_in_purl() {
         let content = r#"
 [metadata]

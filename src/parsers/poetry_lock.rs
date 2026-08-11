@@ -407,16 +407,11 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
         return Some(truncate_field(build_manual_pypi_purl(name, version)));
     }
 
-    if let Ok(mut purl) = PackageUrl::new(PoetryLockParser::PACKAGE_TYPE.as_str(), name) {
-        if let Some(version) = version
-            && purl.with_version(version).is_err()
-        {
-            return None;
-        }
-        return Some(truncate_field(purl.to_string()));
+    let mut purl = PackageUrl::new(PoetryLockParser::PACKAGE_TYPE.as_str(), name).ok()?;
+    if let Some(version) = version {
+        purl.with_version(version).ok()?;
     }
-
-    Some(truncate_field(build_manual_pypi_purl(name, version)))
+    Some(truncate_field(purl.to_string()))
 }
 
 fn build_manual_pypi_purl(name: &str, version: Option<&str>) -> String {

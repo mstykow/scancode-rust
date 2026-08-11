@@ -771,4 +771,41 @@ license = { file = "LICENSE.txt" }
             1
         );
     }
+
+    #[test]
+    fn test_setup_cfg_scan_keeps_a_purl_less_dependency_through_assembly() {
+        // A requirement whose name is not a distribution name yields no PURL, and
+        // assembly must still carry it to the top level rather than dropping the
+        // only record of it. `extracted_requirement` is where the raw text lives,
+        // so a purl-less entry is the honest result, not a lost one.
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("setup.cfg"),
+            "[metadata]\nname = demo\nversion = 1.0.0\n\n[options]\ninstall_requires =\n    a/b==2.0\n    requests>=2.0\n",
+        )
+        .expect("write setup.cfg");
+
+        let (_files, result) = scan_and_assemble(temp_dir.path());
+
+        assert_dependency_present(&result.dependencies, "pkg:pypi/requests", "setup.cfg");
+
+        let purl_less = result
+            .dependencies
+            .iter()
+            .find(|dependency| dependency.extracted_requirement.as_deref() == Some("a/b==2.0"))
+            .expect("the purl-less dependency should survive assembly");
+        assert_eq!(purl_less.purl, None);
+        assert!(
+            purl_less.datafile_path.ends_with("setup.cfg"),
+            "it should stay attributed to its datafile, got {}",
+            purl_less.datafile_path
+        );
+        assert!(
+            result.dependencies.iter().all(|dependency| dependency
+                .purl
+                .as_deref()
+                .is_none_or(|purl| !purl.contains("a/b"))),
+            "the invalid name must not reappear as a purl anywhere"
+        );
+    }
 }
