@@ -6,6 +6,7 @@
 use crate::models::{DatasourceId, PackageType};
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use super::PackageParser;
 use super::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
@@ -193,6 +194,45 @@ fn test_conanfile_txt_basic() {
     assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
     assert_eq!(result.datasource_id, Some(DatasourceId::ConanConanFileTxt));
+}
+
+#[test]
+fn test_conan_reference_purls_are_encoded() {
+    use std::io::Write;
+
+    // A reference with a range constraint yields no PURL version, so it took the
+    // hand-formatted path where a name was spliced in unencoded.
+    let dir = std::env::temp_dir().join(format!(
+        "provenant-conan-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let path = dir.join("conanfile.txt");
+    let mut file = std::fs::File::create(&path).expect("create conanfile.txt");
+    writeln!(file, "[requires]\nmy pkg/[>=1.0]\nplain/1.0").expect("write conanfile.txt");
+
+    let result = ConanfileTxtParser::extract_first_package(&path);
+    let purls: Vec<&str> = result
+        .dependencies
+        .iter()
+        .filter_map(|dependency| dependency.purl.as_deref())
+        .collect();
+
+    assert!(
+        purls.contains(&"pkg:conan/my%20pkg"),
+        "the ranged reference should encode its name, got {purls:?}"
+    );
+    assert!(purls.contains(&"pkg:conan/plain@1.0"));
+
+    for purl in &purls {
+        let parsed = packageurl::PackageUrl::from_str(purl).expect("purl should parse");
+        assert_eq!(parsed.to_string(), *purl, "{purl} should round-trip");
+    }
+
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
