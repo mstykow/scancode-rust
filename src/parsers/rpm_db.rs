@@ -444,7 +444,11 @@ fn build_package_data(pkg: RpmQueryPackage, datasource_id: DatasourceId) -> Pack
                 )
             })
             .unwrap_or_else(empty_declared_license_data);
-    let source_packages = source_rpm.clone().into_iter().collect();
+    let source_packages = source_rpm
+        .as_deref()
+        .and_then(source_rpm_purl)
+        .into_iter()
+        .collect();
     let file_references = {
         let from_dir_components =
             build_file_references(&pkg.base_names, &pkg.dir_indexes, &pkg.dir_names);
@@ -540,6 +544,34 @@ fn build_dependency(require: &str) -> Option<Dependency> {
     })
 }
 
+/// Builds the PURL for a binary RPM's source RPM, from its `name-version-release.arch.rpm`
+/// filename.
+///
+/// `source_packages` is specified as a list of *PURLs* — an SRPM is the source
+/// package of a binary RPM — so storing the filename verbatim put a value there
+/// that no consumer can parse. The release is part of the version, matching how
+/// the binary package's own PURL is built, and `arch` stays a qualifier.
+///
+/// Returns `None` when the filename does not decompose, rather than falling back
+/// to the raw string: a non-PURL in this field is exactly the problem.
+pub(super) fn source_rpm_purl(source_rpm: &str) -> Option<String> {
+    let stem = source_rpm.strip_suffix(".rpm")?;
+    let (name_version_release, arch) = stem.rsplit_once('.')?;
+    let (name_version, release) = name_version_release.rsplit_once('-')?;
+    let (name, version) = name_version.rsplit_once('-')?;
+    if name.is_empty() || version.is_empty() || release.is_empty() {
+        return None;
+    }
+
+    build_package_purl(
+        Some(name),
+        None,
+        Some(&format!("{version}-{release}")),
+        Some(arch),
+        None,
+    )
+}
+
 fn build_package_purl(
     name: Option<&str>,
     namespace: Option<&str>,
@@ -602,6 +634,33 @@ fn infer_platform_architecture(platform: Option<&str>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_source_rpm_purl_decomposes_a_nevra_filename() {
+        // `source_packages` is specified as PURLs — an SRPM is the source package
+        // of a binary RPM — so the filename was a value no consumer could parse.
+        assert_eq!(
+            super::source_rpm_purl("gcc-13.1.1-2.fc38.src.rpm").as_deref(),
+            Some("pkg:rpm/gcc@13.1.1-2.fc38?arch=src")
+        );
+        // A name containing `-` still splits correctly: only the last two
+        // hyphen-separated fields are version and release.
+        assert_eq!(
+            super::source_rpm_purl("fedora-modular-repos-26-0.4.module_39876f37.src.rpm")
+                .as_deref(),
+            Some("pkg:rpm/fedora-modular-repos@26-0.4.module_39876f37?arch=src")
+        );
+        assert_eq!(
+            super::source_rpm_purl("fping-2.4b2-10.fc12.src.rpm").as_deref(),
+            Some("pkg:rpm/fping@2.4b2-10.fc12?arch=src")
+        );
+
+        // Anything that does not decompose yields no PURL rather than falling
+        // back to the raw string, which is the defect being fixed.
+        for malformed in ["gcc.rpm", "gcc-13.src.rpm", "not-an-rpm", ""] {
+            assert_eq!(super::source_rpm_purl(malformed), None, "{malformed:?}");
+        }
+    }
+
     use super::*;
 
     use crate::models::DatasourceId;

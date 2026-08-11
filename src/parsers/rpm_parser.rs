@@ -508,7 +508,12 @@ fn build_salvaged_rpm_package(path: &Path, fields: SalvagedRpmFields) -> Option<
         declared_license_expression_spdx,
         license_detections,
         extracted_license_statement,
-        source_packages: fields.source_rpm.into_iter().collect(),
+        source_packages: fields
+            .source_rpm
+            .as_deref()
+            .and_then(super::rpm_db::source_rpm_purl)
+            .into_iter()
+            .collect(),
         extra_data: (!extra_data.is_empty()).then_some(extra_data),
         purl: build_rpm_purl(
             &name,
@@ -808,7 +813,11 @@ fn parse_rpm_package(metadata: &PackageMetadata, path: &Path) -> PackageData {
         license_detections,
         extracted_license_statement,
         dependencies,
-        source_packages: source_rpm.into_iter().collect(),
+        source_packages: source_rpm
+            .as_deref()
+            .and_then(super::rpm_db::source_rpm_purl)
+            .into_iter()
+            .collect(),
         vcs_url,
         extra_data: (!extra_data.is_empty()).then_some(extra_data),
         purl: name.as_ref().and_then(|n| {

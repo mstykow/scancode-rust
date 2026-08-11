@@ -59,7 +59,7 @@
     "other_license_detections": [],
     "extracted_license_statement": "GPLv3+ and GPLv3+ with exceptions and GPLv2+ with exceptions and LGPLv2+ and BSD",
     "notice_text": null,
-    "source_packages": ["gcc-13.1.1-2.fc38.src.rpm"],
+    "source_packages": ["pkg:rpm/gcc@13.1.1-2.fc38?arch=src"],
     "file_references": [
       {
         "path": "/lib64/libgcc_s-13-20230511.so.1",
