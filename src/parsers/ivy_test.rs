@@ -253,3 +253,55 @@ fn test_xml_entities_are_decoded() {
     assert_eq!(pkg.namespace.as_deref(), Some("org.example&co"));
     assert_eq!(pkg.name.as_deref(), Some("a&b"));
 }
+
+#[test]
+fn test_ivy_purls_encode_components_and_keep_the_revision() {
+    use std::io::Write;
+    use std::str::FromStr;
+
+    // `organisation`, `module` and `rev` are raw XML attributes. Hand-formatting
+    // them lost data on re-parse: a space truncated the PURL and took the
+    // revision with it, so the module silently lost its version.
+    let dir = std::env::temp_dir().join(format!(
+        "provenant-ivy-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let path = dir.join("ivy.xml");
+    let mut file = std::fs::File::create(&path).expect("create ivy.xml");
+    write!(
+        file,
+        r#"<ivy-module version="2.0">
+  <info organisation="org with space" module="mod?x" revision="1.0"/>
+  <dependencies>
+    <dependency org="dep org" name="dep?name" rev="2.0"/>
+  </dependencies>
+</ivy-module>"#
+    )
+    .expect("write ivy.xml");
+
+    let package_data = IvyXmlParser::extract_first_package(&path);
+
+    let purl = package_data.purl.as_deref().expect("package purl");
+    assert_eq!(purl, "pkg:ivy/org%20with%20space/mod%3Fx@1.0");
+    let parsed = packageurl::PackageUrl::from_str(purl).expect("purl should parse");
+    assert_eq!(parsed.namespace(), Some("org with space"));
+    assert_eq!(parsed.name(), "mod?x");
+    // The revision is the part that used to disappear.
+    assert_eq!(parsed.version(), Some("1.0"));
+    assert_eq!(parsed.to_string(), purl);
+
+    let dependency = package_data
+        .dependencies
+        .first()
+        .expect("one dependency expected");
+    assert_eq!(
+        dependency.purl.as_deref(),
+        Some("pkg:ivy/dep%20org/dep%3Fname")
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
+}

@@ -196,11 +196,8 @@ fn interpret_ivy_xml(content: &str, path: &Path) -> PackageData {
     package_data.dependencies = dependencies;
 
     if let (Some(namespace), Some(name)) = (&package_data.namespace, &package_data.name) {
-        package_data.purl = Some(truncate_field(build_ivy_purl(
-            namespace,
-            name,
-            package_data.version.as_deref(),
-        )));
+        package_data.purl =
+            build_ivy_purl(namespace, name, package_data.version.as_deref()).map(truncate_field);
     }
 
     package_data
@@ -401,13 +398,15 @@ fn parse_ivy_dependency(element: &BytesStart) -> Option<Dependency> {
     let rev = attr_value(element, b"rev");
     let conf = attr_value(element, b"conf");
 
+    // An ivy dependency without an organisation has no namespace to place, so it
+    // falls back to a name-only PURL — still through the encoder.
     let purl = match &org {
         Some(org) => build_ivy_purl(org, &name, None),
-        None => format!("pkg:ivy/{}", name),
+        None => crate::parsers::utils::simple_purl("ivy", &name, None),
     };
 
     Some(Dependency {
-        purl: Some(truncate_field(purl)),
+        purl: purl.map(truncate_field),
         extracted_requirement: rev.map(truncate_field),
         scope: conf.map(truncate_field),
         is_runtime: None,
@@ -419,11 +418,12 @@ fn parse_ivy_dependency(element: &BytesStart) -> Option<Dependency> {
     })
 }
 
-fn build_ivy_purl(organisation: &str, module: &str, revision: Option<&str>) -> String {
-    let mut purl = format!("pkg:ivy/{}/{}", organisation, module);
-    if let Some(revision) = revision.filter(|value| !value.trim().is_empty()) {
-        purl.push('@');
-        purl.push_str(revision);
-    }
-    purl
+/// Builds an ivy PURL through the encoder.
+///
+/// `organisation` and `module` come straight from XML attributes, so they can
+/// hold anything. Hand-formatting them produced strings that silently lost data
+/// on re-parse: a space in either component truncated the PURL, taking the
+/// revision with it.
+fn build_ivy_purl(organisation: &str, module: &str, revision: Option<&str>) -> Option<String> {
+    crate::parsers::utils::namespaced_purl("ivy", organisation, module, revision)
 }

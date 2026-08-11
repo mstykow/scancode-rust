@@ -141,7 +141,7 @@ pub(crate) fn interpret_manifest_mf(content: &str, path: &Path) -> PackageData {
             package_data.version = bundle_version.clone();
 
             if let (Some(name), Some(version)) = (&package_data.name, &package_data.version) {
-                package_data.purl = Some(format!("pkg:osgi/{}@{}", name, version));
+                package_data.purl = crate::parsers::utils::simple_purl("osgi", name, Some(version));
             }
         }
 
@@ -291,7 +291,7 @@ pub(super) fn parse_osgi_package_list(package_list: &str, scope: &str) -> Vec<De
         let is_optional = package_entry.contains("resolution:=optional");
 
         dependencies.push(Dependency {
-            purl: Some(format!("pkg:osgi/{}", package_name)),
+            purl: crate::parsers::utils::simple_purl("osgi", package_name, None),
             extracted_requirement: version_requirement,
             scope: Some(scope.to_string()),
             is_runtime: Some(true),
@@ -335,7 +335,7 @@ pub(super) fn parse_osgi_bundle_list(bundle_list: &str, scope: &str) -> Vec<Depe
         let is_optional = bundle_entry.contains("resolution:=optional");
 
         dependencies.push(Dependency {
-            purl: Some(format!("pkg:osgi/{}", bundle_name)),
+            purl: crate::parsers::utils::simple_purl("osgi", bundle_name, None),
             extracted_requirement: version_requirement,
             scope: Some(scope.to_string()),
             is_runtime: Some(!is_optional),
