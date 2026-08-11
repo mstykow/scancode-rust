@@ -121,11 +121,33 @@ fn is_unknown_reference_like_match_public(match_item: &Match) -> bool {
     )
 }
 
+/// Recompute a file's `detected_license_expression` and its SPDX counterpart from
+/// the file's current `license_detections`.
+///
+/// Every pass that rewrites `license_detections` must refresh through here rather
+/// than assigning the key field alone: the two expression fields are one fact in
+/// two spellings, and updating only the key form leaves the SPDX field asserting a
+/// license the file no longer claims. The SPDX form mirrors the key expression's
+/// operator structure (see [`spdx_expression_mirroring_key`]) instead of
+/// independently recombining each detection's SPDX string, and is absent whenever
+/// the key form is absent or an operand carries no SPDX id.
+fn refresh_file_license_expressions(file: &mut FileInfo) {
+    file.detected_license_expression = combine_license_expressions(
+        file.license_detections
+            .iter()
+            .map(|detection| detection.license_expression.clone()),
+    );
+    file.detected_license_expression_spdx = file
+        .detected_license_expression
+        .as_deref()
+        .and_then(|key| spdx_expression_mirroring_key(key, &file.license_detections));
+}
+
 /// Move unresolved reference-placeholder detections out of `license_detections`
-/// and into `license_clues`, then recompute the file-level
-/// `detected_license_expression` from the surviving real detections. This keeps
-/// the placeholder matches visible as weak evidence (matching ScanCode's
-/// `license_clues`) while ensuring they no longer assert a license.
+/// and into `license_clues`, then recompute the file-level license expressions
+/// from the surviving real detections. This keeps the placeholder matches visible
+/// as weak evidence (matching ScanCode's `license_clues`) while ensuring they no
+/// longer assert a license in either expression field.
 fn demote_unresolved_reference_detections_to_clues(file: &mut FileInfo) {
     if !file
         .license_detections
@@ -145,11 +167,7 @@ fn demote_unresolved_reference_detections_to_clues(file: &mut FileInfo) {
     }
     file.license_detections = surviving;
 
-    file.detected_license_expression = combine_license_expressions(
-        file.license_detections
-            .iter()
-            .map(|detection| detection.license_expression.clone()),
-    );
+    refresh_file_license_expressions(file);
 }
 
 fn collect_referenced_file_paths(files: &[FileInfo]) -> HashSet<String> {
@@ -689,11 +707,7 @@ fn follow_references_for_file(file: &mut FileInfo, snapshot: &ReferenceFollowSna
     }
 
     if modified {
-        file.detected_license_expression = combine_license_expressions(
-            file.license_detections
-                .iter()
-                .map(|detection| detection.license_expression.clone()),
-        );
+        refresh_file_license_expressions(file);
     }
 
     modified
@@ -727,11 +741,7 @@ fn inherit_same_directory_legal_detections_for_file(
     }
 
     file.license_detections = inherited_detections;
-    file.detected_license_expression = combine_license_expressions(
-        file.license_detections
-            .iter()
-            .map(|detection| detection.license_expression.clone()),
-    );
+    refresh_file_license_expressions(file);
     true
 }
 
@@ -1983,6 +1993,39 @@ mod tests {
             font.license_detections[0].matches[0].from_file.as_deref(),
             Some("fonts/OFL.txt")
         );
+        // Inheritance replaces the asset's detections outright, so the SPDX field
+        // must follow the inherited license rather than keep whatever the asset
+        // carried before.
+        assert_eq!(
+            font.detected_license_expression_spdx.as_deref(),
+            Some("OFL-1.1")
+        );
+    }
+
+    #[test]
+    fn same_directory_legal_inheritance_replaces_a_stale_spdx_expression() {
+        // The asset arrives carrying its own (unresolved-reference) expressions.
+        // Inheriting the sibling legal file's license must overwrite *both*
+        // spellings; keeping the old SPDX form would name a different license
+        // than the key form.
+        let mut font = file("fonts/Scheherazade-Bold.ttf");
+        font.detected_license_expression = Some("unknown-license-reference".to_string());
+        font.detected_license_expression_spdx =
+            Some("LicenseRef-scancode-unknown-license-reference".to_string());
+
+        let mut legal = file("fonts/OFL.txt");
+        legal.license_detections = vec![detection("ofl-1.1", "OFL-1.1", "fonts/OFL.txt")];
+        legal.detected_license_expression = Some("ofl-1.1".to_string());
+
+        let mut files = vec![font, legal];
+        apply_package_reference_following(&mut files, &mut []);
+        let font = files.remove(0);
+
+        assert_eq!(font.detected_license_expression.as_deref(), Some("ofl-1.1"));
+        assert_eq!(
+            font.detected_license_expression_spdx.as_deref(),
+            Some("OFL-1.1")
+        );
     }
 
     fn placeholder_reference_match(expression: &str, rule_identifier: &str) -> Match {
@@ -2023,6 +2066,7 @@ mod tests {
             identifier: "free-unknown-id".to_string(),
         }];
         po.detected_license_expression = Some("free-unknown".to_string());
+        po.detected_license_expression_spdx = Some("LicenseRef-scancode-free-unknown".to_string());
 
         let mut files = vec![po];
         apply_package_reference_following(&mut files, &mut []);
@@ -2032,6 +2076,10 @@ mod tests {
         assert_eq!(po.license_clues.len(), 1);
         assert_eq!(po.license_clues[0].license_expression, "free-unknown");
         assert_eq!(po.detected_license_expression, None);
+        // The SPDX counterpart must be cleared with the key form. Leaving it set
+        // makes the file assert a license in one spelling that it denies in the
+        // other, which is what a clue-only file looked like before this fix.
+        assert_eq!(po.detected_license_expression_spdx, None);
     }
 
     #[test]
@@ -2075,6 +2123,8 @@ mod tests {
             },
         ];
         f.detected_license_expression = Some("apache-2.0 AND free-unknown".to_string());
+        f.detected_license_expression_spdx =
+            Some("Apache-2.0 AND LicenseRef-scancode-free-unknown".to_string());
 
         let mut files = vec![f];
         apply_package_reference_following(&mut files, &mut []);
@@ -2084,6 +2134,10 @@ mod tests {
         assert_eq!(f.license_detections[0].license_expression, "apache-2.0");
         assert_eq!(f.license_clues.len(), 1);
         assert_eq!(f.detected_license_expression.as_deref(), Some("apache-2.0"));
+        assert_eq!(
+            f.detected_license_expression_spdx.as_deref(),
+            Some("Apache-2.0")
+        );
     }
 
     fn detection(expression: &str, spdx: &str, from_file: &str) -> crate::models::LicenseDetection {
