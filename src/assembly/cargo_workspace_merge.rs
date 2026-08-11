@@ -483,7 +483,7 @@ fn create_member_packages(
         let mut deps: Vec<TopLevelDependency> = resolved_pkg_data
             .dependencies
             .iter()
-            .filter(|dep| dep.purl.is_some())
+            .filter(|dep| super::is_reportable_dependency(dep))
             .map(|dep| {
                 TopLevelDependency::from_dependency(
                     dep,
@@ -501,7 +501,7 @@ fn create_member_packages(
                 lock_pkg_data
                     .dependencies
                     .iter()
-                    .filter(|dep| dep.purl.is_some())
+                    .filter(|dep| super::is_reportable_dependency(dep))
                     .map(|dep| {
                         TopLevelDependency::from_dependency(
                             dep,
@@ -562,7 +562,7 @@ fn create_root_package(
     let mut deps: Vec<TopLevelDependency> = resolved_pkg_data
         .dependencies
         .iter()
-        .filter(|dep| dep.purl.is_some())
+        .filter(|dep| super::is_reportable_dependency(dep))
         .map(|dep| {
             TopLevelDependency::from_dependency(
                 dep,
@@ -580,7 +580,7 @@ fn create_root_package(
             lock_pkg_data
                 .dependencies
                 .iter()
-                .filter(|dep| dep.purl.is_some())
+                .filter(|dep| super::is_reportable_dependency(dep))
                 .map(|dep| {
                     TopLevelDependency::from_dependency(
                         dep,
@@ -633,7 +633,7 @@ fn hoist_root_lock_dependencies(
             pkg_data
                 .dependencies
                 .iter()
-                .filter(|dep| dep.purl.is_some())
+                .filter(|dep| super::is_reportable_dependency(dep))
                 .map(|dep| {
                     TopLevelDependency::from_dependency(
                         dep,

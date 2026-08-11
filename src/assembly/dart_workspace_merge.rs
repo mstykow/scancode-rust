@@ -145,7 +145,7 @@ pub(super) fn apply_dart_workspace_domain(
             root_data
                 .dependencies
                 .iter()
-                .filter(|dep| dep.purl.is_some())
+                .filter(|dep| super::is_reportable_dependency(dep))
                 .map(|dependency| {
                     TopLevelDependency::from_dependency(
                         dependency,
@@ -256,7 +256,7 @@ fn attribute_shared_lock(
         for dependency in lock_data
             .dependencies
             .iter()
-            .filter(|dep| dep.purl.is_some())
+            .filter(|dep| super::is_reportable_dependency(dep))
         {
             let name = dependency.purl.as_deref().and_then(purl_name);
             let owners = candidates.iter().filter(|candidate| {

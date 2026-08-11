@@ -113,7 +113,7 @@ pub(super) fn assemble_single_sibling_package(
                 }
 
                 for dep in &pkg_data.dependencies {
-                    if dep.purl.is_some() {
+                    if super::is_reportable_dependency(dep) {
                         pending_dependencies.push(PendingDependency {
                             dependency: dep.clone(),
                             datafile_path: datafile_path.clone(),
@@ -241,7 +241,7 @@ pub(super) fn assemble_siblings_per_identity(
                     pkg_data
                         .dependencies
                         .iter()
-                        .filter(|dep| dep.purl.is_some())
+                        .filter(|dep| super::is_reportable_dependency(dep))
                         .map(|dep| PendingDependency {
                             dependency: dep.clone(),
                             datafile_path: datafile_path.clone(),
@@ -297,7 +297,7 @@ pub(super) fn collect_pending_dependencies(
     pkg_data
         .dependencies
         .iter()
-        .filter(|dep| dep.purl.is_some() || dep.extracted_requirement.is_some())
+        .filter(|dep| super::is_reportable_dependency(dep))
         .cloned()
         .map(|dependency| PendingDependency {
             dependency,

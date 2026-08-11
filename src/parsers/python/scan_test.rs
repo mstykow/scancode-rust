@@ -716,4 +716,59 @@ license = { file = "LICENSE.txt" }
             "the package license detection should include a match from the referenced LICENSE.txt"
         );
     }
+
+    #[test]
+    fn test_requirements_url_dependency_reaches_the_top_level_exactly_once() {
+        // A bare URL requirement resolves to no PURL but carries the text it was
+        // declared with, so it is a real declared dependency. Assemblers that
+        // filtered on the PURL alone dropped it, which left the manifest's own
+        // record of it visible only inside `package_data`.
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+        fs::write(
+            temp_dir.path().join("requirements.txt"),
+            "https://example.com/foo-1.0.tar.gz\nrequests==2.0\n",
+        )
+        .expect("write requirements.txt");
+
+        let (_files, result) = scan_and_assemble(temp_dir.path());
+
+        assert_dependency_present(
+            &result.dependencies,
+            "pkg:pypi/requests@2.0",
+            "requirements.txt",
+        );
+
+        let url_dependencies: Vec<_> = result
+            .dependencies
+            .iter()
+            .filter(|dependency| {
+                dependency.extracted_requirement.as_deref()
+                    == Some("https://example.com/foo-1.0.tar.gz")
+            })
+            .collect();
+        assert_eq!(
+            url_dependencies.len(),
+            1,
+            "the URL requirement should be reported once, got {:?}",
+            result
+                .dependencies
+                .iter()
+                .map(|dependency| (
+                    dependency.purl.clone(),
+                    dependency.extracted_requirement.clone()
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(url_dependencies[0].purl, None);
+
+        // The neighbouring requirement must not be duplicated either.
+        assert_eq!(
+            result
+                .dependencies
+                .iter()
+                .filter(|dependency| dependency.purl.as_deref() == Some("pkg:pypi/requests@2.0"))
+                .count(),
+            1
+        );
+    }
 }

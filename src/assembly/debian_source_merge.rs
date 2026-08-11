@@ -66,7 +66,7 @@ pub(super) fn assemble_debian_source_packages(
             let dependencies = pkg_data
                 .dependencies
                 .iter()
-                .filter(|dependency| dependency.purl.is_some())
+                .filter(|dependency| super::is_reportable_dependency(dependency))
                 .map(|dependency| {
                     TopLevelDependency::from_dependency(
                         dependency,

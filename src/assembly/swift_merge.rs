@@ -198,7 +198,7 @@ fn hoist_dependencies(
 ) -> Vec<TopLevelDependency> {
     dependencies
         .iter()
-        .filter(|dependency| dependency.purl.is_some())
+        .filter(|dependency| super::is_reportable_dependency(dependency))
         .map(|dependency| {
             TopLevelDependency::from_dependency(
                 dependency,

@@ -490,7 +490,7 @@ fn emit_direct_dependencies(
             continue;
         }
 
-        if dep.purl.is_some() {
+        if super::is_reportable_dependency(dep) {
             dependencies.push(TopLevelDependency::from_dependency(
                 dep,
                 manifest_path.to_string(),
