@@ -938,6 +938,9 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
         return None;
     }
 
+    // Safe to assemble by hand: `is_valid_distribution_name` above restricts the
+    // name to the PEP 508 charset, which needs no percent-encoding, and the
+    // version is encoded by `encode_pypi_purl_version`.
     PackageUrl::new(RequirementsTxtParser::PACKAGE_TYPE.as_str(), name)
         .ok()
         .map(|_| match version {
