@@ -307,18 +307,25 @@ pub fn url_authority_host(authority: &str) -> &str {
 /// when the components cannot form a PURL, which is the honest outcome: the
 /// declared text is still reported in the fields that carry it.
 ///
+/// Components are bounded before construction, never after: truncating an
+/// assembled PURL can cut a percent escape in half or drop a trailing component,
+/// turning a valid PURL into one that no longer parses. Callers must not apply
+/// `truncate_field` to the result.
+///
 /// Only for types the crate does not rewrite. It lowercases names for
 /// `bitbucket`, `deb`, `github`, `hex`, `npm` and `pypi`, so those need a
 /// deliberate decision about case rather than this helper.
 pub fn simple_purl(package_type: &str, name: &str, version: Option<&str>) -> Option<String> {
-    let name = name.trim();
+    let name = truncate_field(name.trim().to_string());
     if name.is_empty() {
         return None;
     }
 
-    let mut package_url = PackageUrl::new(package_type.to_string(), name.to_string()).ok()?;
+    let mut package_url = PackageUrl::new(package_type.to_string(), name).ok()?;
     if let Some(version) = version.map(str::trim).filter(|value| !value.is_empty()) {
-        package_url.with_version(version.to_string()).ok()?;
+        package_url
+            .with_version(truncate_field(version.to_string()))
+            .ok()?;
     }
     Some(package_url.to_string())
 }
@@ -336,15 +343,18 @@ pub fn namespaced_purl(
     name: &str,
     version: Option<&str>,
 ) -> Option<String> {
-    let (namespace, name) = (namespace.trim(), name.trim());
+    let namespace = truncate_field(namespace.trim().to_string());
+    let name = truncate_field(name.trim().to_string());
     if namespace.is_empty() || name.is_empty() {
         return None;
     }
 
-    let mut package_url = PackageUrl::new(package_type.to_string(), name.to_string()).ok()?;
-    package_url.with_namespace(namespace.to_string()).ok()?;
+    let mut package_url = PackageUrl::new(package_type.to_string(), name).ok()?;
+    package_url.with_namespace(namespace).ok()?;
     if let Some(version) = version.map(str::trim).filter(|value| !value.is_empty()) {
-        package_url.with_version(version.to_string()).ok()?;
+        package_url
+            .with_version(truncate_field(version.to_string()))
+            .ok()?;
     }
     Some(package_url.to_string())
 }

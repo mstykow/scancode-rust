@@ -492,3 +492,48 @@ fn test_osgi_manifest_without_implementation_version_stays_osgi() {
         Some("pkg:osgi/com.fasterxml.jackson.core.jackson-core@2.18.0".to_string())
     );
 }
+
+#[test]
+fn test_osgi_purls_encode_components_and_keep_the_version() {
+    use std::str::FromStr;
+
+    // Manifest headers are free text, so a `Bundle-SymbolicName` or an imported
+    // package name can hold anything. Hand-formatting truncated the PURL at the
+    // first space, which took the bundle version with it.
+    let temp_dir = TempDir::new().expect("create temp dir");
+    let meta_inf = temp_dir.path().join("META-INF");
+    fs::create_dir_all(&meta_inf).expect("create META-INF");
+    let manifest_path = meta_inf.join("MANIFEST.MF");
+    fs::write(
+        &manifest_path,
+        "Bundle-SymbolicName: my bundle?x\nBundle-Version: 1.0.0\nImport-Package: com.foo bar\nRequire-Bundle: req bundle#z\n",
+    )
+    .expect("write MANIFEST.MF");
+
+    let package_data = MavenParser::extract_first_package(&manifest_path);
+
+    let purl = package_data.purl.as_deref().expect("package purl");
+    assert_eq!(purl, "pkg:osgi/my%20bundle%3Fx@1.0.0");
+    let parsed = packageurl::PackageUrl::from_str(purl).expect("purl should parse");
+    assert_eq!(parsed.name(), "my bundle?x");
+    // The version is the part that used to be lost.
+    assert_eq!(parsed.version(), Some("1.0.0"));
+    assert_eq!(parsed.to_string(), purl);
+
+    let purls: Vec<&str> = package_data
+        .dependencies
+        .iter()
+        .filter_map(|dependency| dependency.purl.as_deref())
+        .collect();
+    assert!(purls.contains(&"pkg:osgi/com.foo%20bar"), "got {purls:?}");
+    // `#` would otherwise become a subpath rather than part of the name.
+    assert!(
+        purls.contains(&"pkg:osgi/req%20bundle%23z"),
+        "got {purls:?}"
+    );
+    for purl in &purls {
+        let parsed = packageurl::PackageUrl::from_str(purl).expect("purl should parse");
+        assert_eq!(parsed.subpath(), None);
+        assert_eq!(parsed.to_string(), *purl);
+    }
+}
