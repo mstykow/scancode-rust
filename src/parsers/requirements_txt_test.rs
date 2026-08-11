@@ -191,6 +191,85 @@ mod tests {
     }
 
     #[test]
+    fn test_is_match_rejects_directories_of_projects_named_requirements() {
+        // A project *named* `requirements*` has an sdist root, a `.dist-info` /
+        // `.egg-info` and a module directory that all start with the word, so a
+        // bare prefix test claimed their generated metadata and parsed it line by
+        // line: `SOURCES.txt` became one dependency per shipped file path,
+        // `LICENSE.txt` one per line of licence prose.
+        for path in [
+            "/tmp/requirements_wayback_machine-0.1.1.dist-info/LICENSE.txt",
+            "/tmp/requirementslib-3.0.0/src/requirementslib.egg-info/SOURCES.txt",
+            "/tmp/requirements-builder-0.4.4/tests/fixtures/setup.txt",
+            "/tmp/requirements-score-1.2.0/top_level.txt",
+            "/tmp/site-packages/requirements_parser-0.9.0.dist-info/entry_points.txt",
+        ] {
+            assert!(
+                !RequirementsTxtParser::is_match(&PathBuf::from(path)),
+                "{path} must not be parsed as a requirements file"
+            );
+        }
+
+        // `requires.txt` in distribution metadata is genuine and matches on its
+        // filename, which the directory rules must not take away.
+        assert!(RequirementsTxtParser::is_match(&PathBuf::from(
+            "/tmp/requirementslib-3.0.0/src/requirementslib.egg-info/requires.txt"
+        )));
+
+        // Real requirements directories keep matching, at any depth.
+        for path in [
+            "/tmp/project/requirements/base.txt",
+            "/tmp/project/requirements-dev/extra.in",
+            "/tmp/project/dev-requirements/extra.txt",
+            "/tmp/salt/requirements/static/ci/py3.10/linux.txt",
+        ] {
+            assert!(
+                RequirementsTxtParser::is_match(&PathBuf::from(path)),
+                "{path} must still be parsed as a requirements file"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_match_ignores_directories_above_the_scan_root() {
+        // Parsers receive an absolute path, so an unbounded ancestor walk read
+        // directory names above the scanned tree: unpacking a wheel under a
+        // directory called `requirements/` made every `.txt` in it parse as
+        // requirements, and the same tree scanned from elsewhere did not. A scan
+        // must not depend on where the tree happens to live.
+        let root = unique_temp_path("scan-root");
+        let nested = root.join("mywheel").join("pkg-1.0.dist-info");
+        fs::create_dir_all(&nested).expect("create nested dirs");
+        let readme = nested.join("README.txt");
+        fs::write(&readme, "::\n").expect("write readme");
+
+        // The scan root here is a directory whose *parent* chain contains no
+        // requirements-like name; rename the root itself to the dangerous name.
+        let requirements_root = root
+            .parent()
+            .expect("temp dir should have a parent")
+            .join("requirements");
+        fs::rename(&root, &requirements_root).expect("rename root");
+        let readme = requirements_root
+            .join("mywheel")
+            .join("pkg-1.0.dist-info")
+            .join("README.txt");
+
+        // Scanned with the requirements-named directory as the root, nothing
+        // above or at the root may make this a requirements file.
+        let matched_within_scan =
+            crate::parsers::with_parser_scan_root(Some(&requirements_root), || {
+                RequirementsTxtParser::is_match(&readme)
+            });
+        assert!(
+            !matched_within_scan,
+            "a directory at/above the scan root must not claim this file"
+        );
+
+        fs::remove_dir_all(&requirements_root).ok();
+    }
+
+    #[test]
     fn test_is_match_supports_underscore_lockfile_and_nested_directory_names() {
         assert!(RequirementsTxtParser::is_match(&PathBuf::from(
             "/tmp/requirements_lock_3_11.txt"

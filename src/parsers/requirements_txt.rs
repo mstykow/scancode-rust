@@ -43,6 +43,7 @@ use crate::parsers::utils::{
 };
 
 use super::PackageParser;
+use crate::parsers::active_parser_scan_root;
 
 /// pip requirements.txt parser supporting PEP 508 dependency specifications.
 ///
@@ -84,14 +85,16 @@ impl PackageParser for RequirementsTxtParser {
                 "**/requirements*.in",
                 "**/*requirements.in",
                 "**/requires.txt",
-                "**/requirements/*.txt",
-                "**/requirements/*.in",
+                // Any `.txt`/`.in` beneath a requirements *directory*, at any
+                // depth within the scan root. The separator after the word is
+                // required so a project merely named `requirements*` does not
+                // have its own source and metadata directories claimed.
                 "**/requirements/**/*.txt",
                 "**/requirements/**/*.in",
-                "**/requirements*/*.txt",
-                "**/requirements*/*.in",
-                "**/requirements*/**/*.txt",
-                "**/requirements*/**/*.in",
+                "**/requirements[-_.]*/**/*.txt",
+                "**/requirements[-_.]*/**/*.in",
+                "**/*[-_.]requirements/**/*.txt",
+                "**/*[-_.]requirements/**/*.in",
             ],
             package_type: "pypi",
             primary_language: "Python",
@@ -139,17 +142,89 @@ fn is_requirements_like_extension(name: &str) -> bool {
     name.ends_with(".txt") || name.ends_with(".in")
 }
 
+/// Whether the file sits under a directory that organises requirements files,
+/// which is what lets a `.txt`/`.in` with an unrelated name (`base.txt`,
+/// `py3.10.txt`) still be recognised.
+///
+/// The walk stops at the scan root. Parsers are handed an absolute filesystem
+/// path, so an unbounded walk reads directory names *above* what is being
+/// scanned: the same tree at the same in-scan path produced dependencies or not
+/// depending only on where it happened to be unpacked on disk, which made scans
+/// irreproducible across machines. Anything above the root is not part of the
+/// scanned tree and must not influence the result. When the root is unknown (a
+/// parser invoked outside a scan) the walk stays unbounded, preserving the
+/// previous behaviour rather than silently matching less.
+///
+/// Consequence worth knowing: pointing a scan *directly* at a `requirements/`
+/// directory no longer makes that directory's own name count, since it is then
+/// the root. Files named `requirements*.txt` / `requires.txt` still match on
+/// filename alone.
 fn has_requirements_like_ancestor(path: &Path) -> bool {
-    path.parent()
-        .into_iter()
-        .flat_map(Path::ancestors)
-        .filter_map(|ancestor| ancestor.file_name())
-        .filter_map(|name| name.to_str())
-        .any(is_requirements_like_dir_name)
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+
+    let boundary = active_parser_scan_root().and_then(|root| root.canonicalize().ok());
+    let canonical_parent = parent.canonicalize().ok();
+    let start = canonical_parent.as_deref().unwrap_or(parent);
+
+    for ancestor in start.ancestors() {
+        if boundary.as_deref().is_some_and(|root| ancestor == root) {
+            break;
+        }
+        if ancestor
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(is_requirements_like_dir_name)
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
+/// A directory that groups requirements files, as opposed to one that merely
+/// starts or ends with the word.
+///
+/// A bare prefix/suffix test also claims every directory belonging to a *project
+/// named* `requirements*` — its sdist root, its `.dist-info`/`.egg-info`, its
+/// module directory — so shipped metadata such as `SOURCES.txt`,
+/// `entry_points.txt`, `top_level.txt` and even `LICENSE.txt` was parsed as
+/// requirements, one junk dependency per line.
 fn is_requirements_like_dir_name(name: &str) -> bool {
-    name == "requirements" || name.starts_with("requirements") || name.ends_with("requirements")
+    if is_python_distribution_metadata_dir(name) || looks_like_versioned_distribution_dir(name) {
+        return false;
+    }
+
+    if name == "requirements" {
+        return true;
+    }
+
+    if let Some(rest) = name.strip_prefix("requirements")
+        && rest.starts_with(['-', '_', '.'])
+    {
+        return true;
+    }
+
+    name.strip_suffix("requirements")
+        .is_some_and(|rest| rest.ends_with(['-', '_', '.']))
+}
+
+/// `*.dist-info`, `*.egg-info` and `*.data` hold generated distribution
+/// metadata. The only requirements file they legitimately carry is
+/// `requires.txt`, which matches on its filename alone.
+fn is_python_distribution_metadata_dir(name: &str) -> bool {
+    name.ends_with(".dist-info") || name.ends_with(".egg-info") || name.ends_with(".data")
+}
+
+/// A `name-version` distribution root (`requirements-builder-0.4.4`,
+/// `requirementslib-3.0.0`), recognised by a trailing `-`-separated segment that
+/// starts with a digit. Its contents are a project's source tree, not a
+/// requirements directory.
+fn looks_like_versioned_distribution_dir(name: &str) -> bool {
+    name.rsplit_once('-')
+        .is_some_and(|(_, last)| last.starts_with(|ch: char| ch.is_ascii_digit()))
 }
 
 struct ParseState {
