@@ -724,7 +724,7 @@ fn parse_hackage_spec_dependency(
         }
 
         return Some(Dependency {
-            purl: Some(truncate_field(format!("pkg:hackage/{}@{}", name, version))),
+            purl: build_hackage_purl(Some(&name), Some(&version)).map(truncate_field),
             extracted_requirement: Some(truncate_field(version)),
             scope: scope.map(str::to_string),
             is_runtime: component.map(component_is_runtime).or(is_runtime),
@@ -754,14 +754,8 @@ fn parse_hackage_spec_dependency(
             .as_ref()
             .map(|(_, version)| version.clone())
     });
-    let purl = if let Some(version) = exact_version.as_deref() {
-        Some(truncate_field(format!(
-            "pkg:hackage/{}@{}",
-            resolved_name, version
-        )))
-    } else {
-        Some(truncate_field(format!("pkg:hackage/{}", resolved_name)))
-    };
+    let purl =
+        build_hackage_purl(Some(resolved_name), exact_version.as_deref()).map(truncate_field);
 
     let mut extra_data = HashMap::new();
     if let Some(component) = component {
@@ -1003,12 +997,13 @@ fn build_party(value: &str, role: &str) -> Option<Party> {
     })
 }
 
-fn build_hackage_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
-    match (name, version) {
-        (Some(name), Some(version)) => Some(format!("pkg:hackage/{}@{}", name, version)),
-        (Some(name), None) => Some(format!("pkg:hackage/{}", name)),
-        _ => None,
-    }
+/// Builds a hackage PURL through the encoder.
+///
+/// A `.cabal` `name:` field is free text, so a `/` in it would otherwise be read
+/// back as a namespace separator — which hackage prohibits, making the PURL
+/// unparsable.
+pub(super) fn build_hackage_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
+    crate::parsers::utils::simple_purl("hackage", name?, version)
 }
 
 fn split_hackage_name_version(spec: &str) -> Option<(String, String)> {
