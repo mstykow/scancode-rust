@@ -309,7 +309,7 @@ fn parse_url_namespace_and_name(url: &str) -> Option<(String, String)> {
         .strip_prefix("https://")
         .or_else(|| trimmed.strip_prefix("http://"))?;
     let mut parts = without_scheme.split('/');
-    let host = parts.next()?;
+    let host = crate::parsers::utils::url_authority_host(parts.next()?);
     let owner = parts.next()?;
     let repo = parts.next()?;
 
