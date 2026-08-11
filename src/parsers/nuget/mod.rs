@@ -169,7 +169,7 @@ pub(super) fn build_nuget_urls(
     )
 }
 
-pub(super) fn build_nuget_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
+pub(crate) fn build_nuget_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
     let name = name?;
     let mut package_url = PackageUrl::new("nuget", name).ok()?;
 

@@ -657,7 +657,12 @@ fn build_central_dependency(
     }
 
     Some(Dependency {
-        purl: Some(format!("pkg:nuget/{name}")),
+        // Build the PURL exactly as the csproj parser does. This value is a join
+        // key — `resolve_central_package_version` matches it against the
+        // dependency the project file produced — so hand-formatting it here made
+        // any name needing percent-encoding fail to match, and the central
+        // `PackageVersion` silently failed to resolve.
+        purl: crate::parsers::build_nuget_purl(Some(&name), None),
         extracted_requirement: Some(version),
         scope: Some("package_version".to_string()),
         is_runtime: Some(true),

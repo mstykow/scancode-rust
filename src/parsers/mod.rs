@@ -718,6 +718,9 @@ pub use self::nix::{NixDefaultParser, NixFlakeLockParser, NixFlakeParser};
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
+/// Shared so assembly builds NuGet PURLs the same way the project parsers do;
+/// the value is a join key between the two.
+pub(crate) use self::nuget::build_nuget_purl;
 pub use self::nuget::{
     CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
     NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
