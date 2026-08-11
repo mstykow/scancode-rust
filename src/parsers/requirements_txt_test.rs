@@ -216,12 +216,16 @@ mod tests {
             "/tmp/requirementslib-3.0.0/src/requirementslib.egg-info/requires.txt"
         )));
 
-        // Real requirements directories keep matching, at any depth.
+        // Real requirements directories keep matching, at any depth — including
+        // an organiser carrying a version-like suffix, which the
+        // versioned-distribution-root rule must not mistake for a package root.
         for path in [
             "/tmp/project/requirements/base.txt",
             "/tmp/project/requirements-dev/extra.in",
             "/tmp/project/dev-requirements/extra.txt",
             "/tmp/salt/requirements/static/ci/py3.10/linux.txt",
+            "/tmp/project/requirements-3.11/base.txt",
+            "/tmp/project/requirements-2.7/base.in",
         ] {
             assert!(
                 RequirementsTxtParser::is_match(&PathBuf::from(path)),

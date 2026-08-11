@@ -85,16 +85,14 @@ impl PackageParser for RequirementsTxtParser {
                 "**/requirements*.in",
                 "**/*requirements.in",
                 "**/requires.txt",
-                // Any `.txt`/`.in` beneath a requirements *directory*, at any
-                // depth within the scan root. The separator after the word is
-                // required so a project merely named `requirements*` does not
-                // have its own source and metadata directories claimed.
-                "**/requirements/**/*.txt",
-                "**/requirements/**/*.in",
-                "**/requirements[-_.]*/**/*.txt",
-                "**/requirements[-_.]*/**/*.in",
-                "**/*[-_.]requirements/**/*.txt",
-                "**/*[-_.]requirements/**/*.in",
+                // The directory clause is not expressible as a glob: it excludes
+                // distribution metadata and versioned distribution roots, and is
+                // bounded by the scan root. Describing it as a glob would
+                // advertise files the parser explicitly declines, so it follows
+                // the `<...>` convention for non-glob surfaces instead.
+                "<any *.txt or *.in under a requirements directory within the \
+                  scan root, excluding *.dist-info, *.egg-info, *.data and \
+                  versioned distribution roots>",
             ],
             package_type: "pypi",
             primary_language: "Python",
@@ -219,12 +217,20 @@ fn is_python_distribution_metadata_dir(name: &str) -> bool {
 }
 
 /// A `name-version` distribution root (`requirements-builder-0.4.4`,
-/// `requirementslib-3.0.0`), recognised by a trailing `-`-separated segment that
-/// starts with a digit. Its contents are a project's source tree, not a
-/// requirements directory.
+/// `requirementslib-3.0.0`), whose contents are a project's source tree rather
+/// than a requirements directory.
+///
+/// Recognised by a trailing `-`-separated segment starting with a digit, but only
+/// when what precedes it names something *other* than requirements itself: an
+/// organiser directory may legitimately carry a version-like suffix
+/// (`requirements-3.11/` holding `base.txt`), and stripping the suffix
+/// distinguishes the two — `requirements-builder-0.4.4` leaves
+/// `requirements-builder`, a distribution name, while `requirements-3.11` leaves
+/// the bare word.
 fn looks_like_versioned_distribution_dir(name: &str) -> bool {
-    name.rsplit_once('-')
-        .is_some_and(|(_, last)| last.starts_with(|ch: char| ch.is_ascii_digit()))
+    name.rsplit_once('-').is_some_and(|(prefix, last)| {
+        last.starts_with(|ch: char| ch.is_ascii_digit()) && prefix != "requirements"
+    })
 }
 
 struct ParseState {
