@@ -262,6 +262,9 @@ pub(super) fn build_python_dependency_purl(name: &str, version: Option<&str>) ->
         return None;
     }
 
+    // Safe to assemble by hand: the validation above restricts the name to the
+    // PEP 508 charset, which needs no percent-encoding, and the version is
+    // encoded by `encode_python_dependency_purl_version`.
     Some(match version {
         Some(version) => format!(
             "pkg:pypi/{normalized_name}@{}",

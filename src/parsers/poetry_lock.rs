@@ -404,7 +404,7 @@ fn normalize_pypi_name(name: &str) -> String {
 
 fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
     if name.contains('[') || name.contains(']') {
-        return Some(truncate_field(build_manual_pypi_purl(name, version)));
+        return build_manual_pypi_purl(name, version).map(truncate_field);
     }
 
     let mut purl = PackageUrl::new(PoetryLockParser::PACKAGE_TYPE.as_str(), name).ok()?;
@@ -414,20 +414,14 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
     Some(truncate_field(purl.to_string()))
 }
 
-fn build_manual_pypi_purl(name: &str, version: Option<&str>) -> String {
-    let encoded_name = encode_pypi_name(name);
-    let mut purl = format!("pkg:pypi/{}", encoded_name);
-    if let Some(version) = version
-        && !version.is_empty()
-    {
-        purl.push('@');
-        purl.push_str(version);
-    }
-    purl
-}
-
-fn encode_pypi_name(name: &str) -> String {
-    name.replace('[', "%5b").replace(']', "%5d")
+/// Builds a PyPI PURL for a name carrying extras (`requests[socks]`).
+///
+/// The crate encodes brackets as `%5B`/`%5D`; this lowercases those two escapes
+/// to keep the spelling ScanCode emits. Everything else still goes through the
+/// encoder, so a name that also contains a reserved character is not left raw.
+fn build_manual_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
+    crate::parsers::utils::simple_purl("pypi", name, version)
+        .map(|purl| purl.replace("%5B", "%5b").replace("%5D", "%5d"))
 }
 
 fn extract_sha256_from_files(package_table: &TomlMap<String, TomlValue>) -> Option<String> {

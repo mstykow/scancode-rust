@@ -416,6 +416,11 @@ fn parse_dep_to_base_purl_and_version(dep: &str) -> (String, Option<String>) {
     (base_purl, requirement)
 }
 
+/// The internal key a pod is tracked by while parsing — never emitted.
+///
+/// Emitted PURLs come from `create_cocoapods_purl`, which encodes through the
+/// crate. This only has to be a stable key for the maps below, so it is not
+/// encoded and must not start being used as an output value.
 fn make_base_purl(name: &str) -> String {
     format!("pkg:cocoapods/{}", name)
 }
