@@ -500,7 +500,7 @@ fn create_simple_dependency(
     let is_optional = scope.as_deref() == Some("optional");
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: Some(version),
         scope,
         is_runtime: Some(is_runtime),
@@ -631,7 +631,7 @@ pub fn extract_dependency(
     };
 
     let dependency = Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: Some(version),
         scope,
         is_runtime: Some(is_runtime),
@@ -726,7 +726,14 @@ pub fn parse_purl_fields(
     }
 }
 
-pub fn create_purl(namespace: &Option<String>, name: &str, version: &str) -> String {
+/// Builds the npm PURL for a lockfile entry.
+///
+/// Returns `None` only if the components cannot form a PURL at all. This
+/// previously fell back to a hand-formatted string, which could never be reached
+/// — `npm_purl`'s three fallible calls are all infallible in practice, since the
+/// type is a literal and `with_version` has no error path — and would have
+/// emitted an unencoded PURL if it somehow were.
+pub fn create_purl(namespace: &Option<String>, name: &str, version: &str) -> Option<String> {
     let full_name = match namespace {
         Some(ns) if !ns.is_empty() => {
             let ns_with_at = if ns.starts_with('@') {
@@ -738,7 +745,7 @@ pub fn create_purl(namespace: &Option<String>, name: &str, version: &str) -> Str
         }
         _ => name.to_string(),
     };
-    npm_purl(&full_name, Some(version)).unwrap_or_else(|| format!("pkg:npm/{}", name))
+    npm_purl(&full_name, Some(version))
 }
 
 fn parse_integrity(
