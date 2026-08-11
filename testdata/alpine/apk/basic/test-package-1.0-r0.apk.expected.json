@@ -35,7 +35,7 @@
     },
     "dependencies": [
       {
-        "purl": "pkg:apk/alpine/musl>=1.2.0",
+        "purl": "pkg:apk/alpine/musl",
         "extracted_requirement": "musl>=1.2.0",
         "scope": "runtime",
         "is_runtime": true,

@@ -232,7 +232,9 @@ fn parse_alpine_package_paragraph(
         build_alpine_license_data(extracted_license_statement.as_deref());
 
     let source_packages = if let Some(origin) = get_first(headers, "o") {
-        vec![format!("pkg:apk/alpine/{}", origin)]
+        crate::parsers::utils::namespaced_purl("apk", "alpine", &origin, None)
+            .into_iter()
+            .collect()
     } else {
         Vec::new()
     };
@@ -256,9 +258,10 @@ fn parse_alpine_package_paragraph(
                 break 'dep_loop;
             }
 
+            let (dep_name, declared) = split_apk_dependency(dep_str);
             dependencies.push(Dependency {
-                purl: Some(format!("pkg:apk/alpine/{}", dep_str)),
-                extracted_requirement: None,
+                purl: crate::parsers::utils::namespaced_purl("apk", "alpine", dep_name, None),
+                extracted_requirement: declared.map(str::to_string),
                 scope: Some("install".to_string()),
                 is_runtime: Some(true),
                 is_optional: Some(false),
@@ -886,6 +889,23 @@ fn parse_apkbuild_checksums(value: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Splits an apk dependency token into its package name and the full declared
+/// token.
+///
+/// apk writes constraints inline — `musl>=1.2.0`, `busybox=1.36.1-r5`,
+/// `zlib~1.3` — so the token is not a package name. Treating it as one put the
+/// constraint inside the PURL (`pkg:apk/alpine/musl>=1.2.0`, which re-parses to
+/// a name of `musl>=1.2.0`) and left the requirement unrecorded.
+fn split_apk_dependency(token: &str) -> (&str, Option<&str>) {
+    match token.find(['<', '>', '=', '~']) {
+        // The whole token is the declared requirement, constraint included; a
+        // bare name carries no requirement beyond the identity already in the
+        // PURL, so it stays unset rather than repeating itself.
+        Some(name_end) => (&token[..name_end], Some(token)),
+        None => (token, None),
+    }
+}
+
 fn build_alpine_license_data(
     extracted: Option<&str>,
 ) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
@@ -1345,8 +1365,9 @@ fn parse_pkginfo(content: &str) -> PackageData {
                 break;
             }
             let dep_name = dep_str.split_whitespace().next().unwrap_or(dep_str);
+            let (dep_name, _) = split_apk_dependency(dep_name);
             dependencies.push(Dependency {
-                purl: Some(format!("pkg:apk/alpine/{}", dep_name)),
+                purl: crate::parsers::utils::namespaced_purl("apk", "alpine", dep_name, None),
                 extracted_requirement: Some(dep_str.to_string()),
                 scope: Some("runtime".to_string()),
                 is_runtime: Some(true),
@@ -1389,6 +1410,29 @@ mod tests {
     use std::io::Write;
     use std::path::PathBuf;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_apk_dependency_constraints_stay_out_of_the_purl_name() {
+        // apk writes constraints inline, so the token is not a package name.
+        // Treating it as one produced `pkg:apk/alpine/musl>=1.2.0`, which
+        // re-parses to a name of `musl>=1.2.0`, and left the constraint recorded
+        // nowhere else.
+        assert_eq!(
+            split_apk_dependency("musl>=1.2.0"),
+            ("musl", Some("musl>=1.2.0"))
+        );
+        assert_eq!(
+            split_apk_dependency("busybox=1.36.1-r5"),
+            ("busybox", Some("busybox=1.36.1-r5"))
+        );
+        assert_eq!(split_apk_dependency("zlib~1.3"), ("zlib", Some("zlib~1.3")));
+        // A bare name carries no requirement beyond the PURL's identity.
+        assert_eq!(split_apk_dependency("musl"), ("musl", None));
+
+        let purl = crate::parsers::utils::namespaced_purl("apk", "alpine", "musl", None)
+            .expect("purl should build");
+        assert_eq!(purl, "pkg:apk/alpine/musl");
+    }
 
     /// Creates a temp file mimicking the Alpine installed db path structure.
     /// Returns the TempDir (must be kept alive) and path to the file.

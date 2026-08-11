@@ -372,3 +372,20 @@ library
         assert_eq!(dependency.is_pinned, Some(false));
     }
 }
+
+#[test]
+fn test_hackage_purl_encodes_the_name() {
+    use std::str::FromStr;
+
+    // A `.cabal` `name:` field is free text; a `/` in it would be read back as a
+    // namespace separator, which hackage prohibits, making the PURL unparsable.
+    let purl =
+        super::hackage::build_hackage_purl(Some("ns/pkg"), Some("2.0")).expect("purl should build");
+    assert_eq!(purl, "pkg:hackage/ns%2Fpkg@2.0");
+
+    let parsed = packageurl::PackageUrl::from_str(&purl).expect("purl should parse");
+    assert_eq!(parsed.name(), "ns/pkg");
+    assert_eq!(parsed.namespace(), None);
+    assert_eq!(parsed.version(), Some("2.0"));
+    assert_eq!(parsed.to_string(), purl);
+}
