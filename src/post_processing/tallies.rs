@@ -401,6 +401,13 @@ fn merge_non_null_entries_into_counts(
     }
 }
 
+/// The values a file contributes to the `detected_license_expression` tally.
+///
+/// Clues are counted alongside detections even though a clue-only file reports
+/// no `detected_license_expression` of its own. That is deliberate and matches
+/// ScanCode's `license_tallies`, which appends every `license_clues` match's
+/// expression to the same list: the tally answers "what license evidence did
+/// this tree contain", which is a broader question than what each file asserts.
 fn detected_license_values(file: &FileInfo) -> Vec<String> {
     let mut detection_expressions: Vec<String> = file
         .license_detections

@@ -298,6 +298,11 @@ fn apply_directory_merge_results(
 /// every one of its dependencies twice. Skip any datafile+datasource that already
 /// contributed, and keep intra-file duplicates (a requirement genuinely listed
 /// twice) intact by never deduplicating individual entries.
+///
+/// Correctness rests on what was actually emitted, not on `for_packages`, which
+/// is why no separate "this datafile was handled" signal needs threading out of
+/// assembly: a hoisted-but-unowned record has no package to link to, so it
+/// cannot be represented in the file→package link by construction.
 fn hoist_unassembled_file_dependencies(
     files: &[FileInfo],
     dependencies: &mut Vec<TopLevelDependency>,
