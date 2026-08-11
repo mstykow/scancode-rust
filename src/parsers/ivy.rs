@@ -196,8 +196,7 @@ fn interpret_ivy_xml(content: &str, path: &Path) -> PackageData {
     package_data.dependencies = dependencies;
 
     if let (Some(namespace), Some(name)) = (&package_data.namespace, &package_data.name) {
-        package_data.purl =
-            build_ivy_purl(namespace, name, package_data.version.as_deref()).map(truncate_field);
+        package_data.purl = build_ivy_purl(namespace, name, package_data.version.as_deref());
     }
 
     package_data
@@ -406,7 +405,7 @@ fn parse_ivy_dependency(element: &BytesStart) -> Option<Dependency> {
     };
 
     Some(Dependency {
-        purl: purl.map(truncate_field),
+        purl,
         extracted_requirement: rev.map(truncate_field),
         scope: conf.map(truncate_field),
         is_runtime: None,

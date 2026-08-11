@@ -658,7 +658,7 @@ fn extract_parties(authors: &[String], maintainers: &[String]) -> Vec<Party> {
 fn extract_dependencies(deps: &[(String, String)]) -> Vec<Dependency> {
     deps.iter()
         .map(|(name, version_constraint)| Dependency {
-            purl: crate::parsers::utils::simple_purl("opam", name, None).map(truncate_field),
+            purl: crate::parsers::utils::simple_purl("opam", name, None),
             extracted_requirement: Some(truncate_field(version_constraint.clone())),
             scope: Some("dependency".to_string()),
             is_runtime: Some(true),
