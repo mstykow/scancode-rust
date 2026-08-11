@@ -13,7 +13,20 @@ mod tests {
         let (files, result) = scan_and_assemble(Path::new("testdata/gitmodules"));
 
         assert!(result.packages.is_empty());
-        assert_eq!(result.dependencies.len(), 3);
+        // Four submodules, including one on an arbitrary host that maps to no
+        // PURL. It is still a declared submodule of this repository, so it is
+        // reported with the source recorded in `extracted_requirement`.
+        assert_eq!(result.dependencies.len(), 4);
+        assert!(
+            result.dependencies.iter().any(|dependency| {
+                dependency.purl.is_none()
+                    && dependency
+                        .extracted_requirement
+                        .as_deref()
+                        .is_some_and(|requirement| requirement.contains("custom.example.com"))
+            }),
+            "the self-hosted submodule should be reported"
+        );
         assert_dependency_present(
             &result.dependencies,
             "pkg:github/example/dep1",

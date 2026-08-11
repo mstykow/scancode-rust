@@ -91,7 +91,7 @@
       },
       {
         "purl": null,
-        "extracted_requirement": null,
+        "extracted_requirement": "https://enterprise.local/ghe/desktop/git-error-translations2.git",
         "scope": "dependencies",
         "is_runtime": null,
         "is_optional": null,
