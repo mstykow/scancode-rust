@@ -54,6 +54,17 @@ pub(crate) fn parse_pep508_requirement(input: &str) -> Option<Pep508Requirement>
     let (name, extras, rest) = parse_name_and_extras(requirement_part)?;
     let specifiers = normalize_specifiers(rest);
 
+    // Whatever follows the name must be a version specifier. Accepting it
+    // unchecked meant any prose starting with a word-like token parsed as a
+    // requirement, so `import os` became `pkg:pypi/import` and a line of licence
+    // text became a dependency named after its first word.
+    if specifiers
+        .as_deref()
+        .is_some_and(|specifiers| !is_valid_specifier_set(specifiers))
+    {
+        return None;
+    }
+
     Some(Pep508Requirement {
         name: truncate_field(name),
         extras,
@@ -85,6 +96,34 @@ fn split_name_at_url(input: &str) -> Option<(String, String)> {
     None
 }
 
+/// True for a name matching PEP 508's `identifier` grammar:
+/// `letterOrDigit (letterOrDigit | '-' | '_' | '.')* letterOrDigit`, i.e. it must
+/// start and end alphanumeric and contain only alphanumerics and `-_.` between.
+///
+/// Without this check any text before the first specifier character is taken as a
+/// distribution name, so a line that is not a requirement at all — a
+/// reStructuredText `::` literal-block marker, a table rule, prose — becomes a
+/// package, and its name is then spliced straight into a PURL. Rejecting the name
+/// here lets callers fall through to their link/URL handling or drop the line,
+/// which is what pip's own parser does with an unparsable requirement.
+pub(crate) fn is_valid_distribution_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    let Some(last) = name.chars().next_back() else {
+        return false;
+    };
+    if !last.is_ascii_alphanumeric() {
+        return false;
+    }
+    name.chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
 fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -100,7 +139,7 @@ fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     }
 
     let name = trimmed[..name_end].trim();
-    if name.is_empty() {
+    if !is_valid_distribution_name(name) {
         return None;
     }
 
@@ -123,6 +162,53 @@ fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     }
 
     Some((name.to_string(), extras, rest))
+}
+
+/// True for a PEP 440 specifier set: comma-separated clauses, each an operator
+/// followed by a version. PEP 508 also permits the whole set to be parenthesised
+/// (`foo (>=1.0)`), which `pyproject.toml` dependency strings do use.
+///
+/// Input arrives whitespace-stripped from [`normalize_specifiers`].
+fn is_valid_specifier_set(specifiers: &str) -> bool {
+    const OPERATORS: [&str; 8] = ["===", "==", "!=", "<=", ">=", "~=", "<", ">"];
+
+    let specifiers = specifiers
+        .strip_prefix('(')
+        .and_then(|inner| inner.strip_suffix(')'))
+        .unwrap_or(specifiers);
+
+    if specifiers.is_empty() {
+        return false;
+    }
+
+    specifiers.split(',').all(|clause| {
+        OPERATORS.iter().any(|operator| {
+            clause.strip_prefix(operator).is_some_and(|version| {
+                // `===` is PEP 440 arbitrary-string equality, so its operand is
+                // deliberately unconstrained. Every other operator takes a
+                // version, and accepting arbitrary text there let `hello==world`
+                // through as `pkg:pypi/hello@world`.
+                if *operator == "===" {
+                    !version.is_empty()
+                } else {
+                    is_valid_version(version)
+                }
+            })
+        })
+    })
+}
+
+/// True for a PEP 440 version as it appears in a specifier: an optional `v`
+/// prefix, then a digit, then only characters the grammar can produce — digits
+/// and letters for pre/post/dev segments, `.` separators, `!` for an epoch, `+`
+/// for a local version, `-`/`_` for the normalising forms, and `*` for the
+/// `==1.4.*` prefix match.
+fn is_valid_version(version: &str) -> bool {
+    let version = version.strip_prefix(['v', 'V']).unwrap_or(version);
+    version.starts_with(|ch: char| ch.is_ascii_digit())
+        && version
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '!' | '+' | '-' | '_' | '*'))
 }
 
 fn normalize_specifiers(rest: &str) -> Option<String> {

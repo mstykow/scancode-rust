@@ -36,7 +36,9 @@ use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
-use crate::parsers::pep508::{Pep508Requirement, parse_pep508_requirement};
+use crate::parsers::pep508::{
+    Pep508Requirement, is_valid_distribution_name, parse_pep508_requirement,
+};
 use crate::parsers::utils::{
     CappedIterExt, MAX_ITERATION_COUNT, MAX_RECURSION_DEPTH, RecursionGuard,
     capped_iteration_limit, read_file_to_string, truncate_field,
@@ -859,6 +861,15 @@ fn extract_pinned_version(specifiers: &str) -> Option<String> {
 }
 
 fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
+    // `PackageUrl::new` validates the *type* only — it accepts any name whatsoever
+    // — and the string below is assembled by hand rather than through the crate's
+    // encoder, so an unchecked name lands in the PURL verbatim and produces a
+    // string no PURL parser accepts. Names arriving from the `#egg=` fragment path
+    // never went through the PEP 508 grammar, so check here as well.
+    if !is_valid_distribution_name(name) {
+        return None;
+    }
+
     PackageUrl::new(RequirementsTxtParser::PACKAGE_TYPE.as_str(), name)
         .ok()
         .map(|_| match version {
