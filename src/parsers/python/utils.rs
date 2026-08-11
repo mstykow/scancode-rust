@@ -214,8 +214,8 @@ pub(super) fn build_python_dependency(
         requirement
             .as_deref()
             .map(|req| req.trim_start_matches('='))
-            .map(|version| build_python_dependency_purl(&name, Some(version)))
-            .unwrap_or(purl)
+            .and_then(|version| build_python_dependency_purl(&name, Some(version)))
+            .or(purl)
     } else {
         purl
     };
@@ -227,7 +227,7 @@ pub(super) fn build_python_dependency(
     }
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: requirement,
         scope: Some(parsed.scope),
         is_runtime: Some(true),
@@ -247,16 +247,28 @@ pub(super) fn normalize_python_dependency_name(name: &str) -> String {
     normalize_python_distribution_name(name)
 }
 
-pub(super) fn build_python_dependency_purl(name: &str, version: Option<&str>) -> String {
+/// Builds the PyPI PURL for a dependency name, or `None` when the name is not a
+/// distribution name.
+///
+/// The check replaces a `PackageUrl::new(…).ok()` gate that never rejected
+/// anything: that call validates the *type*, which is a constant here, and the
+/// PURL was then assembled with `format!` anyway. Names reaching this from
+/// `setup.cfg` are taken from free-form text, so `install_requires = a/b==2.0`
+/// produced `pkg:pypi/a/b@2.0` — a PURL no parser accepts, since pypi prohibits a
+/// namespace.
+pub(super) fn build_python_dependency_purl(name: &str, version: Option<&str>) -> Option<String> {
     let normalized_name = normalize_python_dependency_name(name);
+    if !crate::parsers::pep508::is_valid_distribution_name(&normalized_name) {
+        return None;
+    }
 
-    match version {
+    Some(match version {
         Some(version) => format!(
             "pkg:pypi/{normalized_name}@{}",
             encode_python_dependency_purl_version(version)
         ),
         None => format!("pkg:pypi/{normalized_name}"),
-    }
+    })
 }
 
 fn encode_python_dependency_purl_version(version: &str) -> String {
@@ -501,7 +513,7 @@ fn parse_setup_py_dep_list(deps_str: &str, scope: &str, is_optional: bool) -> Ve
             let purl = build_python_dependency_purl(&name, None);
 
             Some(Dependency {
-                purl: Some(purl),
+                purl,
                 extracted_requirement: Some(dep_str.to_string()),
                 scope: Some(scope.to_string()),
                 is_runtime: Some(true),

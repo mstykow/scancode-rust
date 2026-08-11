@@ -737,7 +737,7 @@ fn build_poetry_group_dependency(
     }
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: version_spec,
         scope: scope.map(|value| value.to_string()),
         is_runtime: Some(!is_optional),
@@ -795,7 +795,7 @@ fn build_pyproject_array_dependency(
     let extracted_requirement = parsed.specifiers.or(parsed.url);
 
     Some(Dependency {
-        purl: Some(purl),
+        purl,
         extracted_requirement: extracted_requirement.clone(),
         scope: scope.map(|s| s.to_string()),
         is_runtime: Some(!is_optional),
