@@ -85,6 +85,34 @@ fn split_name_at_url(input: &str) -> Option<(String, String)> {
     None
 }
 
+/// True for a name matching PEP 508's `identifier` grammar:
+/// `letterOrDigit (letterOrDigit | '-' | '_' | '.')* letterOrDigit`, i.e. it must
+/// start and end alphanumeric and contain only alphanumerics and `-_.` between.
+///
+/// Without this check any text before the first specifier character is taken as a
+/// distribution name, so a line that is not a requirement at all — a
+/// reStructuredText `::` literal-block marker, a table rule, prose — becomes a
+/// package, and its name is then spliced straight into a PURL. Rejecting the name
+/// here lets callers fall through to their link/URL handling or drop the line,
+/// which is what pip's own parser does with an unparsable requirement.
+pub(crate) fn is_valid_distribution_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    let Some(last) = name.chars().next_back() else {
+        return false;
+    };
+    if !last.is_ascii_alphanumeric() {
+        return false;
+    }
+    name.chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
 fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -100,7 +128,7 @@ fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     }
 
     let name = trimmed[..name_end].trim();
-    if name.is_empty() {
+    if !is_valid_distribution_name(name) {
         return None;
     }
 

@@ -20,6 +20,72 @@ mod tests {
     }
 
     #[test]
+    fn test_pep508_rejects_names_outside_the_identifier_grammar() {
+        // PEP 508 names start and end alphanumeric with only `-_.` between. Text
+        // that is not a requirement at all must not be accepted as a name, or it
+        // ends up spliced into a PURL: a reStructuredText literal-block marker
+        // once produced `pkg:pypi/::`.
+        for input in ["::", ".. note::", "-", "_leading", "trailing.", "a b"] {
+            assert!(
+                parse_pep508_requirement(input).is_none_or(|parsed| parsed.name != input),
+                "{input:?} must not parse as a distribution name"
+            );
+        }
+
+        // Names that are legal must keep parsing, including single characters and
+        // every separator the grammar allows.
+        for (input, expected) in [
+            ("x", "x"),
+            ("zope.interface", "zope.interface"),
+            ("typing_extensions>=4", "typing_extensions"),
+            ("ruamel.yaml.clib==0.2.8", "ruamel.yaml.clib"),
+            ("Django", "Django"),
+            ("2to3", "2to3"),
+        ] {
+            let parsed = parse_pep508_requirement(input).expect("valid name should parse");
+            assert_eq!(parsed.name, expected);
+        }
+    }
+
+    #[test]
+    fn test_requirements_junk_lines_do_not_produce_invalid_purls() {
+        // A `.txt` file that is not really a requirements file (here, prose with
+        // an RST literal-block marker) must not yield PURLs that no PURL parser
+        // accepts.
+        let path = unique_temp_path("requirements.txt");
+        fs::write(&path, "::\n=====\n.. note::\nrequests==2.0\n").expect("write requirements");
+
+        let packages = RequirementsTxtParser::extract_packages(&path);
+        let dependencies = &packages[0].dependencies;
+
+        for dependency in dependencies {
+            if let Some(purl) = dependency.purl.as_deref() {
+                assert!(
+                    purl.starts_with("pkg:pypi/"),
+                    "unexpected purl shape: {purl}"
+                );
+                let name = purl
+                    .trim_start_matches("pkg:pypi/")
+                    .split('@')
+                    .next()
+                    .unwrap_or_default();
+                assert!(
+                    crate::parsers::pep508::is_valid_distribution_name(name),
+                    "emitted an invalid pypi name in {purl}"
+                );
+            }
+        }
+
+        // The genuine requirement in the same file still resolves.
+        assert!(
+            dependencies
+                .iter()
+                .any(|dependency| dependency.purl.as_deref() == Some("pkg:pypi/requests@2.0")),
+            "the real requirement must survive"
+        );
+    }
+
+    #[test]
     fn test_pep508_parsing_variants() {
         let requirement = "package[extra1,extra2]>=1.0,<2.0; python_version >= '3.8'";
         let parsed = parse_pep508_requirement(requirement).expect("parse pep508");
