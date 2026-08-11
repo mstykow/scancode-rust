@@ -192,7 +192,7 @@ fn parse_github_url(url: &str) -> Option<String> {
         return None;
     };
 
-    Some(truncate_field(format!("pkg:github/{}/{}", namespace, name)))
+    crate::parsers::utils::namespaced_purl("github", &namespace, &name, None).map(truncate_field)
 }
 
 fn parse_gitlab_url(url: &str) -> Option<String> {
@@ -206,7 +206,7 @@ fn parse_gitlab_url(url: &str) -> Option<String> {
         return None;
     };
 
-    Some(truncate_field(format!("pkg:gitlab/{}/{}", namespace, name)))
+    crate::parsers::utils::namespaced_purl("gitlab", &namespace, &name, None).map(truncate_field)
 }
 
 fn parse_repo_path(path: &str) -> Option<(String, String)> {

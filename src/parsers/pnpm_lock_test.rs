@@ -211,7 +211,8 @@ fn test_parse_purl_fields_v9_multiple_at_symbols() {
 
 #[test]
 fn test_create_purl_scoped() {
-    let purl = create_purl(&Some("@babel".to_string()), "runtime", "7.18.9");
+    let purl = create_purl(&Some("@babel".to_string()), "runtime", "7.18.9")
+        .expect("a scoped package should yield a purl");
     assert!(purl.contains("pkg:npm"));
     assert!(purl.contains("%40babel"));
     assert!(purl.contains("runtime"));
@@ -220,7 +221,8 @@ fn test_create_purl_scoped() {
 
 #[test]
 fn test_create_purl_non_scoped() {
-    let purl = create_purl(&None, "express", "4.18.2");
+    let purl =
+        create_purl(&None, "express", "4.18.2").expect("a plain package should yield a purl");
     assert!(purl.contains("pkg:npm"));
     assert!(purl.contains("express"));
     assert!(purl.contains("4.18.2"));
