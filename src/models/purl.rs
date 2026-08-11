@@ -22,6 +22,7 @@
 //! owning parser. Unlisted types are returned unchanged, preserving the
 //! case-sensitive types (npm, maven, cargo, gem, …).
 
+use std::borrow::Cow;
 use std::str::FromStr;
 
 use packageurl::PackageUrl;
@@ -144,9 +145,112 @@ fn lowercase_first_path_segment(purl: &str, prefix: &str) -> String {
     )
 }
 
+/// Add the `uuid` qualifier that turns a PURL into a UID, keeping it a
+/// qualifier.
+///
+/// A PURL orders its parts `…?qualifiers#subpath`, so appending to the end of the
+/// string lands the uuid *inside the subpath* whenever one is present: a
+/// cocoapods subspec UID came out as `pkg:cocoapods/SwiftFormat@0.44.17#CLI?uuid=…`,
+/// where `?uuid=…` is no longer a qualifier and re-parsing yields the subpath
+/// `CLI?uuid=…`. Insert ahead of the subpath instead, and use `&` only when the
+/// PURL already carries a qualifier.
+///
+/// Non-PURL bases (the `generated-package:` fallback identity) carry neither
+/// qualifiers nor a subpath, so they simply take the `?uuid=` form.
+pub(crate) fn append_uuid_qualifier(base: &str, uuid: &str) -> String {
+    let (head, subpath) = split_subpath(base);
+    let separator = if head.contains('?') { '&' } else { '?' };
+    match subpath {
+        Some(subpath) => format!("{head}{separator}uuid={uuid}#{subpath}"),
+        None => format!("{head}{separator}uuid={uuid}"),
+    }
+}
+
+/// The UID with its `uuid` qualifier removed, restoring the underlying PURL.
+///
+/// Borrows whenever the UID has no subpath, which is the common case; only a
+/// subpath-carrying UID needs the two remaining parts rejoined.
+pub(crate) fn strip_uuid_qualifier(uid: &str) -> Cow<'_, str> {
+    let (head, subpath) = split_subpath(uid);
+    let Some((prefix, _)) = head
+        .split_once("?uuid=")
+        .or_else(|| head.split_once("&uuid="))
+    else {
+        return Cow::Borrowed(uid);
+    };
+
+    match subpath {
+        Some(subpath) => Cow::Owned(format!("{prefix}#{subpath}")),
+        None => Cow::Borrowed(prefix),
+    }
+}
+
+/// The value of a UID's `uuid` qualifier, or `None` when it carries none.
+pub(crate) fn uuid_qualifier_value(uid: &str) -> Option<&str> {
+    let (head, _) = split_subpath(uid);
+    head.split_once("?uuid=")
+        .or_else(|| head.split_once("&uuid="))
+        .map(|(_, uuid)| uuid)
+}
+
+fn split_subpath(purl: &str) -> (&str, Option<&str>) {
+    match purl.split_once('#') {
+        Some((head, subpath)) => (head, Some(subpath)),
+        None => (purl, None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uuid_qualifier_stays_a_qualifier_when_the_purl_has_a_subpath() {
+        let uid = append_uuid_qualifier("pkg:cocoapods/SwiftFormat@0.44.17#CLI", "abc");
+        assert_eq!(uid, "pkg:cocoapods/SwiftFormat@0.44.17?uuid=abc#CLI");
+        assert_eq!(
+            strip_uuid_qualifier(&uid),
+            "pkg:cocoapods/SwiftFormat@0.44.17#CLI"
+        );
+
+        // The parsed UID must still expose the original subpath rather than one
+        // with the uuid swallowed into it.
+        let parsed = PackageUrl::from_str(&uid).expect("uid should parse as a purl");
+        assert_eq!(parsed.subpath(), Some("CLI"));
+        assert_eq!(
+            parsed.qualifiers().get("uuid").map(Cow::as_ref),
+            Some("abc")
+        );
+    }
+
+    #[test]
+    fn uuid_qualifier_joins_existing_qualifiers_with_an_ampersand() {
+        let uid = append_uuid_qualifier("pkg:generic/x?arch=amd64", "abc");
+        assert_eq!(uid, "pkg:generic/x?arch=amd64&uuid=abc");
+        assert_eq!(strip_uuid_qualifier(&uid), "pkg:generic/x?arch=amd64");
+    }
+
+    #[test]
+    fn uuid_qualifier_round_trips_plain_purls_and_opaque_bases() {
+        for base in [
+            "pkg:pypi/requests@2.0",
+            "pkg:npm/%40scope/name@1.0.0",
+            "generated-package:cargo/unknown@unknown",
+        ] {
+            let uid = append_uuid_qualifier(base, "abc");
+            assert_eq!(uid, format!("{base}?uuid=abc"));
+            assert_eq!(strip_uuid_qualifier(&uid), base);
+        }
+    }
+
+    #[test]
+    fn strip_uuid_qualifier_leaves_a_uid_without_one_untouched() {
+        assert_eq!(
+            strip_uuid_qualifier("pkg:pypi/requests@2.0"),
+            "pkg:pypi/requests@2.0"
+        );
+        assert_eq!(strip_uuid_qualifier(""), "");
+    }
 
     /// Spec-rule matrix: representative PURL per type asserted against the
     /// canonical form. Guards every parser against drift.

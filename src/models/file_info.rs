@@ -1558,10 +1558,14 @@ impl TopLevelDependency {
         datasource_id: DatasourceId,
         for_package_uid: Option<PackageUid>,
     ) -> Self {
+        // Derive the UID from the canonical PURL. The `purl` field is normalized
+        // at the output boundary, so building the UID from the raw parser string
+        // let the two disagree within one record — `pkg:pypi/typing-extensions`
+        // beside a `dependency_uid` of `pkg:pypi/typing_extensions?uuid=…`.
         let dependency_uid = dep
             .purl
             .as_ref()
-            .map(|p| DependencyUid::new(p))
+            .map(|purl| DependencyUid::new(&crate::models::normalize_purl(purl)))
             .unwrap_or_else(DependencyUid::empty);
 
         TopLevelDependency {

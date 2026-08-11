@@ -231,7 +231,7 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
 
     for file in files.iter_mut() {
         file.for_packages
-            .sort_by(|left, right| left.stable_key().cmp(right.stable_key()));
+            .sort_by(|left, right| left.stable_key().cmp(&right.stable_key()));
         file.for_packages.dedup();
     }
 
