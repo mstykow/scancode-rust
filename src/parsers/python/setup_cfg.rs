@@ -253,10 +253,10 @@ fn build_setup_cfg_dependency(req: &str, scope: &str, is_optional: bool) -> Opti
         normalized_requirement
             .as_deref()
             .map(|requirement| requirement.trim_start_matches('='))
-            .and_then(|version| build_python_dependency_purl(&name, Some(version)))
-            .or_else(|| build_python_dependency_purl(&name, None))?
+            .map(|version| build_python_dependency_purl(&name, Some(version)))
+            .unwrap_or_else(|| build_python_dependency_purl(&name, None))
     } else {
-        build_python_dependency_purl(&name, None)?
+        build_python_dependency_purl(&name, None)
     };
 
     Some(Dependency {

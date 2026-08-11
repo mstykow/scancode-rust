@@ -205,7 +205,7 @@ pub(super) fn build_python_dependency(
         default_scope,
         default_optional,
     );
-    let purl = build_python_dependency_purl(&name, None)?;
+    let purl = build_python_dependency_purl(&name, None);
 
     let is_pinned = requirement
         .as_deref()
@@ -214,7 +214,7 @@ pub(super) fn build_python_dependency(
         requirement
             .as_deref()
             .map(|req| req.trim_start_matches('='))
-            .and_then(|version| build_python_dependency_purl(&name, Some(version)))
+            .map(|version| build_python_dependency_purl(&name, Some(version)))
             .unwrap_or(purl)
     } else {
         purl
@@ -247,20 +247,16 @@ pub(super) fn normalize_python_dependency_name(name: &str) -> String {
     normalize_python_distribution_name(name)
 }
 
-pub(super) fn build_python_dependency_purl(name: &str, version: Option<&str>) -> Option<String> {
+pub(super) fn build_python_dependency_purl(name: &str, version: Option<&str>) -> String {
     let normalized_name = normalize_python_dependency_name(name);
 
-    PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &normalized_name)
-        .ok()
-        .map(|_| match version {
-            Some(version) => {
-                format!(
-                    "pkg:pypi/{normalized_name}@{}",
-                    encode_python_dependency_purl_version(version)
-                )
-            }
-            None => format!("pkg:pypi/{normalized_name}"),
-        })
+    match version {
+        Some(version) => format!(
+            "pkg:pypi/{normalized_name}@{}",
+            encode_python_dependency_purl_version(version)
+        ),
+        None => format!("pkg:pypi/{normalized_name}"),
+    }
 }
 
 fn encode_python_dependency_purl_version(version: &str) -> String {
@@ -502,7 +498,7 @@ fn parse_setup_py_dep_list(deps_str: &str, scope: &str, is_optional: bool) -> Ve
             }
 
             let name = extract_setup_cfg_dependency_name(dep_str)?;
-            let purl = build_python_dependency_purl(&name, None)?;
+            let purl = build_python_dependency_purl(&name, None);
 
             Some(Dependency {
                 purl: Some(purl),
