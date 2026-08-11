@@ -36,7 +36,7 @@ pub fn assign_python_requirements_to_projects(
             project_roots: &project_roots,
             is_relevant_file: is_requirements_subdir_file,
             find_root: find_nearest_project_root,
-            include_dependency: |dep: &Dependency| dep.purl.is_some(),
+            include_dependency: |dep: &Dependency| super::is_reportable_dependency(dep),
         },
     );
 }

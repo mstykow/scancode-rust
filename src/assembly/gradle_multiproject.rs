@@ -309,7 +309,7 @@ fn ensure_gradle_package(
             dependencies.extend(
                 data.dependencies
                     .iter()
-                    .filter(|dep| dep.purl.is_some())
+                    .filter(|dep| super::is_reportable_dependency(dep))
                     .map(|dependency| {
                         TopLevelDependency::from_dependency(
                             dependency,

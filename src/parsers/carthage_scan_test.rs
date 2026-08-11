@@ -13,12 +13,29 @@ mod tests {
         let (files, result) = scan_and_assemble(Path::new("testdata/carthage"));
 
         assert!(result.packages.is_empty());
-        assert_eq!(result.dependencies.len(), 10);
+        assert_eq!(result.dependencies.len(), 13);
+
+        // `git` and `binary` entries resolve to no PURL — a GitHub Enterprise
+        // clone URL and a binary framework manifest are not addressable as one —
+        // but they are declared dependencies all the same, and each carries the
+        // name derived from its source. Reporting them is the point: dropping a
+        // dependency because it is self-hosted hides exactly the ones an SBOM
+        // consumer cannot look up elsewhere.
+        let purl_less: Vec<_> = result
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.purl.is_none())
+            .collect();
+        assert_eq!(purl_less.len(), 3);
         assert!(
-            result
-                .dependencies
-                .iter()
-                .all(|dependency| dependency.purl.is_some())
+            purl_less.iter().all(|dependency| {
+                dependency.extracted_requirement.is_some()
+                    && dependency
+                        .extra_data
+                        .as_ref()
+                        .is_some_and(|extra| extra.contains_key("name"))
+            }),
+            "every purl-less entry must still be identifiable: {purl_less:?}"
         );
         assert!(
             result

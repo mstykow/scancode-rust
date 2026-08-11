@@ -583,7 +583,7 @@ fn create_member_packages(
         let deps: Vec<TopLevelDependency> = pkg_data
             .dependencies
             .iter()
-            .filter(|dep| dep.purl.is_some())
+            .filter(|dep| super::is_reportable_dependency(dep))
             .map(|dep| {
                 TopLevelDependency::from_dependency(
                     dep,
@@ -621,7 +621,7 @@ fn hoist_root_dependencies(
             .find(|pkg| pkg.datasource_id == Some(DatasourceId::NpmPackageJson))
         {
             for dep in &root_pkg_data.dependencies {
-                if dep.purl.is_some() {
+                if super::is_reportable_dependency(dep) {
                     let mut top_dep = TopLevelDependency::from_dependency(
                         dep,
                         root_file.path.clone(),
@@ -683,7 +683,7 @@ fn hoist_root_dependencies(
             }
 
             for dep in &pkg_data.dependencies {
-                if dep.purl.is_some() {
+                if super::is_reportable_dependency(dep) {
                     let mut top_dep = TopLevelDependency::from_dependency(
                         dep,
                         file.path.clone(),

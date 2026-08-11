@@ -138,7 +138,16 @@ fn parse_cartfile_lines(content: &str, is_resolved: bool) -> Vec<Dependency> {
             OriginType::Binary => make_binary_dep_info(&parsed.source),
         };
 
-        let extracted_requirement = parsed.version_spec.map(truncate_field);
+        // `github` entries are identified by their PURL, so the version spec alone
+        // is the requirement. A `git` or `binary` entry has no PURL, and its
+        // source URL is the only thing identifying it, so an entry declared
+        // without a version would otherwise carry nothing addressable at all.
+        let extracted_requirement = match (&parsed.origin, parsed.version_spec) {
+            (OriginType::Github, version_spec) => version_spec,
+            (_, Some(version_spec)) => Some(version_spec),
+            (_, None) => Some(parsed.source.clone()),
+        }
+        .map(truncate_field);
 
         let is_pinned = if is_resolved { Some(true) } else { None };
 

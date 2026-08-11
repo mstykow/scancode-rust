@@ -247,7 +247,7 @@ fn assemble_from_indices(
                 }
 
                 for dep in &pkg_data.dependencies {
-                    if dep.purl.is_some() {
+                    if super::is_reportable_dependency(dep) {
                         pending_dependencies.push(PendingDependency {
                             dependency: dep.clone(),
                             datafile_path: datafile_path.clone(),

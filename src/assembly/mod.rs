@@ -45,7 +45,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-use crate::models::{DatasourceId, FileInfo, Package, PackageUid, TopLevelDependency};
+use crate::models::{DatasourceId, Dependency, FileInfo, Package, PackageUid, TopLevelDependency};
 
 pub use assemblers::ASSEMBLERS;
 
@@ -335,6 +335,21 @@ fn hoist_unassembled_file_dependencies(
     dependencies.extend(hoisted);
 }
 
+/// Whether a parsed dependency is worth reporting at the top level.
+///
+/// A dependency the parser could not resolve to a PURL is still a declared
+/// dependency as long as it carries the text it was declared with, and
+/// `extracted_requirement` is exactly that text. Dropping it discards the only
+/// record that the manifest asked for it.
+///
+/// Every assembler shares this rule. Testing the PURL alone — as most of them
+/// used to — made a purl-less dependency's visibility depend on which assembler
+/// happened to claim the datafile, so the same manifest reported it or not
+/// according to what sat next to it on disk.
+pub(super) fn is_reportable_dependency(dependency: &Dependency) -> bool {
+    dependency.purl.is_some() || dependency.extracted_requirement.is_some()
+}
+
 const HOIST_IF_UNOWNED_DATASOURCE_IDS: &[DatasourceId] = &[DatasourceId::PipRequirements];
 
 fn should_hoist_unassembled_dependencies(datasource_id: DatasourceId) -> bool {
@@ -405,7 +420,7 @@ fn assemble_one_per_package_data(
             let deps: Vec<TopLevelDependency> = pkg_data
                 .dependencies
                 .iter()
-                .filter(|dep| dep.purl.is_some() || dep.extracted_requirement.is_some())
+                .filter(|dep| is_reportable_dependency(dep))
                 .map(|dep| {
                     TopLevelDependency::from_dependency(
                         dep,
