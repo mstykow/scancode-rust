@@ -54,6 +54,17 @@ pub(crate) fn parse_pep508_requirement(input: &str) -> Option<Pep508Requirement>
     let (name, extras, rest) = parse_name_and_extras(requirement_part)?;
     let specifiers = normalize_specifiers(rest);
 
+    // Whatever follows the name must be a version specifier. Accepting it
+    // unchecked meant any prose starting with a word-like token parsed as a
+    // requirement, so `import os` became `pkg:pypi/import` and a line of licence
+    // text became a dependency named after its first word.
+    if specifiers
+        .as_deref()
+        .is_some_and(|specifiers| !is_valid_specifier_set(specifiers))
+    {
+        return None;
+    }
+
     Some(Pep508Requirement {
         name: truncate_field(name),
         extras,
@@ -151,6 +162,32 @@ fn parse_name_and_extras(input: &str) -> Option<(String, Vec<String>, &str)> {
     }
 
     Some((name.to_string(), extras, rest))
+}
+
+/// True for a PEP 440 specifier set: comma-separated clauses, each an operator
+/// followed by a version. PEP 508 also permits the whole set to be parenthesised
+/// (`foo (>=1.0)`), which `pyproject.toml` dependency strings do use.
+///
+/// Input arrives whitespace-stripped from [`normalize_specifiers`].
+fn is_valid_specifier_set(specifiers: &str) -> bool {
+    const OPERATORS: [&str; 8] = ["===", "==", "!=", "<=", ">=", "~=", "<", ">"];
+
+    let specifiers = specifiers
+        .strip_prefix('(')
+        .and_then(|inner| inner.strip_suffix(')'))
+        .unwrap_or(specifiers);
+
+    if specifiers.is_empty() {
+        return false;
+    }
+
+    specifiers.split(',').all(|clause| {
+        OPERATORS.iter().any(|operator| {
+            clause
+                .strip_prefix(operator)
+                .is_some_and(|version| !version.is_empty())
+        })
+    })
 }
 
 fn normalize_specifiers(rest: &str) -> Option<String> {

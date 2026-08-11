@@ -25,10 +25,24 @@ mod tests {
         // that is not a requirement at all must not be accepted as a name, or it
         // ends up spliced into a PURL: a reStructuredText literal-block marker
         // once produced `pkg:pypi/::`.
-        for input in ["::", ".. note::", "-", "_leading", "trailing.", "a b"] {
+        // Rejected outright — asserting `is_none()` rather than merely that the
+        // name differs from the input, which a prose line would satisfy while
+        // still yielding a dependency named after its first word.
+        for input in [
+            "::",
+            ".. note::",
+            "-",
+            "_leading",
+            "trailing.",
+            "a b",
+            "import os",
+            "from setuptools import setup",
+            "Permission is hereby granted, free of charge",
+            "CHANGELOG.rst is the changelog",
+        ] {
             assert!(
-                parse_pep508_requirement(input).is_none_or(|parsed| parsed.name != input),
-                "{input:?} must not parse as a distribution name"
+                parse_pep508_requirement(input).is_none(),
+                "{input:?} must not parse as a requirement"
             );
         }
 
@@ -41,6 +55,13 @@ mod tests {
             ("ruamel.yaml.clib==0.2.8", "ruamel.yaml.clib"),
             ("Django", "Django"),
             ("2to3", "2to3"),
+            // Every specifier form, including the parenthesised set PEP 508
+            // allows and `pyproject.toml` dependency strings use.
+            ("urllib3>=1.21.1,<3", "urllib3"),
+            ("requests (>=2.0)", "requests"),
+            ("black~=24.1", "black"),
+            ("pip!=21.0", "pip"),
+            ("setuptools===69.0.0", "setuptools"),
         ] {
             let parsed = parse_pep508_requirement(input).expect("valid name should parse");
             assert_eq!(parsed.name, expected);
