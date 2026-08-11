@@ -2493,6 +2493,47 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_hoists_standalone_requirements_txt_dependencies_exactly_once() {
+        // `requirements.txt` matches the Python assembler's `requirements*.txt`
+        // sibling pattern, so the sibling merge hoists its dependencies even
+        // though the purl-less record yields no package to own them. The file
+        // therefore stays unowned, and the unassembled fallback used to hoist the
+        // very same dependencies a second time. (The neighbouring test's
+        // `min_requirements.txt` does not match that pattern, so only the
+        // fallback ever ran for it.)
+        let mut files = vec![create_test_file_info(
+            "requirements.txt",
+            DatasourceId::PipRequirements,
+            None,
+            None,
+            None,
+            vec![
+                create_test_dependency("pkg:pypi/requests@2.0", Some("==2.0"), None),
+                create_test_dependency("pkg:pypi/sphinx@3.4.3", Some("==3.4.3"), None),
+            ],
+        )];
+
+        let result = assemble(&mut files);
+
+        assert!(result.packages.is_empty());
+        assert_eq!(result.dependencies.len(), 2);
+        let mut purls: Vec<&str> = result
+            .dependencies
+            .iter()
+            .filter_map(|dependency| dependency.purl.as_deref())
+            .collect();
+        purls.sort_unstable();
+        assert_eq!(purls, ["pkg:pypi/requests@2.0", "pkg:pypi/sphinx@3.4.3"]);
+        assert!(
+            result
+                .dependencies
+                .iter()
+                .all(|dependency| dependency.for_package_uid.is_none())
+        );
+        assert!(files[0].for_packages.is_empty());
+    }
+
+    #[test]
     fn test_assemble_does_not_hoist_unowned_nuget_cpm_metadata_dependencies() {
         let mut files = vec![create_test_file_info(
             "repo/Directory.Packages.props",

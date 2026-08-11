@@ -287,10 +287,27 @@ fn apply_directory_merge_results(
     }
 }
 
+/// Last-resort visibility for datafiles that no assembler emitted dependencies
+/// for, so a dep-bearing manifest is never silently dropped.
+///
+/// An empty `for_packages` does not by itself mean "not assembled": an assembler
+/// can hoist a purl-less record's dependencies (`for_package_uid: None`) without
+/// creating a package to own them, which leaves the file unowned even though its
+/// dependencies are already in the list. A standalone `requirements.txt` is
+/// exactly that shape, and hoisting on the `for_packages` signal alone emitted
+/// every one of its dependencies twice. Skip any datafile+datasource that already
+/// contributed, and keep intra-file duplicates (a requirement genuinely listed
+/// twice) intact by never deduplicating individual entries.
 fn hoist_unassembled_file_dependencies(
     files: &[FileInfo],
     dependencies: &mut Vec<TopLevelDependency>,
 ) {
+    let already_emitted: HashSet<(&str, DatasourceId)> = dependencies
+        .iter()
+        .map(|dependency| (dependency.datafile_path.as_str(), dependency.datasource_id))
+        .collect();
+
+    let mut hoisted = Vec::new();
     for file in files {
         if !file.for_packages.is_empty() {
             continue;
@@ -305,11 +322,17 @@ fn hoist_unassembled_file_dependencies(
                 continue;
             }
 
-            dependencies.extend(pkg_data.dependencies.iter().map(|dep| {
+            if already_emitted.contains(&(file.path.as_str(), datasource_id)) {
+                continue;
+            }
+
+            hoisted.extend(pkg_data.dependencies.iter().map(|dep| {
                 TopLevelDependency::from_dependency(dep, file.path.clone(), datasource_id, None)
             }));
         }
     }
+
+    dependencies.extend(hoisted);
 }
 
 const HOIST_IF_UNOWNED_DATASOURCE_IDS: &[DatasourceId] = &[DatasourceId::PipRequirements];
