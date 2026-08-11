@@ -726,13 +726,8 @@ pub fn parse_purl_fields(
     }
 }
 
-/// Builds the npm PURL for a lockfile entry.
-///
-/// Returns `None` only if the components cannot form a PURL at all. This
-/// previously fell back to a hand-formatted string, which could never be reached
-/// — `npm_purl`'s three fallible calls are all infallible in practice, since the
-/// type is a literal and `with_version` has no error path — and would have
-/// emitted an unencoded PURL if it somehow were.
+/// Builds the npm PURL for a lockfile entry, or `None` when the components
+/// cannot form one.
 pub fn create_purl(namespace: &Option<String>, name: &str, version: &str) -> Option<String> {
     let full_name = match namespace {
         Some(ns) if !ns.is_empty() => {
