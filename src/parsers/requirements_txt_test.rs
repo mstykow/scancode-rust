@@ -121,6 +121,112 @@ mod tests {
     }
 
     #[test]
+    fn test_egg_info_requires_sections_group_dependencies_instead_of_becoming_them() {
+        // The shape setuptools writes into an egg-info `requires.txt`: bare
+        // requirements first, then `[extra]`, `[:marker]` and `[extra:marker]`
+        // groups. Header lines are not requirements — they used to be emitted as
+        // dependencies with `extracted_requirement: "[dev]"` and a null purl.
+        let path = unique_temp_path("requires.txt");
+        fs::write(
+            &path,
+            "requests>=2.0\n\
+             [dev]\n\
+             pytest>=7.0\n\
+             [:python_version < \"3.12\"]\n\
+             importlib-metadata\n\
+             [docs:python_version >= \"3.9\"]\n\
+             sphinx\n",
+        )
+        .expect("write requires.txt");
+
+        let package_data = RequirementsTxtParser::extract_first_package(&path);
+        let dependencies = &package_data.dependencies;
+
+        assert!(
+            dependencies.iter().all(|dependency| {
+                dependency
+                    .extracted_requirement
+                    .as_deref()
+                    .is_none_or(|requirement| !requirement.starts_with('['))
+            }),
+            "a section header must not become a dependency: {:?}",
+            dependencies
+                .iter()
+                .map(|dependency| dependency.extracted_requirement.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(dependencies.len(), 4);
+
+        let find = |purl: &str| {
+            dependencies
+                .iter()
+                .find(|dependency| dependency.purl.as_deref() == Some(purl))
+                .unwrap_or_else(|| panic!("expected {purl}"))
+        };
+        let marker = |dependency: &crate::models::Dependency| {
+            dependency
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("markers"))
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        };
+
+        // Outside any section: the file's own scope, not optional, no marker.
+        let requests = find("pkg:pypi/requests");
+        assert_eq!(requests.scope.as_deref(), Some("install"));
+        assert_eq!(requests.is_optional, Some(false));
+        assert_eq!(marker(requests), None);
+
+        // An extra names the scope and makes its members optional.
+        let pytest = find("pkg:pypi/pytest");
+        assert_eq!(pytest.scope.as_deref(), Some("dev"));
+        assert_eq!(pytest.is_optional, Some(true));
+        assert_eq!(marker(pytest), None);
+
+        // A bare `[:marker]` section carries a condition but no extra.
+        let importlib = find("pkg:pypi/importlib-metadata");
+        assert_eq!(importlib.scope.as_deref(), Some("install"));
+        assert_eq!(importlib.is_optional, Some(false));
+        assert_eq!(
+            marker(importlib).as_deref(),
+            Some("python_version < \"3.12\"")
+        );
+
+        // `[extra:marker]` carries both.
+        let sphinx = find("pkg:pypi/sphinx");
+        assert_eq!(sphinx.scope.as_deref(), Some("docs"));
+        assert_eq!(sphinx.is_optional, Some(true));
+        assert_eq!(marker(sphinx).as_deref(), Some("python_version >= \"3.9\""));
+    }
+
+    #[test]
+    fn test_section_marker_combines_with_an_inline_marker() {
+        let path = unique_temp_path("requires.txt");
+        fs::write(
+            &path,
+            "[docs:python_version >= \"3.9\"]\nsphinx; os_name == \"posix\"\n",
+        )
+        .expect("write requires.txt");
+
+        let package_data = RequirementsTxtParser::extract_first_package(&path);
+        let sphinx = package_data
+            .dependencies
+            .iter()
+            .find(|dependency| dependency.purl.as_deref() == Some("pkg:pypi/sphinx"))
+            .expect("expected sphinx");
+
+        assert_eq!(
+            sphinx
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("markers"))
+                .and_then(|value| value.as_str()),
+            Some("(os_name == \"posix\") and (python_version >= \"3.9\")")
+        );
+    }
+
+    #[test]
     fn test_pep508_parsing_variants() {
         let requirement = "package[extra1,extra2]>=1.0,<2.0; python_version >= '3.8'";
         let parsed = parse_pep508_requirement(requirement).expect("parse pep508");

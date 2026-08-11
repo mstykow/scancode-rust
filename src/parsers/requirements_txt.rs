@@ -346,6 +346,10 @@ fn parse_requirements_with_includes(
         }
     };
 
+    // Sections are file-scoped: an included file starts outside any section and
+    // does not carry one back to its includer.
+    let mut section = RequirementSection::default();
+
     let logical_lines = collect_logical_lines(&content);
     let limit = capped_iteration_limit(logical_lines.len(), "requirements.txt logical lines");
     for line in logical_lines.into_iter().take(limit) {
@@ -406,7 +410,12 @@ fn parse_requirements_with_includes(
             continue;
         }
 
-        if let Some(dependency) = build_dependency(trimmed, scope, is_runtime) {
+        if let Some(parsed_section) = RequirementSection::parse(trimmed) {
+            section = parsed_section;
+            continue;
+        }
+
+        if let Some(dependency) = build_dependency(trimmed, scope, is_runtime, &section) {
             if state.dependencies.len() >= MAX_ITERATION_COUNT {
                 warn!(
                     "Reached maximum dependency count ({}) in {:?}",
@@ -521,7 +530,58 @@ fn scope_from_filename(path: &Path) -> (String, bool) {
     ("install".to_string(), true)
 }
 
-fn build_dependency(line: &str, scope: &str, is_runtime: bool) -> Option<Dependency> {
+/// The `[extra]` / `[:marker]` / `[extra:marker]` grouping that setuptools writes
+/// into an egg-info `requires.txt`, and that everything after it belongs to.
+///
+/// pip's own requirements format has no sections, so a header line is not a
+/// requirement in any file it appears in; treating it as one produced a
+/// dependency whose `extracted_requirement` was literally `[dev]` or
+/// `[:python_version < "3.12"]`. Reading it instead recovers what the group
+/// actually means: an extra is an optional dependency group, and a section
+/// marker applies to every requirement under it.
+#[derive(Default)]
+struct RequirementSection {
+    extra: Option<String>,
+    marker: Option<String>,
+}
+
+impl RequirementSection {
+    /// Parses a `[...]` header, or returns `None` for any other line.
+    fn parse(line: &str) -> Option<Self> {
+        let inner = line.strip_prefix('[')?.strip_suffix(']')?;
+
+        let (extra, marker) = match inner.split_once(':') {
+            Some((extra, marker)) => (extra.trim(), Some(marker.trim())),
+            None => (inner.trim(), None),
+        };
+
+        Some(Self {
+            extra: (!extra.is_empty()).then(|| truncate_field(extra.to_string())),
+            marker: marker
+                .filter(|marker| !marker.is_empty())
+                .map(|marker| truncate_field(marker.to_string())),
+        })
+    }
+
+    /// The scope a requirement in this section belongs to: the extra's own name,
+    /// falling back to the scope derived from the filename outside any extra.
+    fn scope<'a>(&'a self, default_scope: &'a str) -> &'a str {
+        self.extra.as_deref().unwrap_or(default_scope)
+    }
+
+    /// Requirements under an extra are installed only when that extra is
+    /// requested, which is exactly what `is_optional` records.
+    fn is_optional(&self) -> bool {
+        self.extra.is_some()
+    }
+}
+
+fn build_dependency(
+    line: &str,
+    scope: &str,
+    is_runtime: bool,
+    section: &RequirementSection,
+) -> Option<Dependency> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return None;
@@ -619,7 +679,15 @@ fn build_dependency(line: &str, scope: &str, is_runtime: bool) -> Option<Depende
             .unwrap_or(JsonValue::Null),
     );
 
-    if let Some(marker) = parsed.marker {
+    // A section marker applies to every requirement under it, so it combines with
+    // an inline one rather than replacing it.
+    let marker = match (parsed.marker, section.marker.as_deref()) {
+        (Some(inline), Some(section_marker)) => Some(format!("({inline}) and ({section_marker})")),
+        (Some(inline), None) => Some(inline),
+        (None, Some(section_marker)) => Some(section_marker.to_string()),
+        (None, None) => None,
+    };
+    if let Some(marker) = marker {
         extra_data.insert(
             "markers".to_string(),
             JsonValue::String(truncate_field(marker)),
@@ -629,9 +697,9 @@ fn build_dependency(line: &str, scope: &str, is_runtime: bool) -> Option<Depende
     Some(Dependency {
         purl,
         extracted_requirement: Some(truncate_field(extracted_requirement)),
-        scope: Some(scope.to_string()),
+        scope: Some(section.scope(scope).to_string()),
         is_runtime: Some(is_runtime),
-        is_optional: Some(false),
+        is_optional: Some(section.is_optional()),
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
