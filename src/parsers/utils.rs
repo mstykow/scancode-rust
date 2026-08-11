@@ -323,6 +323,32 @@ pub fn simple_purl(package_type: &str, name: &str, version: Option<&str>) -> Opt
     Some(package_url.to_string())
 }
 
+/// Builds a PURL for a type that carries a namespace, running every component
+/// through the crate's encoder.
+///
+/// The namespace keeps its `/` separators — its segments are path parts — while
+/// the name and version are encoded, which is what hand-formatting missed.
+///
+/// Same caveat as [`simple_purl`]: not for the types the crate rewrites.
+pub fn namespaced_purl(
+    package_type: &str,
+    namespace: &str,
+    name: &str,
+    version: Option<&str>,
+) -> Option<String> {
+    let (namespace, name) = (namespace.trim(), name.trim());
+    if namespace.is_empty() || name.is_empty() {
+        return None;
+    }
+
+    let mut package_url = PackageUrl::new(package_type.to_string(), name.to_string()).ok()?;
+    package_url.with_namespace(namespace.to_string()).ok()?;
+    if let Some(version) = version.map(str::trim).filter(|value| !value.is_empty()) {
+        package_url.with_version(version.to_string()).ok()?;
+    }
+    Some(package_url.to_string())
+}
+
 /// Creates a correctly-formatted npm Package URL for scoped or regular packages.
 ///
 /// Handles namespace encoding for scoped packages (e.g., `@babel/core`) and ensures
