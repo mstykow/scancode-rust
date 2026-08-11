@@ -39,6 +39,10 @@ mod tests {
             "from setuptools import setup",
             "Permission is hereby granted, free of charge",
             "CHANGELOG.rst is the changelog",
+            // Valid name and operator, but the operand is not a version.
+            "hello==world",
+            "foo>=bar",
+            "baz~=qux",
         ] {
             assert!(
                 parse_pep508_requirement(input).is_none(),
@@ -62,6 +66,16 @@ mod tests {
             ("black~=24.1", "black"),
             ("pip!=21.0", "pip"),
             ("setuptools===69.0.0", "setuptools"),
+            // Version forms PEP 440 produces, all of which must survive.
+            ("jsonschema==4.*", "jsonschema"),
+            ("numpy>=1.26.0rc1", "numpy"),
+            ("torch==2.1.0.dev0", "torch"),
+            ("tzdata>=2020.1", "tzdata"),
+            ("legacy==1!2.0", "legacy"),
+            ("local==1.0+cu118", "local"),
+            ("prefixed>=v1.2", "prefixed"),
+            // `===` takes an arbitrary string by design.
+            ("weird===not-a-version", "weird"),
         ] {
             let parsed = parse_pep508_requirement(input).expect("valid name should parse");
             assert_eq!(parsed.name, expected);

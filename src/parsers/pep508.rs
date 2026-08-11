@@ -183,11 +183,32 @@ fn is_valid_specifier_set(specifiers: &str) -> bool {
 
     specifiers.split(',').all(|clause| {
         OPERATORS.iter().any(|operator| {
-            clause
-                .strip_prefix(operator)
-                .is_some_and(|version| !version.is_empty())
+            clause.strip_prefix(operator).is_some_and(|version| {
+                // `===` is PEP 440 arbitrary-string equality, so its operand is
+                // deliberately unconstrained. Every other operator takes a
+                // version, and accepting arbitrary text there let `hello==world`
+                // through as `pkg:pypi/hello@world`.
+                if *operator == "===" {
+                    !version.is_empty()
+                } else {
+                    is_valid_version(version)
+                }
+            })
         })
     })
+}
+
+/// True for a PEP 440 version as it appears in a specifier: an optional `v`
+/// prefix, then a digit, then only characters the grammar can produce — digits
+/// and letters for pre/post/dev segments, `.` separators, `!` for an epoch, `+`
+/// for a local version, `-`/`_` for the normalising forms, and `*` for the
+/// `==1.4.*` prefix match.
+fn is_valid_version(version: &str) -> bool {
+    let version = version.strip_prefix(['v', 'V']).unwrap_or(version);
+    version.starts_with(|ch: char| ch.is_ascii_digit())
+        && version
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '!' | '+' | '-' | '_' | '*'))
 }
 
 fn normalize_specifiers(rest: &str) -> Option<String> {
