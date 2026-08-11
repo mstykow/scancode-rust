@@ -474,6 +474,19 @@ Copyright - split out libs\0\xff",
     }
 
     #[test]
+    // A file whose only license evidence is an unresolvable reference ("see the
+    // file COPYING", with no such file in the tree) keeps that evidence as a
+    // clue and asserts no license. Both `detected_license_expression` and its
+    // SPDX counterpart must be null: reporting a license in one spelling while
+    // denying it in the other is the inconsistency this fixture guards.
+    fn test_golden_reference_follow_unresolved_reference_clue_only() {
+        assert_reference_follow_fixture_matches_expected(
+            "testdata/summarycode-golden/reference_following/unresolved_reference_clue_only",
+            "testdata/summarycode-golden/reference_following/unresolved_reference_clue_only/expected.json",
+        );
+    }
+
+    #[test]
     fn test_golden_reference_follow_root_fallback_no_package() {
         assert_reference_follow_fixture_matches_expected(
             "testdata/summarycode-golden/reference_following/root_fallback_no_package",

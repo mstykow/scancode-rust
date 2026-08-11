@@ -1,0 +1,91 @@
+{
+  "summary": {
+    "declared_license_expression": null,
+    "license_clarity_score": {
+      "score": 0,
+      "declared_license": false,
+      "identification_precision": false,
+      "has_license_text": false,
+      "declared_copyrights": false,
+      "conflicting_license_categories": false,
+      "ambiguous_compound_licensing": true
+    },
+    "declared_holder": null,
+    "primary_language": null,
+    "other_license_expressions": [],
+    "other_holders": [],
+    "other_languages": []
+  },
+  "tallies": {
+    "detected_license_expression": [
+      {
+        "value": "unknown-license-reference",
+        "count": 1
+      }
+    ],
+    "copyrights": [],
+    "holders": [],
+    "authors": [],
+    "programming_language": []
+  },
+  "tallies_of_key_files": {
+    "detected_license_expression": [
+      {
+        "value": "unknown-license-reference",
+        "count": 1
+      }
+    ],
+    "copyrights": [],
+    "holders": [],
+    "authors": [],
+    "programming_language": []
+  },
+  "license_detections": [],
+  "license_references": [
+    {
+      "key": "unknown-license-reference",
+      "language": "en",
+      "short_name": "Unknown License reference",
+      "name": "Unknown License file reference",
+      "owner": "Unspecified",
+      "homepage_url": null,
+      "spdx_license_key": "LicenseRef-scancode-unknown-license-reference",
+      "osi_license_key": null,
+      "text_urls": [],
+      "osi_url": null,
+      "faq_url": null,
+      "other_urls": [],
+      "category": "Unstated License",
+      "is_exception": false,
+      "is_unknown": true,
+      "is_generic": false,
+      "minimum_coverage": null,
+      "standard_notice": null
+    }
+  ],
+  "license_rule_references": [
+    {
+      "identifier": "license-intro_59.RULE",
+      "license_expression": "unknown-license-reference",
+      "language": null,
+      "rule_url": "https://github.com/aboutcode-org/scancode-toolkit/tree/develop/src/licensedcode/data/rules/license-intro_59.RULE",
+      "is_synthetic": false,
+      "length": 3,
+      "referenced_filenames": []
+    }
+  ],
+  "packages": [],
+  "files": [
+    {
+      "path": "codebase/README.md",
+      "type": "file",
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_manifest": false,
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "package_data": []
+    }
+  ]
+}
