@@ -26,11 +26,10 @@ impl PackageUid {
     }
 
     fn with_uuid_suffix(base: &str, uuid: Uuid) -> Self {
-        if base.contains('?') {
-            PackageUid(format!("{}&uuid={}", base, uuid))
-        } else {
-            PackageUid(format!("{}?uuid={}", base, uuid))
-        }
+        PackageUid(crate::models::purl::append_uuid_qualifier(
+            base,
+            &uuid.to_string(),
+        ))
     }
 
     /// Wraps an existing UID string without validation or UUID generation.
@@ -46,25 +45,19 @@ impl PackageUid {
         PackageUid(String::new())
     }
 
-    /// Returns the purl portion by stripping the UUID suffix.
-    pub fn stable_key(&self) -> &str {
-        self.0
-            .split_once("?uuid=")
-            .map(|(prefix, _)| prefix)
-            .or_else(|| self.0.split_once("&uuid=").map(|(prefix, _)| prefix))
-            .unwrap_or(&self.0)
+    /// Returns the purl portion by stripping the UUID qualifier. Borrows unless
+    /// the purl carries a subpath, which has to be rejoined to what precedes the
+    /// qualifier.
+    pub fn stable_key(&self) -> std::borrow::Cow<'_, str> {
+        crate::models::purl::strip_uuid_qualifier(&self.0)
     }
 
-    /// Returns a new `PackageUid` with the purl base replaced, preserving the UUID suffix.
+    /// Returns a new `PackageUid` with the purl base replaced, preserving the UUID.
     pub fn replace_base(&self, new_purl: &str) -> Self {
-        if let Some((_, suffix)) = self.0.split_once("?uuid=") {
-            return PackageUid(format!("{}?uuid={}", new_purl, suffix));
-        }
-        if let Some((_, suffix)) = self.0.split_once("&uuid=") {
-            let separator = if new_purl.contains('?') { '&' } else { '?' };
-            return PackageUid(format!("{}{separator}uuid={suffix}", new_purl));
-        }
-        PackageUid(self.0.clone())
+        let Some(uuid) = crate::models::purl::uuid_qualifier_value(&self.0) else {
+            return PackageUid(self.0.clone());
+        };
+        PackageUid(crate::models::purl::append_uuid_qualifier(new_purl, uuid))
     }
 
     /// Returns the inner string slice.
