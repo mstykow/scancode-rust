@@ -401,6 +401,16 @@ jobs:
         if: matrix.shard == 'integration'
         run: cargo test --test output_format_golden --profile ci-release --verbose
 
+      # Expected fixtures are generated from the parsers, so they double as a
+      # broad sample of the PURLs the parsers emit. Nothing at runtime enforces
+      # PURL validity — `normalize_purl` returns unparsable input unchanged, and
+      # dropping such a value at the output boundary would erase the component
+      # from SBOM output, where the PURL is its identity — so the guard lives
+      # here instead.
+      - name: Run emitted PURL validity guard
+        if: matrix.shard == 'integration'
+        run: cargo test --test emitted_purl_validity_guard --profile ci-release --verbose
+
       # The progress-CLI suite above already builds `provenant` at
       # `target/ci-release/provenant` (it exercises `CARGO_BIN_EXE_provenant`),
       # so this reuses that binary instead of paying for a second CLI build in
