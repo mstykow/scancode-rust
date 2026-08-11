@@ -248,12 +248,7 @@ fn build_dependency(
 fn create_dependency_purl(dep: &SwiftDependency, version: Option<&str>) -> Option<String> {
     let url = dep.url.as_deref()?;
     let (namespace, name) = parse_url_namespace_and_name(url)?;
-    let mut purl = format!("pkg:swift/{}/{}", namespace, name);
-    if let Some(version) = version {
-        purl.push('@');
-        purl.push_str(version);
-    }
-    Some(purl)
+    crate::parsers::utils::namespaced_purl("swift", &namespace, &name, version)
 }
 
 /// As with dependencies, the root package needs a namespace derived from its
@@ -268,13 +263,7 @@ fn create_root_purl(
         return None;
     }
     let (namespace, _) = parse_url_namespace_and_name(url?)?;
-
-    let mut purl = format!("pkg:swift/{}/{}", namespace, name);
-    if let Some(version) = version {
-        purl.push('@');
-        purl.push_str(version);
-    }
-    Some(purl)
+    crate::parsers::utils::namespaced_purl("swift", &namespace, name, version)
 }
 
 fn normalize_version(version: Option<String>) -> Option<String> {

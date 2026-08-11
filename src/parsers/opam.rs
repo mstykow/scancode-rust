@@ -228,11 +228,9 @@ fn build_opam_urls(
         _ => None,
     };
 
-    let purl = match (name, version) {
-        (Some(n), Some(v)) => Some(format!("pkg:opam/{}@{}", n, v)),
-        (Some(n), None) => Some(format!("pkg:opam/{}", n)),
-        _ => None,
-    };
+    let purl = name
+        .as_deref()
+        .and_then(|n| crate::parsers::utils::simple_purl("opam", n, version.as_deref()));
 
     (repository_homepage_url, api_data_url, purl)
 }
@@ -660,7 +658,7 @@ fn extract_parties(authors: &[String], maintainers: &[String]) -> Vec<Party> {
 fn extract_dependencies(deps: &[(String, String)]) -> Vec<Dependency> {
     deps.iter()
         .map(|(name, version_constraint)| Dependency {
-            purl: Some(truncate_field(format!("pkg:opam/{}", name))),
+            purl: crate::parsers::utils::simple_purl("opam", name, None).map(truncate_field),
             extracted_requirement: Some(truncate_field(version_constraint.clone())),
             scope: Some("dependency".to_string()),
             is_runtime: Some(true),
@@ -694,6 +692,41 @@ mod tests {
     fn test_is_match_with_non_opam() {
         let path = Path::new("sample.txt");
         assert!(!OpamParser::is_match(path));
+    }
+
+    #[test]
+    fn test_opam_purls_are_encoded_rather_than_formatted() {
+        // Names come from a quoted opam field, so anything but a quote reaches the
+        // PURL. Splicing them in unencoded produced strings that either failed to
+        // parse or silently changed meaning: a `/` became a namespace separator
+        // and text after a `#` became a subpath.
+        use std::str::FromStr;
+
+        for (name, version, expected) in [
+            ("conf gmp", None, "pkg:opam/conf%20gmp"),
+            ("ocaml/evil", None, "pkg:opam/ocaml%2Fevil"),
+            ("sharp#frag", None, "pkg:opam/sharp%23frag"),
+            // Already-percent-encoded text is data, not encoding: the real name is
+            // the literal six characters, so it must survive a round trip.
+            ("pct%20", None, "pkg:opam/pct%2520"),
+            ("my pkg", Some("1.0 beta"), "pkg:opam/my%20pkg@1.0%20beta"),
+        ] {
+            let purl = crate::parsers::utils::simple_purl("opam", name, version)
+                .expect("a non-empty name should yield a purl");
+            assert_eq!(purl, expected);
+
+            let parsed = packageurl::PackageUrl::from_str(&purl).expect("purl should parse");
+            assert_eq!(parsed.name(), name);
+            assert_eq!(parsed.namespace(), None);
+            assert_eq!(parsed.subpath(), None);
+            assert_eq!(parsed.version(), version);
+            assert_eq!(parsed.to_string(), purl, "purl should round-trip");
+        }
+
+        assert_eq!(
+            crate::parsers::utils::simple_purl("opam", "   ", None),
+            None
+        );
     }
 
     #[test]

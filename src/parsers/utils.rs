@@ -297,6 +297,58 @@ pub fn url_authority_host(authority: &str) -> &str {
         .unwrap_or(authority)
 }
 
+/// Builds a PURL for a type that takes no namespace, running the name and version
+/// through the crate's encoder.
+///
+/// Parsers that assemble a PURL with `format!` splice unvalidated text straight
+/// into it, so a name carrying a space, `?`, `#` or `/` yields a string that
+/// either fails to parse or silently reinterprets — a `/` in the name becomes a
+/// namespace separator, and text after a `#` becomes a subpath. Returns `None`
+/// when the components cannot form a PURL, which is the honest outcome: the
+/// declared text is still reported in the fields that carry it.
+///
+/// Only for types the crate does not rewrite. It lowercases names for
+/// `bitbucket`, `deb`, `github`, `hex`, `npm` and `pypi`, so those need a
+/// deliberate decision about case rather than this helper.
+pub fn simple_purl(package_type: &str, name: &str, version: Option<&str>) -> Option<String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut package_url = PackageUrl::new(package_type.to_string(), name.to_string()).ok()?;
+    if let Some(version) = version.map(str::trim).filter(|value| !value.is_empty()) {
+        package_url.with_version(version.to_string()).ok()?;
+    }
+    Some(package_url.to_string())
+}
+
+/// Builds a PURL for a type that carries a namespace, running every component
+/// through the crate's encoder.
+///
+/// The namespace keeps its `/` separators — its segments are path parts — while
+/// the name and version are encoded, which is what hand-formatting missed.
+///
+/// Same caveat as [`simple_purl`]: not for the types the crate rewrites.
+pub fn namespaced_purl(
+    package_type: &str,
+    namespace: &str,
+    name: &str,
+    version: Option<&str>,
+) -> Option<String> {
+    let (namespace, name) = (namespace.trim(), name.trim());
+    if namespace.is_empty() || name.is_empty() {
+        return None;
+    }
+
+    let mut package_url = PackageUrl::new(package_type.to_string(), name.to_string()).ok()?;
+    package_url.with_namespace(namespace.to_string()).ok()?;
+    if let Some(version) = version.map(str::trim).filter(|value| !value.is_empty()) {
+        package_url.with_version(version.to_string()).ok()?;
+    }
+    Some(package_url.to_string())
+}
+
 /// Creates a correctly-formatted npm Package URL for scoped or regular packages.
 ///
 /// Handles namespace encoding for scoped packages (e.g., `@babel/core`) and ensures

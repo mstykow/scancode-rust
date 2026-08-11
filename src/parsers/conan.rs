@@ -30,7 +30,6 @@
 use std::path::Path;
 
 use crate::parser_warn as warn;
-use packageurl::PackageUrl;
 use ruff_python_ast as ast;
 use ruff_python_parser::parse_module;
 use serde_json::Value;
@@ -477,16 +476,9 @@ fn parse_conan_reference(ref_str: &str) -> Option<Dependency> {
 
     // A range constraint is not a PURL version, so ranged and bare references
     // both fall through to a name-only PURL and keep the constraint in
-    // `extracted_requirement`.
-    let purl = version
-        .as_deref()
-        .and_then(|v| {
-            PackageUrl::new("conan", name).ok().map(|mut p| {
-                let _ = p.with_version(v);
-                p.to_string()
-            })
-        })
-        .unwrap_or_else(|| format!("pkg:conan/{}", name));
+    // `extracted_requirement`. Both forms go through the encoder — the
+    // hand-formatted fallback left a name like `my pkg` unencoded.
+    let purl = crate::parsers::utils::simple_purl("conan", name, version.as_deref());
 
     let is_pinned = version_spec
         .as_ref()
@@ -494,7 +486,7 @@ fn parse_conan_reference(ref_str: &str) -> Option<Dependency> {
         .unwrap_or(false);
 
     Some(Dependency {
-        purl: Some(truncate_field(purl)),
+        purl: purl.map(truncate_field),
         extracted_requirement: version_spec,
         scope: Some("install".to_string()),
         is_runtime: Some(true),
