@@ -1877,6 +1877,61 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_nuget_cpm_resolves_a_central_version_for_a_name_needing_encoding() {
+        // The central version is matched to the project reference by PURL, so both
+        // sides have to spell the PURL the same way. Assembly used to hand-format
+        // it while the project parser built it through the PURL encoder, so any
+        // name with a character needing percent-encoding silently failed to match
+        // and the reference kept no version at all.
+        let mut props_file = create_test_file_info(
+            "repo/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            (
+                "property_values".to_string(),
+                json!({ "ManagePackageVersionsCentrally": "true" }),
+            ),
+            (
+                "package_versions".to_string(),
+                json!([
+                    {
+                        "name": "My Package",
+                        "version": "2.0.0",
+                        "condition": null
+                    }
+                ]),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/app/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                // The project parser emits the encoded form.
+                vec![create_test_dependency("pkg:nuget/My%20Package", None, None)],
+            ),
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+
+        let dependency = result
+            .dependencies
+            .iter()
+            .find(|dependency| dependency.purl.as_deref() == Some("pkg:nuget/My%20Package"))
+            .expect("the project reference should be reported");
+        assert_eq!(dependency.extracted_requirement.as_deref(), Some("2.0.0"));
+    }
+
+    #[test]
     fn test_assemble_nuget_cpm_uses_composed_central_versions() {
         let mut props_file = create_test_file_info(
             "repo/Directory.Packages.props",
