@@ -47,6 +47,14 @@ dist/
 !.env.example
 node_modules/
 
+# This project's Node tooling is npm-managed and pinned by package-lock.json.
+# Running another package manager here leaves a competing lockfile behind, which
+# is both committable by accident and picked up as a real package by Provenant's
+# own parsers when it scans this repository.
+pnpm-lock.yaml
+yarn.lock
+bun.lockb
+
 # Test fixtures should always be reviewable and trackable, even when they use
 # names like dist/, node_modules/, *.log, or *.exe.
 !testdata/
