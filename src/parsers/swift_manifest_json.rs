@@ -308,7 +308,7 @@ pub fn get_namespace_and_name(url: &str) -> (Option<String>, String) {
         .unwrap_or(path)
         .trim_end_matches('/');
 
-    if let Some(host) = hostname {
+    if let Some(host) = hostname.map(crate::parsers::utils::url_authority_host) {
         let canonical = format!("{}/{}", host, clean_path);
         match canonical.rsplit_once('/') {
             Some((ns, name)) => (Some(ns.to_string()), name.to_string()),

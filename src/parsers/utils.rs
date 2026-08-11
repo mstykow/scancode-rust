@@ -279,6 +279,24 @@ pub fn read_file_to_string(path: &Path, max_size: Option<u64>) -> Result<String>
     }
 }
 
+/// The host portion of a URL authority, dropping any `user:password@` userinfo.
+///
+/// Clone URLs carry credentials in that position — CI checkouts use
+/// `https://x-access-token:<token>@github.com/owner/repo.git` — and the authority
+/// is what parsers turn into a package namespace. Keeping the userinfo copies the
+/// credential into `purl`, `dependency_uid` and `package_uid`: identity a package
+/// does not have, propagated into an SBOM that is usually published. Split from
+/// the right so a password containing `@` still leaves the real host.
+///
+/// Parsers that resolve URLs through the `url` crate get this for free from
+/// `host_str`; this is for the ones that split the string themselves.
+pub fn url_authority_host(authority: &str) -> &str {
+    authority
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(authority)
+}
+
 /// Creates a correctly-formatted npm Package URL for scoped or regular packages.
 ///
 /// Handles namespace encoding for scoped packages (e.g., `@babel/core`) and ensures

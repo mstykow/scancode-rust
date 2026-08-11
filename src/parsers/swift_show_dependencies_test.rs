@@ -29,6 +29,50 @@ mod tests {
     }
 
     #[test]
+    fn test_clone_url_credentials_are_not_part_of_package_identity() {
+        // A CI checkout clones over `https://<user>:<token>@host/owner/repo.git`,
+        // and the URL authority is what becomes the package namespace. The
+        // credential is not identity and must not reach any emitted PURL.
+        let content = r#"{
+            "identity": "myroot",
+            "name": "MyRoot",
+            "url": "https://github.com/acme/myroot.git",
+            "version": "1.0.0",
+            "dependencies": [
+                {
+                    "identity": "alamofire",
+                    "name": "Alamofire",
+                    "url": "https://x-access-token:ghp_examplevalue@github.com/Alamofire/Alamofire.git",
+                    "version": "5.6.4",
+                    "dependencies": []
+                }
+            ]
+        }"#;
+        let pkg = parse_swift_show_dependencies(content);
+
+        let purls: Vec<String> = pkg
+            .dependencies
+            .iter()
+            .filter_map(|dependency| dependency.purl.clone())
+            .chain(pkg.purl.clone())
+            .collect();
+
+        assert!(!purls.is_empty(), "expected at least one emitted purl");
+        for purl in &purls {
+            assert!(
+                !purl.contains("ghp_examplevalue") && !purl.contains("x-access-token"),
+                "credential leaked into purl: {purl}"
+            );
+        }
+        assert!(
+            purls
+                .iter()
+                .any(|purl| purl == "pkg:swift/github.com/Alamofire/Alamofire@5.6.4"),
+            "expected the credential-free identity, got {purls:?}"
+        );
+    }
+
+    #[test]
     fn test_parse_basic() {
         let content = r#"{"name": "MyPackage"}"#;
         let pkg = parse_swift_show_dependencies(content);

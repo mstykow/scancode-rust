@@ -187,6 +187,17 @@ mod tests {
     }
 
     #[test]
+    fn test_get_namespace_and_name_drops_clone_url_credentials() {
+        // The URL authority becomes the namespace, so userinfo from a CI clone
+        // URL would otherwise be carried into every emitted PURL.
+        let (ns, name) = get_namespace_and_name(
+            "https://x-access-token:ghp_examplevalue@github.com/apple/swift-argument-parser.git",
+        );
+        assert_eq!(ns, Some("github.com/apple".to_string()));
+        assert_eq!(name, "swift-argument-parser");
+    }
+
+    #[test]
     fn test_get_namespace_and_name_no_git_suffix() {
         let (ns, name) = get_namespace_and_name("https://github.com/vapor/vapor");
         assert_eq!(ns, Some("github.com/vapor".to_string()));
