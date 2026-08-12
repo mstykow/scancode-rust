@@ -52,6 +52,10 @@ node_modules/
 # is both committable by accident and picked up as a real package by Provenant's
 # own parsers when it scans this repository. Anchored to the root so a nested
 # project's own lockfile stays visible.
+#
+# The usual source is lefthook's generated git hook: with no `node_modules` — a
+# fresh worktree that has not run `npm run setup` — it probes package managers in
+# turn, and `pnpm lefthook -h` writes a lockfile just by being probed.
 /pnpm-lock.yaml
 /yarn.lock
 /bun.lockb
