@@ -2,14 +2,14 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.7",
-  "serialNumber": "urn:uuid:96b8310d-ea47-490f-8934-9194fa93de20",
+  "serialNumber": "urn:uuid:3dc35dc3-927d-4ebb-be68-57bae26ff4cf",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-07-24T14:34:31Z",
+    "timestamp": "2026-08-12T06:10:11Z",
     "tools": [
       {
         "name": "Provenant",
-        "version": "1.0.3"
+        "version": "1.0.5"
       }
     ],
     "component": {
