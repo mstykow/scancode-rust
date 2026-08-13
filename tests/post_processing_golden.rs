@@ -474,11 +474,9 @@ Copyright - split out libs\0\xff",
     }
 
     #[test]
-    // A wheel `METADATA` whose `License-Expression` and `License-File` sit too far
-    // apart to group into one detection. The unresolved reference is demoted to a
-    // clue, which would leave the file asserting the package's declared license
-    // with no detection behind it; the package data's own detection is adopted
-    // instead, so the expression stays backed by visible evidence.
+    // `License-Expression` and `License-File` too far apart to group into one
+    // detection: demoting the reference must not leave the declared license
+    // asserted with an empty `license_detections`.
     fn test_golden_reference_follow_wheel_metadata_license_file_reference() {
         assert_reference_follow_fixture_matches_expected(
             "testdata/summarycode-golden/reference_following/wheel_metadata_license_file_reference",

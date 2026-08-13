@@ -167,12 +167,9 @@ fn demote_unresolved_reference_detections_to_clues(file: &mut FileInfo) {
     }
     file.license_detections = surviving;
 
-    // `FileInfo::new` adopts a file's own package data's detections when the file
-    // has none of its own, so a manifest's declared licence is backed by visible
-    // evidence. A file whose only detection was the unresolved reference skipped
-    // that adoption at construction and would be left asserting its package's
-    // licence with an empty `license_detections` — the same expression-without-
-    // evidence shape this demotion exists to prevent. Adopt them now instead.
+    // Keep the expression backed by evidence. `FileInfo::new` adopts package-data
+    // detections only for a file that starts with none, which a file whose sole
+    // detection was this reference did not.
     if file.license_detections.is_empty() {
         for package_data in &file.package_data {
             file.license_detections
@@ -2097,12 +2094,9 @@ mod tests {
 
     #[test]
     fn demoting_the_only_detection_adopts_the_file_package_data_detections() {
-        // A wheel `METADATA` declaring `License-Expression: MIT` and referencing a
-        // `License-File` too far away to group into one detection: the reference
-        // is the file's only own detection, so it skipped the package-data
-        // adoption `FileInfo::new` performs, and demoting it left the file
-        // asserting `mit` with an empty `license_detections` — an expression with
-        // no evidence behind it, which is what this demotion exists to prevent.
+        // A wheel `METADATA` whose `License-File` reference is its only own
+        // detection, so demoting it would leave the package's declared `mit`
+        // asserted with an empty `license_detections`.
         let mut metadata = file("demo-1.0.dist-info/METADATA");
         metadata.license_detections = vec![crate::models::LicenseDetection {
             license_expression: "unknown-license-reference".to_string(),
