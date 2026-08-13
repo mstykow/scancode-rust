@@ -92,6 +92,21 @@ fn collect_purls(value: &Value, into: &mut BTreeSet<String>) {
     }
 }
 
+/// Every PURL-shaped value in the checked-in expected fixtures.
+fn collect_fixture_purls() -> BTreeSet<String> {
+    let mut purls = BTreeSet::new();
+    for fixture in expected_fixture_files(Path::new("testdata")) {
+        let Ok(contents) = fs::read_to_string(&fixture) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<Value>(&contents) else {
+            continue;
+        };
+        collect_purls(&value, &mut purls);
+    }
+    purls
+}
+
 #[test]
 fn every_emitted_purl_in_expected_fixtures_parses() {
     let fixtures = expected_fixture_files(Path::new("testdata"));
@@ -134,6 +149,48 @@ fn every_emitted_purl_in_expected_fixtures_parses() {
             .map(|purl| purl.as_str())
             .collect::<Vec<_>>()
             .join("\n  ")
+    );
+}
+
+/// The qualifier keys carried by a PURL string, in the order written.
+///
+/// Read from the raw text rather than a parsed PURL on purpose: parsing is where
+/// a duplicate key is resolved away, so a parsed value can never reveal one.
+fn qualifier_keys(purl: &str) -> Vec<&str> {
+    let head = purl.split('#').next().unwrap_or(purl);
+    let Some((_, qualifiers)) = head.split_once('?') else {
+        return Vec::new();
+    };
+    qualifiers
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(key, _)| key)
+        .collect()
+}
+
+#[test]
+fn no_emitted_purl_repeats_a_qualifier_key() {
+    // A repeated key is silently resolved last-wins, so whatever the earlier one
+    // held is discarded on the first parse. Appending a UID's `uuid` marker to a
+    // julia PURL — whose spec-required `uuid` qualifier *is* its registry
+    // identity — destroyed that identity exactly this way.
+    //
+    // The component-stability check below cannot see this: it compares a parsed
+    // PURL against a re-parsed one, and both have already lost the earlier value.
+    let mut duplicated = Vec::new();
+    for purl in collect_fixture_purls() {
+        let keys = qualifier_keys(&purl);
+        let unique: BTreeSet<&str> = keys.iter().copied().collect();
+        if unique.len() != keys.len() {
+            duplicated.push(purl.clone());
+        }
+    }
+
+    assert!(
+        duplicated.is_empty(),
+        "these emitted PURLs repeat a qualifier key, so the earlier value is \
+         discarded when they are parsed:\n  {}",
+        duplicated.join("\n  ")
     );
 }
 
