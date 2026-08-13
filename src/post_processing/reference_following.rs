@@ -167,6 +167,19 @@ fn demote_unresolved_reference_detections_to_clues(file: &mut FileInfo) {
     }
     file.license_detections = surviving;
 
+    // `FileInfo::new` adopts a file's own package data's detections when the file
+    // has none of its own, so a manifest's declared licence is backed by visible
+    // evidence. A file whose only detection was the unresolved reference skipped
+    // that adoption at construction and would be left asserting its package's
+    // licence with an empty `license_detections` — the same expression-without-
+    // evidence shape this demotion exists to prevent. Adopt them now instead.
+    if file.license_detections.is_empty() {
+        for package_data in &file.package_data {
+            file.license_detections
+                .extend(package_data.license_detections.clone());
+        }
+    }
+
     refresh_file_license_expressions(file);
 }
 
@@ -2080,6 +2093,56 @@ mod tests {
         // makes the file assert a license in one spelling that it denies in the
         // other, which is what a clue-only file looked like before this fix.
         assert_eq!(po.detected_license_expression_spdx, None);
+    }
+
+    #[test]
+    fn demoting_the_only_detection_adopts_the_file_package_data_detections() {
+        // A wheel `METADATA` declaring `License-Expression: MIT` and referencing a
+        // `License-File` too far away to group into one detection: the reference
+        // is the file's only own detection, so it skipped the package-data
+        // adoption `FileInfo::new` performs, and demoting it left the file
+        // asserting `mit` with an empty `license_detections` — an expression with
+        // no evidence behind it, which is what this demotion exists to prevent.
+        let mut metadata = file("demo-1.0.dist-info/METADATA");
+        metadata.license_detections = vec![crate::models::LicenseDetection {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            matches: vec![placeholder_reference_match(
+                "unknown-license-reference",
+                "unknown-license-reference_see_license_at_manifest_1.RULE",
+            )],
+            detection_log: vec!["unknown-reference-to-local-file".to_string()],
+            identifier: "unknown-ref-id".to_string(),
+        }];
+        metadata.detected_license_expression = Some("mit".to_string());
+        metadata.detected_license_expression_spdx = Some("MIT".to_string());
+        metadata.package_data = vec![crate::models::PackageData {
+            declared_license_expression: Some("mit".to_string()),
+            declared_license_expression_spdx: Some("MIT".to_string()),
+            license_detections: vec![detection("mit", "MIT", "demo-1.0.dist-info/METADATA")],
+            ..Default::default()
+        }];
+
+        let mut files = vec![metadata];
+        apply_package_reference_following(&mut files, &mut []);
+        let metadata = files.remove(0);
+
+        // The reference stays visible as a clue.
+        assert_eq!(metadata.license_clues.len(), 1);
+        assert_eq!(
+            metadata.license_clues[0].license_expression,
+            "unknown-license-reference"
+        );
+
+        // And the declared licence is now backed by a detection rather than
+        // asserted on its own.
+        assert_eq!(metadata.detected_license_expression.as_deref(), Some("mit"));
+        assert_eq!(
+            metadata.detected_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(metadata.license_detections.len(), 1);
+        assert_eq!(metadata.license_detections[0].license_expression, "mit");
     }
 
     #[test]

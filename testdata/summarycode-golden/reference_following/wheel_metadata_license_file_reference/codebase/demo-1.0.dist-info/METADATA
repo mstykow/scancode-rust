@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: demo
+License-Expression: MIT
+Version: 1.0
+Summary: A demo package
+Author-email: Someone <someone@example.com>
+Requires-Python: >=3.9
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Dist: flask
+Requires-Dist: werkzeug
+Project-URL: Homepage, https://example.com
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# demo
