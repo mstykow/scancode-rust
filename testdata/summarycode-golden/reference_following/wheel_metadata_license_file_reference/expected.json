@@ -1,0 +1,290 @@
+{
+  "summary": {
+    "declared_license_expression": "mit",
+    "license_clarity_score": {
+      "score": 0,
+      "declared_license": false,
+      "identification_precision": false,
+      "has_license_text": false,
+      "declared_copyrights": false,
+      "conflicting_license_categories": false,
+      "ambiguous_compound_licensing": true
+    },
+    "declared_holder": null,
+    "primary_language": "Python",
+    "other_license_expressions": [],
+    "other_holders": [],
+    "other_languages": []
+  },
+  "tallies": {
+    "detected_license_expression": [
+      {
+        "value": "mit",
+        "count": 2
+      },
+      {
+        "value": "unknown-license-reference",
+        "count": 1
+      }
+    ],
+    "copyrights": [],
+    "holders": [],
+    "authors": [],
+    "programming_language": []
+  },
+  "tallies_of_key_files": {
+    "detected_license_expression": [
+      {
+        "value": "mit",
+        "count": 1
+      },
+      {
+        "value": "unknown-license-reference",
+        "count": 1
+      }
+    ],
+    "copyrights": [],
+    "holders": [],
+    "authors": [],
+    "programming_language": []
+  },
+  "license_detections": [
+    {
+      "identifier": "mit-0417f034-29de-3369-3be1-60a79938d91c",
+      "license_expression": "mit",
+      "license_expression_spdx": "MIT",
+      "detection_count": 1,
+      "detection_log": [],
+      "reference_matches": [
+        {
+          "from_file": "codebase/demo-1.0.dist-info/licenses/LICENSE",
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "rule_identifier": "mit_14.RULE"
+        },
+        {
+          "from_file": "codebase/demo-1.0.dist-info/licenses/LICENSE",
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "rule_identifier": "mit.LICENSE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708",
+      "license_expression": "mit",
+      "license_expression_spdx": "MIT",
+      "detection_count": 1,
+      "detection_log": [],
+      "reference_matches": [
+        {
+          "from_file": "codebase/demo-1.0.dist-info/METADATA",
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "rule_identifier": "parser-declared-license"
+        }
+      ]
+    }
+  ],
+  "license_references": [
+    {
+      "key": "mit",
+      "language": "en",
+      "short_name": "MIT License",
+      "name": "MIT License",
+      "owner": "MIT",
+      "homepage_url": "http://opensource.org/licenses/mit-license.php",
+      "spdx_license_key": "MIT",
+      "osi_license_key": null,
+      "text_urls": ["http://opensource.org/licenses/mit-license.php"],
+      "osi_url": "http://www.opensource.org/licenses/MIT",
+      "faq_url": "https://ieeexplore.ieee.org/document/9263265",
+      "other_urls": [
+        "https://opensource.com/article/18/3/patent-grant-mit-license",
+        "https://opensource.com/article/19/4/history-mit-license",
+        "https://opensource.org/licenses/MIT"
+      ],
+      "category": "Permissive",
+      "is_exception": false,
+      "is_unknown": false,
+      "is_generic": false,
+      "minimum_coverage": null,
+      "standard_notice": null
+    },
+    {
+      "key": "unknown-license-reference",
+      "language": "en",
+      "short_name": "Unknown License reference",
+      "name": "Unknown License file reference",
+      "owner": "Unspecified",
+      "homepage_url": null,
+      "spdx_license_key": "LicenseRef-scancode-unknown-license-reference",
+      "osi_license_key": null,
+      "text_urls": [],
+      "osi_url": null,
+      "faq_url": null,
+      "other_urls": [],
+      "category": "Unstated License",
+      "is_exception": false,
+      "is_unknown": true,
+      "is_generic": false,
+      "minimum_coverage": null,
+      "standard_notice": null
+    }
+  ],
+  "license_rule_references": [
+    {
+      "identifier": "mit.LICENSE",
+      "license_expression": "mit",
+      "language": null,
+      "rule_url": "https://github.com/aboutcode-org/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE",
+      "is_synthetic": false,
+      "length": 161,
+      "referenced_filenames": []
+    },
+    {
+      "identifier": "mit_14.RULE",
+      "license_expression": "mit",
+      "language": null,
+      "rule_url": "https://github.com/aboutcode-org/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_14.RULE",
+      "is_synthetic": false,
+      "length": 2,
+      "referenced_filenames": []
+    },
+    {
+      "identifier": "unknown-license-reference_see_license_at_manifest_1.RULE",
+      "license_expression": "unknown-license-reference",
+      "language": null,
+      "rule_url": "https://github.com/aboutcode-org/scancode-toolkit/tree/develop/src/licensedcode/data/rules/unknown-license-reference_see_license_at_manifest_1.RULE",
+      "is_synthetic": false,
+      "length": 3,
+      "referenced_filenames": ["LICENSE"]
+    }
+  ],
+  "packages": [
+    {
+      "type": "pypi",
+      "name": "demo",
+      "version": "1.0",
+      "declared_license_expression": "mit",
+      "declared_license_expression_spdx": "MIT",
+      "other_license_expression": null,
+      "other_license_expression_spdx": null,
+      "datafile_paths": ["codebase/demo-1.0.dist-info/METADATA"],
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "detection_log": [],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708",
+          "matches": [
+            {
+              "from_file": "codebase/demo-1.0.dist-info/METADATA",
+              "matched_text": "MIT",
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "rule_identifier": "parser-declared-license",
+              "referenced_filenames": ["LICENSE"]
+            }
+          ]
+        }
+      ],
+      "other_license_detections": []
+    }
+  ],
+  "files": [
+    {
+      "path": "codebase/demo-1.0.dist-info/METADATA",
+      "type": "file",
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_manifest": true,
+      "detected_license_expression": "mit",
+      "detected_license_expression_spdx": "MIT",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "detection_log": [],
+          "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708",
+          "matches": [
+            {
+              "from_file": "codebase/demo-1.0.dist-info/METADATA",
+              "matched_text": "MIT",
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "rule_identifier": "parser-declared-license",
+              "referenced_filenames": ["LICENSE"]
+            }
+          ]
+        }
+      ],
+      "package_data": [
+        {
+          "type": "pypi",
+          "name": "demo",
+          "version": "1.0",
+          "declared_license_expression": "mit",
+          "declared_license_expression_spdx": "MIT",
+          "other_license_expression": null,
+          "other_license_expression_spdx": null,
+          "license_detections": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "detection_log": [],
+              "identifier": "mit-baa8883e-2a3e-91b8-cdd5-5b082d60e708",
+              "matches": [
+                {
+                  "from_file": "codebase/demo-1.0.dist-info/METADATA",
+                  "matched_text": "MIT",
+                  "license_expression": "mit",
+                  "license_expression_spdx": "MIT",
+                  "rule_identifier": "parser-declared-license",
+                  "referenced_filenames": ["LICENSE"]
+                }
+              ]
+            }
+          ],
+          "other_license_detections": []
+        }
+      ]
+    },
+    {
+      "path": "codebase/demo-1.0.dist-info/licenses/LICENSE",
+      "type": "file",
+      "is_top_level": false,
+      "is_key_file": false,
+      "is_manifest": false,
+      "detected_license_expression": "mit",
+      "detected_license_expression_spdx": "MIT",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "detection_log": [],
+          "identifier": "mit-0417f034-29de-3369-3be1-60a79938d91c",
+          "matches": [
+            {
+              "from_file": "codebase/demo-1.0.dist-info/licenses/LICENSE",
+              "matched_text": null,
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "rule_identifier": "mit_14.RULE",
+              "referenced_filenames": []
+            },
+            {
+              "from_file": "codebase/demo-1.0.dist-info/licenses/LICENSE",
+              "matched_text": null,
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "rule_identifier": "mit.LICENSE",
+              "referenced_filenames": []
+            }
+          ]
+        }
+      ],
+      "package_data": []
+    }
+  ]
+}

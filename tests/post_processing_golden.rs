@@ -474,6 +474,17 @@ Copyright - split out libs\0\xff",
     }
 
     #[test]
+    // `License-Expression` and `License-File` too far apart to group into one
+    // detection: demoting the reference must not leave the declared license
+    // asserted with an empty `license_detections`.
+    fn test_golden_reference_follow_wheel_metadata_license_file_reference() {
+        assert_reference_follow_fixture_matches_expected(
+            "testdata/summarycode-golden/reference_following/wheel_metadata_license_file_reference",
+            "testdata/summarycode-golden/reference_following/wheel_metadata_license_file_reference/expected.json",
+        );
+    }
+
+    #[test]
     // A file whose only license evidence is an unresolvable reference ("see the
     // file COPYING", with no such file in the tree) keeps that evidence as a
     // clue and asserts no license. Both `detected_license_expression` and its
