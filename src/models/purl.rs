@@ -145,37 +145,51 @@ fn lowercase_first_path_segment(purl: &str, prefix: &str) -> String {
     )
 }
 
-/// Add the `uuid` qualifier that turns a PURL into a UID, keeping it a
-/// qualifier.
+/// The qualifier a UID's instance marker normally uses.
+const UID_MARKER: &str = "uuid";
+
+/// The marker used when the PURL already carries a `uuid` qualifier of its own.
+///
+/// Julia's registry identity is exactly that — the spec requires it, and a Julia
+/// name alone is ambiguous without it. Appending a second `uuid` produced a PURL
+/// with a duplicate qualifier key, which a parser resolves last-wins: the
+/// package's own identity was silently discarded, and re-emitting dropped it
+/// from the string entirely.
+const UID_MARKER_ALT: &str = "uid";
+
+/// Add the qualifier that turns a PURL into a UID, keeping it a qualifier and
+/// leaving the PURL's own qualifiers intact.
 ///
 /// A PURL orders its parts `…?qualifiers#subpath`, so appending to the end of the
-/// string lands the uuid *inside the subpath* whenever one is present: a
+/// string lands the marker *inside the subpath* whenever one is present: a
 /// cocoapods subspec UID came out as `pkg:cocoapods/SwiftFormat@0.44.17#CLI?uuid=…`,
-/// where `?uuid=…` is no longer a qualifier and re-parsing yields the subpath
-/// `CLI?uuid=…`. Insert ahead of the subpath instead, and use `&` only when the
-/// PURL already carries a qualifier.
+/// where `?uuid=…` is no longer a qualifier at all. Insert ahead of the subpath
+/// instead, and use `&` only when the PURL already carries a qualifier.
 ///
 /// Non-PURL bases (the `generated-package:` fallback identity) carry neither
 /// qualifiers nor a subpath, so they simply take the `?uuid=` form.
 pub(crate) fn append_uuid_qualifier(base: &str, uuid: &str) -> String {
     let (head, subpath) = split_subpath(base);
     let separator = if head.contains('?') { '&' } else { '?' };
+    let marker = if has_qualifier(head, UID_MARKER) {
+        UID_MARKER_ALT
+    } else {
+        UID_MARKER
+    };
+
     match subpath {
-        Some(subpath) => format!("{head}{separator}uuid={uuid}#{subpath}"),
-        None => format!("{head}{separator}uuid={uuid}"),
+        Some(subpath) => format!("{head}{separator}{marker}={uuid}#{subpath}"),
+        None => format!("{head}{separator}{marker}={uuid}"),
     }
 }
 
-/// The UID with its `uuid` qualifier removed, restoring the underlying PURL.
+/// The UID with its instance marker removed, restoring the underlying PURL.
 ///
 /// Borrows whenever the UID has no subpath, which is the common case; only a
 /// subpath-carrying UID needs the two remaining parts rejoined.
 pub(crate) fn strip_uuid_qualifier(uid: &str) -> Cow<'_, str> {
     let (head, subpath) = split_subpath(uid);
-    let Some((prefix, _)) = head
-        .split_once("?uuid=")
-        .or_else(|| head.split_once("&uuid="))
-    else {
+    let Some((prefix, _)) = split_uid_marker(head) else {
         return Cow::Borrowed(uid);
     };
 
@@ -185,12 +199,41 @@ pub(crate) fn strip_uuid_qualifier(uid: &str) -> Cow<'_, str> {
     }
 }
 
-/// The value of a UID's `uuid` qualifier, or `None` when it carries none.
+/// The value of a UID's instance marker, or `None` when it carries none.
 pub(crate) fn uuid_qualifier_value(uid: &str) -> Option<&str> {
     let (head, _) = split_subpath(uid);
-    head.split_once("?uuid=")
-        .or_else(|| head.split_once("&uuid="))
-        .map(|(_, uuid)| uuid)
+    split_uid_marker(head).map(|(_, uuid)| uuid)
+}
+
+/// Whether `head` already carries `key` as a qualifier.
+///
+/// Anchored on the qualifier separator so `uid` does not match inside `uuid`.
+fn has_qualifier(head: &str, key: &str) -> bool {
+    head.contains(&format!("?{key}=")) || head.contains(&format!("&{key}="))
+}
+
+/// Splits a UID's qualifier section into the PURL before its instance marker and
+/// the marker's value.
+///
+/// Prefers the alternate marker, which is only ever emitted when the PURL has a
+/// `uuid` of its own. Otherwise takes the *last* `uuid`, so a UID produced before
+/// the alternate marker existed still resolves to the appended one rather than to
+/// the package's registry identity.
+fn split_uid_marker(head: &str) -> Option<(&str, &str)> {
+    for marker in [UID_MARKER_ALT, UID_MARKER] {
+        let separator_index = [format!("?{marker}="), format!("&{marker}=")]
+            .iter()
+            .filter_map(|pattern| head.rfind(pattern.as_str()))
+            .max();
+
+        if let Some(index) = separator_index {
+            let value_start = index + marker.len() + 2;
+            let value = &head[value_start..];
+            let value = value.split_once('&').map_or(value, |(value, _)| value);
+            return Some((&head[..index], value));
+        }
+    }
+    None
 }
 
 fn split_subpath(purl: &str) -> (&str, Option<&str>) {
@@ -220,6 +263,55 @@ mod tests {
         assert_eq!(
             parsed.qualifiers().get("uuid").map(Cow::as_ref),
             Some("abc")
+        );
+    }
+
+    #[test]
+    fn uid_marker_does_not_collide_with_a_purls_own_uuid_qualifier() {
+        // julia's registry identity is a `uuid` qualifier and the spec requires
+        // it. A second one made the two indistinguishable: a parser resolves
+        // duplicate keys last-wins, so the package's own identity was discarded
+        // and re-emitting dropped it from the string.
+        let base = "pkg:julia/HTTP@1.0.0?uuid=cd3eb016-35fb-5094-929b-558a96fad6f3";
+        let uid = append_uuid_qualifier(base, "98920f38-6039-4eaf-925e-f1216f083eba");
+        assert_eq!(
+            uid,
+            "pkg:julia/HTTP@1.0.0?uuid=cd3eb016-35fb-5094-929b-558a96fad6f3&uid=98920f38-6039-4eaf-925e-f1216f083eba"
+        );
+
+        // The registry identity survives a parse, and the marker is separate.
+        let parsed = PackageUrl::from_str(&uid).expect("uid should parse");
+        assert_eq!(
+            parsed.qualifiers().get("uuid").map(Cow::as_ref),
+            Some("cd3eb016-35fb-5094-929b-558a96fad6f3")
+        );
+        assert_eq!(
+            parsed.qualifiers().get("uid").map(Cow::as_ref),
+            Some("98920f38-6039-4eaf-925e-f1216f083eba")
+        );
+
+        // And the PURL is recoverable, so two julia packages sharing a name and
+        // version no longer collapse to the same key.
+        assert_eq!(strip_uuid_qualifier(&uid), base);
+        assert_eq!(
+            uuid_qualifier_value(&uid),
+            Some("98920f38-6039-4eaf-925e-f1216f083eba")
+        );
+    }
+
+    #[test]
+    fn a_uid_written_before_the_alternate_marker_resolves_to_the_appended_one() {
+        // Reading back output produced when both markers were spelled `uuid`:
+        // the appended one is the last, so the package's own identity is what
+        // survives stripping.
+        let legacy = "pkg:julia/HTTP@1.0.0?uuid=cd3eb016-35fb-5094-929b-558a96fad6f3&uuid=98920f38-6039-4eaf-925e-f1216f083eba";
+        assert_eq!(
+            strip_uuid_qualifier(legacy),
+            "pkg:julia/HTTP@1.0.0?uuid=cd3eb016-35fb-5094-929b-558a96fad6f3"
+        );
+        assert_eq!(
+            uuid_qualifier_value(legacy),
+            Some("98920f38-6039-4eaf-925e-f1216f083eba")
         );
     }
 
