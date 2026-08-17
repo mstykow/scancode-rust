@@ -424,6 +424,7 @@ pub fn detect_copyrights_from_text_with_deadline(
         &mut holders,
         &mut authors,
         &mut seen,
+        deadline,
     );
 
     refine_final_copyrights(&mut copyrights);
@@ -672,6 +673,7 @@ pub(super) fn detect_copyright_phase_boundaries(content: &str) -> PhaseBoundaryD
         &mut holders,
         &mut authors,
         &mut seen,
+        None,
     );
 
     PhaseBoundaryDetections {

@@ -566,3 +566,36 @@ fn test_lowercase_metadata_version_still_gates_the_field_name_filter() {
         "no author is declared here, got {values:?}"
     );
 }
+
+#[test]
+fn test_the_copyright_deadline_is_honoured_end_to_end() {
+    // `--timeout` becomes this deadline. The assertion is the user-facing
+    // contract — a spent budget stops work rather than being ignored.
+    //
+    // It does not isolate the postprocess checkpoints specifically: an already
+    // expired deadline is caught by the check that precedes the phase. Those
+    // checkpoints bound accumulated work *inside* the phase, which is only
+    // observable with control over when the budget runs out.
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email: jane@example.com\n",
+    );
+
+    let (_c, _h, with_budget) =
+        crate::copyright::detector::detect_copyrights_from_text_with_deadline(
+            input,
+            Some(std::time::Duration::from_secs(60)),
+        );
+    assert_eq!(with_budget.len(), 1);
+    assert_eq!(with_budget[0].author, "Jane Smith");
+
+    let (_c, _h, expired) = crate::copyright::detector::detect_copyrights_from_text_with_deadline(
+        input,
+        Some(std::time::Duration::ZERO),
+    );
+    assert!(
+        expired.is_empty(),
+        "a spent budget should stop the repairs that produce authors, got {expired:?}"
+    );
+}
