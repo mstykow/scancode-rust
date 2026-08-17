@@ -1801,6 +1801,17 @@ const NAME_LISTING_METADATA_FIELDS: &[&str] = &["dynamic:", "provides-extra:"];
 /// were read as the name — a wheel `METADATA` reported an author of
 /// `Dynamic classifier Dynamic`. Line context only exists out here, which is why
 /// the filter lives at this stage rather than in the tagger or the grammar.
+///
+/// Narrowed to this format rather than to every `<Key>: author` line, which a
+/// scan of 25,290 real-world files argues against: of the three that carry such a
+/// line, none produced a false author, and one — a YAML `role: author` above
+/// `name: Spencer Alger` — names a real person the broader rule would have
+/// discarded. The keyword only reaches the next line when that line reads like a
+/// bare name, which lowercase YAML keys do not.
+///
+/// Python core metadata is narrowed because its specification settles the
+/// meaning rather than leaving it to the shape of the next line: `Dynamic:` and
+/// `Provides-Extra:` take field and extra names, never people.
 pub(in super::super) fn drop_metadata_field_listing_authors(
     prepared_cache: &PreparedLines<'_>,
     authors: &mut Vec<AuthorDetection>,
