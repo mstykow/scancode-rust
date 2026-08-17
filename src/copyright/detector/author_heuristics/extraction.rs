@@ -1772,15 +1772,74 @@ pub(in super::super) fn extract_parenthesized_inline_by_authors(
     authors
 }
 
+/// Whether the text is Python core metadata.
+///
+/// Field names are case-insensitive — the format inherits RFC 822 headers — even
+/// though tools write the canonical `Metadata-Version`.
+fn looks_like_python_core_metadata(prepared_cache: &PreparedLines<'_>) -> bool {
+    prepared_cache.iter().any(|line| {
+        line.prepared
+            .trim_start()
+            .to_ascii_lowercase()
+            .starts_with("metadata-version:")
+    })
+}
+
+/// Python core-metadata fields whose value is a field or extra *name*, never a
+/// person.
+///
+/// PEP 643's `Dynamic:` lists which fields a build may fill in, so
+/// `Dynamic: author` declares that the *author field* is dynamic — it does not
+/// name anybody. `Provides-Extra:` names an optional dependency group the same
+/// way.
+const NAME_LISTING_METADATA_FIELDS: &[&str] = &["dynamic:", "provides-extra:"];
+
+/// Drop authors read entirely out of field-name declarations.
+///
+/// The tagger sees the bare word `author` and tags it as an author keyword with
+/// no idea it is a field's *value*, so the lines following `Dynamic: author`
+/// were read as the name — a wheel `METADATA` reported an author of
+/// `Dynamic classifier Dynamic`. Line context only exists out here, which is why
+/// the filter lives at this stage rather than in the tagger or the grammar.
+pub(in super::super) fn drop_metadata_field_listing_authors(
+    prepared_cache: &PreparedLines<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if !looks_like_python_core_metadata(prepared_cache) {
+        return;
+    }
+
+    authors.retain(|author| {
+        let mut line_number = author.start_line;
+        let mut saw_line = false;
+
+        while line_number <= author.end_line {
+            let Some(line) = prepared_cache.line(line_number) else {
+                break;
+            };
+            let lower = line.prepared.trim_start().to_ascii_lowercase();
+            if !lower.is_empty() {
+                saw_line = true;
+                if !NAME_LISTING_METADATA_FIELDS
+                    .iter()
+                    .any(|field| lower.starts_with(field))
+                {
+                    // Some source line is ordinary prose, so keep the author.
+                    return true;
+                }
+            }
+            line_number = line_number.next();
+        }
+
+        !saw_line
+    });
+}
+
 pub(in super::super) fn merge_metadata_author_and_email_lines(
     prepared_cache: &PreparedLines<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    let has_metadata = prepared_cache
-        .iter()
-        .any(|line| line.prepared.trim_start().starts_with("Metadata-Version:"));
-
-    if !has_metadata {
+    if !looks_like_python_core_metadata(prepared_cache) {
         return;
     }
 
