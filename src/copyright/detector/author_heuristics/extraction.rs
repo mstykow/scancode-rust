@@ -1815,12 +1815,9 @@ pub(in super::super) fn merge_metadata_author_and_email_lines(
                 continue;
             }
 
-            // This is the `Author-email` field belonging to the author above, so
-            // the search ends here either way. Anything unusable in it — a field
-            // written without a value, as `python36-kubernetes`'s wheel metadata
-            // does, or without a colon at all — means there is simply no address
-            // to merge. Continuing without consuming the line would re-read it
-            // forever.
+            // The field belongs to the author above, so the search ends at the
+            // first one found: an unusable field means there is no address, not
+            // that a later field might supply one.
             let Some((_, email_raw)) = email_line.split_once(':') else {
                 break;
             };
