@@ -545,3 +545,24 @@ fn test_a_real_author_survives_alongside_dynamic_field_names() {
 
     assert_eq!(values, vec!["Jane Smith"]);
 }
+
+#[test]
+fn test_lowercase_metadata_version_still_gates_the_field_name_filter() {
+    // Core metadata inherits RFC 822 header semantics, so field names are
+    // case-insensitive even though tools write the canonical spelling.
+    let input = concat!(
+        "metadata-version: 2.2\n",
+        "name: kubernetes\n",
+        "Dynamic: author\n",
+        "Dynamic: classifier\n",
+        "Dynamic: description\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert!(
+        values.is_empty(),
+        "no author is declared here, got {values:?}"
+    );
+}

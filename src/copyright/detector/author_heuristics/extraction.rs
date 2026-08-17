@@ -1772,6 +1772,19 @@ pub(in super::super) fn extract_parenthesized_inline_by_authors(
     authors
 }
 
+/// Whether the text is Python core metadata.
+///
+/// Field names are case-insensitive — the format inherits RFC 822 headers — even
+/// though tools write the canonical `Metadata-Version`.
+fn looks_like_python_core_metadata(prepared_cache: &PreparedLines<'_>) -> bool {
+    prepared_cache.iter().any(|line| {
+        line.prepared
+            .trim_start()
+            .to_ascii_lowercase()
+            .starts_with("metadata-version:")
+    })
+}
+
 /// Python core-metadata fields whose value is a field or extra *name*, never a
 /// person.
 ///
@@ -1792,11 +1805,7 @@ pub(in super::super) fn drop_metadata_field_listing_authors(
     prepared_cache: &PreparedLines<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    let has_metadata = prepared_cache
-        .iter()
-        .any(|line| line.prepared.trim_start().starts_with("Metadata-Version:"));
-
-    if !has_metadata {
+    if !looks_like_python_core_metadata(prepared_cache) {
         return;
     }
 
@@ -1830,11 +1839,7 @@ pub(in super::super) fn merge_metadata_author_and_email_lines(
     prepared_cache: &PreparedLines<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    let has_metadata = prepared_cache
-        .iter()
-        .any(|line| line.prepared.trim_start().starts_with("Metadata-Version:"));
-
-    if !has_metadata {
+    if !looks_like_python_core_metadata(prepared_cache) {
         return;
     }
 
