@@ -569,13 +569,8 @@ fn test_lowercase_metadata_version_still_gates_the_field_name_filter() {
 
 #[test]
 fn test_the_copyright_deadline_is_honoured_end_to_end() {
-    // `--timeout` becomes this deadline. The assertion is the user-facing
-    // contract — a spent budget stops work rather than being ignored.
-    //
-    // It does not isolate the postprocess checkpoints specifically: an already
-    // expired deadline is caught by the check that precedes the phase. Those
-    // checkpoints bound accumulated work *inside* the phase, which is only
-    // observable with control over when the budget runs out.
+    // `--timeout` becomes this deadline; a spent budget must stop work rather
+    // than be ignored.
     let input = concat!(
         "Metadata-Version: 2.2\n",
         "Author: Jane Smith\n",
@@ -594,8 +589,5 @@ fn test_the_copyright_deadline_is_honoured_end_to_end() {
         input,
         Some(std::time::Duration::ZERO),
     );
-    assert!(
-        expired.is_empty(),
-        "a spent budget should stop the repairs that produce authors, got {expired:?}"
-    );
+    assert!(expired.is_empty(), "got {expired:?}");
 }

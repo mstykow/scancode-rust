@@ -95,7 +95,6 @@ fn run_author_extraction_and_repairs(
     holders: &mut Vec<HolderDetection>,
     authors: &mut Vec<AuthorDetection>,
     seen: &mut SeenTextSets,
-    deadline: Option<Instant>,
 ) {
     let a_before_markup = authors.len();
     super::author_heuristics::extract_markup_authors(content, authors);
@@ -126,10 +125,6 @@ fn run_author_extraction_and_repairs(
     let mut new_a = super::author_heuristics::extract_maintained_by_authors(prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
-
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
-    }
 
     let mut new_a = super::author_heuristics::extract_package_comment_named_authors(prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -173,10 +168,6 @@ fn run_author_extraction_and_repairs(
     let mut new_a = super::author_heuristics::extract_written_on_top_of_by_authors(content);
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
-
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
-    }
 
     let mut new_a = super::author_heuristics::extract_json_excerpt_developed_by_authors(content);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -239,10 +230,6 @@ fn run_author_extraction_and_repairs(
     copyrights.extend(new_c);
     holders.extend(new_h);
     authors.extend(new_a);
-
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
-    }
 
     let mut new_a = super::author_heuristics::extract_code_written_by_author_blocks(prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -315,10 +302,6 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_json_code_example_authors(raw_lines, authors);
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
     seen.rebuild_authors_from(authors);
-
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
-    }
 
     let mut new_a = super::author_heuristics::extract_name_contributed_authors(prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -718,17 +701,16 @@ fn run_final_variant_and_cleanup_repairs(
 
 // Copyright postprocess phase entry point; the long argument list threads the shared detection-pipeline state.
 #[allow(clippy::too_many_arguments)]
-/// Runs the postprocess repairs, stopping early once `deadline` has passed.
+/// Runs the postprocess repairs, skipping the extraction steps once `deadline`
+/// has passed.
 ///
-/// `--timeout` becomes this deadline, but until now it was only consulted
-/// *between* phases, so a slow file could spend unbounded time here after the
-/// budget was gone. Checks are cooperative and sit between steps, which bounds
-/// accumulated work: a single step that never returns is still unbounded, and no
-/// deadline can change that — see the loop-advancement invariant these repairs
-/// rely on.
+/// The final cleanup runs either way. It is what removes the false positives the
+/// earlier steps emit, so skipping it would leave output dirtier than a complete
+/// run rather than merely smaller.
 ///
-/// Stopping early yields fewer repairs, never wrong ones: every step only adds
-/// or refines detections, so the result is a truncated view of the same scan.
+/// Bounds accumulated work between steps only. A single step that never returns
+/// stays unbounded — a cooperative deadline cannot preempt one — so this is not
+/// protection against a hang.
 pub(in super::super) fn run_phase_postprocess(
     content: &str,
     raw_lines: &[&str],
@@ -741,41 +723,34 @@ pub(in super::super) fn run_phase_postprocess(
     deadline: Option<Instant>,
 ) {
     run_initial_detection_repairs(content, prepared_cache, copyrights, holders, seen);
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
+
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_author_extraction_and_repairs(
+            content,
+            raw_lines,
+            prepared_cache,
+            copyrights,
+            holders,
+            authors,
+            seen,
+        );
     }
 
-    run_author_extraction_and_repairs(
-        content,
-        raw_lines,
-        prepared_cache,
-        copyrights,
-        holders,
-        authors,
-        seen,
-        deadline,
-    );
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_mid_pipeline_repairs(
+            content,
+            raw_lines,
+            prepared_cache,
+            did_expand_href,
+            copyrights,
+            holders,
+            authors,
+            seen,
+        );
     }
 
-    run_mid_pipeline_repairs(
-        content,
-        raw_lines,
-        prepared_cache,
-        did_expand_href,
-        copyrights,
-        holders,
-        authors,
-        seen,
-    );
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
-    }
-
-    run_late_pattern_extractions(content, prepared_cache, copyrights, holders, seen);
-    if super::postprocess_transforms::deadline_exceeded(deadline) {
-        return;
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_late_pattern_extractions(content, prepared_cache, copyrights, holders, seen);
     }
 
     run_final_variant_and_cleanup_repairs(raw_lines, prepared_cache, copyrights, holders, seen);
