@@ -9,6 +9,7 @@ use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetecti
 use crate::models::LineNumber;
 use regex::Regex;
 use std::sync::LazyLock;
+use std::time::Instant;
 
 use super::super::seen_text::SeenTextSets;
 
@@ -700,6 +701,16 @@ fn run_final_variant_and_cleanup_repairs(
 
 // Copyright postprocess phase entry point; the long argument list threads the shared detection-pipeline state.
 #[allow(clippy::too_many_arguments)]
+/// Runs the postprocess repairs, skipping the extraction steps once `deadline`
+/// has passed.
+///
+/// The final cleanup runs either way. It is what removes the false positives the
+/// earlier steps emit, so skipping it would leave output dirtier than a complete
+/// run rather than merely smaller.
+///
+/// Bounds accumulated work between steps only. A single step that never returns
+/// stays unbounded — a cooperative deadline cannot preempt one — so this is not
+/// protection against a hang.
 pub(in super::super) fn run_phase_postprocess(
     content: &str,
     raw_lines: &[&str],
@@ -709,27 +720,38 @@ pub(in super::super) fn run_phase_postprocess(
     holders: &mut Vec<HolderDetection>,
     authors: &mut Vec<AuthorDetection>,
     seen: &mut SeenTextSets,
+    deadline: Option<Instant>,
 ) {
     run_initial_detection_repairs(content, prepared_cache, copyrights, holders, seen);
-    run_author_extraction_and_repairs(
-        content,
-        raw_lines,
-        prepared_cache,
-        copyrights,
-        holders,
-        authors,
-        seen,
-    );
-    run_mid_pipeline_repairs(
-        content,
-        raw_lines,
-        prepared_cache,
-        did_expand_href,
-        copyrights,
-        holders,
-        authors,
-        seen,
-    );
-    run_late_pattern_extractions(content, prepared_cache, copyrights, holders, seen);
+
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_author_extraction_and_repairs(
+            content,
+            raw_lines,
+            prepared_cache,
+            copyrights,
+            holders,
+            authors,
+            seen,
+        );
+    }
+
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_mid_pipeline_repairs(
+            content,
+            raw_lines,
+            prepared_cache,
+            did_expand_href,
+            copyrights,
+            holders,
+            authors,
+            seen,
+        );
+    }
+
+    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+        run_late_pattern_extractions(content, prepared_cache, copyrights, holders, seen);
+    }
+
     run_final_variant_and_cleanup_repairs(raw_lines, prepared_cache, copyrights, holders, seen);
 }
