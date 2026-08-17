@@ -110,6 +110,7 @@ fn run_author_extraction_and_repairs(
 
     let a_before = authors.len();
     super::author_heuristics::merge_metadata_author_and_email_lines(prepared_cache, authors);
+    super::author_heuristics::drop_metadata_field_listing_authors(prepared_cache, authors);
     seen.dedup_new_authors(authors, a_before);
 
     let mut new_a = super::author_heuristics::extract_debian_maintainer_authors(prepared_cache);

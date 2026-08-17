@@ -504,3 +504,44 @@ fn test_wheel_metadata_author_email_with_a_value_still_merges() {
     // only evidence the pairing happened at all.
     assert_eq!(authors[0].end_line, authors[0].start_line.next());
 }
+
+#[test]
+fn test_dynamic_metadata_field_names_are_not_authors() {
+    // PEP 643's `Dynamic:` lists which fields a build may fill in, so
+    // `Dynamic: author` declares that the author *field* is dynamic. The tagger
+    // sees only the bare word and read the following lines as a name, giving a
+    // wheel METADATA an author of "Dynamic classifier Dynamic".
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Name: kubernetes\n",
+        "Dynamic: author\n",
+        "Dynamic: classifier\n",
+        "Dynamic: description\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert!(
+        values.is_empty(),
+        "no author is declared here, got {values:?}"
+    );
+}
+
+#[test]
+fn test_a_real_author_survives_alongside_dynamic_field_names() {
+    // The filter must key on the source lines, not on the presence of `Dynamic:`
+    // anywhere in the file.
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email: jane@example.com\n",
+        "Dynamic: author\n",
+        "Dynamic: classifier\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert_eq!(values, vec!["Jane Smith"]);
+}
