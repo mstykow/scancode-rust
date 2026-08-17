@@ -1814,12 +1814,16 @@ pub(in super::super) fn merge_metadata_author_and_email_lines(
                 next_line_number = next_line_number.next();
                 continue;
             }
+
+            // The field belongs to the author above, so the search ends at the
+            // first one found: an unusable field means there is no address, not
+            // that a later field might supply one.
             let Some((_, email_raw)) = email_line.split_once(':') else {
-                continue;
+                break;
             };
             let email = email_raw.trim();
             if email.is_empty() {
-                continue;
+                break;
             }
 
             let combined_raw = format!("{name} Author-email {email}");

@@ -468,3 +468,39 @@ fn test_json_description_keeps_explicit_anchor_attribution() {
         "holders: {h:?}"
     );
 }
+
+#[test]
+fn test_wheel_metadata_author_email_without_a_value_terminates() {
+    // Reaching the assertions at all is the regression: this input used to loop
+    // forever on the empty field.
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email:\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(authors.len(), 1);
+    assert_eq!(authors[0].author, "Jane Smith");
+    // The empty field is not consumed, so the detection covers the author line
+    // alone — the span is what distinguishes this from a merge.
+    assert_eq!(authors[0].start_line, authors[0].end_line);
+}
+
+#[test]
+fn test_wheel_metadata_author_email_with_a_value_still_merges() {
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email: jane@example.com\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(authors.len(), 1);
+    assert_eq!(authors[0].author, "Jane Smith");
+    // Refinement drops the address from the text, so the widened span is the
+    // only evidence the pairing happened at all.
+    assert_eq!(authors[0].end_line, authors[0].start_line.next());
+}
