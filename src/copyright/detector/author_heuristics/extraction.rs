@@ -1814,12 +1814,19 @@ pub(in super::super) fn merge_metadata_author_and_email_lines(
                 next_line_number = next_line_number.next();
                 continue;
             }
+
+            // This is the `Author-email` field belonging to the author above, so
+            // the search ends here either way. Anything unusable in it — a field
+            // written without a value, as `python36-kubernetes`'s wheel metadata
+            // does, or without a colon at all — means there is simply no address
+            // to merge. Continuing without consuming the line would re-read it
+            // forever.
             let Some((_, email_raw)) = email_line.split_once(':') else {
-                continue;
+                break;
             };
             let email = email_raw.trim();
             if email.is_empty() {
-                continue;
+                break;
             }
 
             let combined_raw = format!("{name} Author-email {email}");

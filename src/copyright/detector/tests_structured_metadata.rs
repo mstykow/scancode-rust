@@ -468,3 +468,41 @@ fn test_json_description_keeps_explicit_anchor_attribution() {
         "holders: {h:?}"
     );
 }
+
+#[test]
+fn test_wheel_metadata_author_email_without_a_value_terminates() {
+    // An `Author-email` field written with no value re-read the same line
+    // forever, so a 58-byte wheel `METADATA` never finished a copyright scan.
+    // Reaching the assertions at all is the regression this guards: the deadline
+    // cannot help, because it is checked between phases and this loop never
+    // returned to one.
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email:\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert_eq!(values, vec!["Jane Smith"]);
+    assert!(
+        !values.iter().any(|value| value.contains("Author-email")),
+        "an empty field has no address to merge, got {values:?}"
+    );
+}
+
+#[test]
+fn test_wheel_metadata_author_email_with_a_value_still_merges() {
+    // The pairing the heuristic exists for must keep working.
+    let input = concat!(
+        "Metadata-Version: 2.2\n",
+        "Author: Jane Smith\n",
+        "Author-email: jane@example.com\n",
+    );
+
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert_eq!(values, vec!["Jane Smith"]);
+}
