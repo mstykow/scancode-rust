@@ -25,6 +25,10 @@ pub(crate) enum TagMatcher {
     AnyLabel(&'static [TreeLabel]),
     /// Match any of several tags OR labels.
     AnyTagOrLabel(&'static [PosTag], &'static [TreeLabel]),
+    /// Match one or more consecutive nodes, each matching any of the tags or
+    /// labels. Ports the `+` repetition of the upstream Python grammar; the
+    /// following matcher acts as the anchor that ends the run.
+    OneOrMoreTagOrLabel(&'static [PosTag], &'static [TreeLabel]),
 }
 
 /// A grammar rule: matches a pattern and produces a tree node with the given label.

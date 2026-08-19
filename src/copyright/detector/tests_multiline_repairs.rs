@@ -585,3 +585,33 @@ fn test_et_al_trailing_period_is_source_faithful() {
         "bare marker must stay bare (no period force-added): {bare:?}"
     );
 }
+
+// The IETF RFC boilerplate wraps a long holder phrase across two lines and ends
+// in "All rights reserved.". The statement must come back as one detection
+// spanning both lines, not truncated at the line break (and not as a truncated
+// prefix alongside a longer one).
+#[test]
+fn test_multiline_wrapped_holder_phrase_before_all_rights_reserved() {
+    let input = "   Copyright (c) 2015 IETF Trust and the persons identified as the\n   document authors.  All rights reserved.\n";
+    let (copyrights, holders, _a) = detect_copyrights_from_text(input);
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| (c.copyright.as_str(), c.start_line.get(), c.end_line.get()))
+            .collect::<Vec<_>>(),
+        vec![(
+            "Copyright (c) 2015 IETF Trust and the persons identified as the document authors",
+            1,
+            2
+        )],
+        "wrapped statement must be one full-span detection: {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| h.holder.as_str())
+            .collect::<Vec<_>>(),
+        vec!["IETF Trust and the persons identified as the document authors"],
+        "holder must carry the whole wrapped phrase: {holders:?}"
+    );
+}
