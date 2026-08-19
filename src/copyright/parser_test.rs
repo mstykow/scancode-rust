@@ -108,3 +108,51 @@ fn test_matcher_any_tag() {
         &node
     ));
 }
+
+#[test]
+fn test_match_pattern_repetition_is_greedy_and_backtracks_to_anchor() {
+    let pattern = [
+        TagMatcher::Tag(PosTag::Copy),
+        TagMatcher::OneOrMoreTagOrLabel(&[PosTag::Nn], &[]),
+        TagMatcher::Tag(PosTag::Reserved),
+    ];
+    let nodes: Vec<ParseNode> = [
+        make_token("Copyright", PosTag::Copy, 1),
+        make_token("a", PosTag::Nn, 1),
+        make_token("b", PosTag::Nn, 1),
+        make_token("c", PosTag::Nn, 1),
+        make_token("reserved.", PosTag::Reserved, 2),
+        make_token("tail", PosTag::Nn, 2),
+    ]
+    .into_iter()
+    .map(ParseNode::Leaf)
+    .collect();
+
+    // Greedy over the three NN tokens, then backtracked so the anchor matches;
+    // the trailing token stays outside the match.
+    assert_eq!(match_pattern(&pattern, &nodes), Some(5));
+
+    // Repetition needs at least one node.
+    assert_eq!(match_pattern(&pattern, &nodes[..1]), None);
+    assert_eq!(
+        match_pattern(&pattern, &[nodes[0].clone(), nodes[4].clone()]),
+        None
+    );
+}
+
+#[test]
+fn test_match_pattern_repetition_is_bounded() {
+    let pattern = [
+        TagMatcher::Tag(PosTag::Copy),
+        TagMatcher::OneOrMoreTagOrLabel(&[PosTag::Nn], &[]),
+        TagMatcher::Tag(PosTag::Reserved),
+    ];
+    let mut tokens = vec![make_token("Copyright", PosTag::Copy, 1)];
+    tokens.extend((0..MAX_REPETITION + 1).map(|_| make_token("word", PosTag::Nn, 1)));
+    tokens.push(make_token("reserved.", PosTag::Reserved, 1));
+    let nodes: Vec<ParseNode> = tokens.into_iter().map(ParseNode::Leaf).collect();
+
+    // A run longer than the cap leaves the anchor out of reach, so degenerate
+    // input cannot collapse into one enormous statement.
+    assert_eq!(match_pattern(&pattern, &nodes), None);
+}

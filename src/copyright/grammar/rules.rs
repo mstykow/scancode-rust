@@ -5450,71 +5450,14 @@ pub(crate) static GRAMMAR_RULES: &[GrammarRule] = &[
             Label(AllRightReserved),
         ],
     },
-    // #99999 catch-all (broad matcher, expanded to 1-3 middle elements)
+    // #99999 catch-all: the upstream middle element is `+`, so a notice of any
+    // length between the copyright marker and "all rights reserved" is one
+    // statement.
     GrammarRule {
         label: Copyright,
         pattern: &[
             AnyTagOrLabel(&[Copy], &[Copyright, Copyright2, NameCopy]),
-            AnyTagOrLabel(
-                &[
-                    Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
-                    Email, MixedCap, Nn,
-                ],
-                &[
-                    YrRange, Name, NameEmail, NameYear, NameCopy, NameCaps, Company,
-                ],
-            ),
-            Label(AllRightReserved),
-        ],
-    },
-    GrammarRule {
-        label: Copyright,
-        pattern: &[
-            AnyTagOrLabel(&[Copy], &[Copyright, Copyright2, NameCopy]),
-            AnyTagOrLabel(
-                &[
-                    Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
-                    Email, MixedCap, Nn,
-                ],
-                &[
-                    YrRange, Name, NameEmail, NameYear, NameCopy, NameCaps, Company,
-                ],
-            ),
-            AnyTagOrLabel(
-                &[
-                    Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
-                    Email, MixedCap, Nn,
-                ],
-                &[
-                    YrRange, Name, NameEmail, NameYear, NameCopy, NameCaps, Company,
-                ],
-            ),
-            Label(AllRightReserved),
-        ],
-    },
-    GrammarRule {
-        label: Copyright,
-        pattern: &[
-            AnyTagOrLabel(&[Copy], &[Copyright, Copyright2, NameCopy]),
-            AnyTagOrLabel(
-                &[
-                    Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
-                    Email, MixedCap, Nn,
-                ],
-                &[
-                    YrRange, Name, NameEmail, NameYear, NameCopy, NameCaps, Company,
-                ],
-            ),
-            AnyTagOrLabel(
-                &[
-                    Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
-                    Email, MixedCap, Nn,
-                ],
-                &[
-                    YrRange, Name, NameEmail, NameYear, NameCopy, NameCaps, Company,
-                ],
-            ),
-            AnyTagOrLabel(
+            OneOrMoreTagOrLabel(
                 &[
                     Copy, Nnp, AuthDot, Caps, Cd, Cds, Pn, Comp, Uni, Cc, Of, In, By, Oth, Van,
                     Email, MixedCap, Nn,
