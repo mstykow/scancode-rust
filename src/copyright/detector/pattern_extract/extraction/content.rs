@@ -692,7 +692,13 @@ pub fn extract_xml_copyright_tag_c_lines(
         }
 
         let mut bodies: Vec<String> = Vec::new();
-        for raw_line in inner.lines() {
+        // The combined statement spans every line that contributes a segment, so
+        // track the last one instead of collapsing the span onto the tag line.
+        let mut last_line = ln;
+        let mut offset = cap.name("body").map(|m| m.start()).unwrap_or(0);
+        for raw_line in inner.split_inclusive('\n') {
+            let line_start = offset;
+            offset += raw_line.len();
             let prepared = crate::copyright::prepare::prepare_text_line(raw_line);
             let line = prepared.trim();
             if line.is_empty() {
@@ -718,6 +724,7 @@ pub fn extract_xml_copyright_tag_c_lines(
             if body.is_empty() {
                 continue;
             }
+            last_line = last_line.max(line_number_index.line_number_at_offset(line_start));
             bodies.push(body);
         }
 
@@ -731,10 +738,18 @@ pub fn extract_xml_copyright_tag_c_lines(
             .collect::<Vec<_>>()
             .join(" ");
         if let Some(cr) = refine_copyright(&combined) {
+            // The grammar path reads the `<copyright>` opener as a bare marker and
+            // reports this same statement with that tag word glued to the front.
+            // The tag name is not part of the notice, so the combined value
+            // supersedes it — mirroring the per-line holder cleanup below.
+            let tag_prefixed = format!("copyright {cr}");
+            copyrights.retain(|c| {
+                !(c.start_line == ln && c.copyright.eq_ignore_ascii_case(&tag_prefixed))
+            });
             copyrights.push(CopyrightDetection {
                 copyright: cr,
                 start_line: ln,
-                end_line: ln,
+                end_line: last_line,
             });
         }
 
@@ -743,7 +758,7 @@ pub fn extract_xml_copyright_tag_c_lines(
             holders.push(HolderDetection {
                 holder: h,
                 start_line: ln,
-                end_line: ln,
+                end_line: last_line,
             });
         }
 

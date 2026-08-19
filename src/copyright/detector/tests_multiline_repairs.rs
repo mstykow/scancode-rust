@@ -615,3 +615,61 @@ fn test_multiline_wrapped_holder_phrase_before_all_rights_reserved() {
         "holder must carry the whole wrapped phrase: {holders:?}"
     );
 }
+
+// A `<copyright>` element whose body carries one `(c)` segment per line is
+// reported once, spanning the lines it actually covers. The grammar path reads
+// the tag opener as a bare `copyright` marker and would otherwise report the
+// same statement a second time with that tag word glued on.
+#[test]
+fn test_xml_copyright_tag_block_reports_one_statement_over_its_real_span() {
+    let input = "<copyright>(c) Distributed via COMTEX News. \n                   (c) YYYY A&G Information Services, all rights reserved.\n        </copyright>\n";
+    let (copyrights, holders, _a) = detect_copyrights_from_text(input);
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| (c.copyright.as_str(), c.start_line.get(), c.end_line.get()))
+            .collect::<Vec<_>>(),
+        vec![(
+            "(c) Distributed via COMTEX News. (c) YYYY A&G Information Services",
+            1,
+            2
+        )],
+        "one statement, no tag-word duplicate, span covers both segments: {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| (h.holder.as_str(), h.start_line.get(), h.end_line.get()))
+            .collect::<Vec<_>>(),
+        vec![(
+            "Distributed via COMTEX News. YYYY A&G Information Services",
+            1,
+            2
+        )],
+        "holder carries the same span as its statement: {holders:?}"
+    );
+}
+
+// The tag word is still needed as a marker when it is the only thing that makes
+// the notice detectable, so the cleanup above must not strip it there.
+#[test]
+fn test_xml_copyright_tag_word_still_marks_a_single_line_notice() {
+    let (copyrights, holders, _a) =
+        detect_copyrights_from_text("<Copyright>MaxRev \u{a9} 2026</Copyright>\n");
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| c.copyright.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Copyright MaxRev (c) 2026"],
+        "single-segment block keeps the tag-derived marker: {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| h.holder.as_str())
+            .collect::<Vec<_>>(),
+        vec!["MaxRev"],
+        "holder unaffected: {holders:?}"
+    );
+}
