@@ -72,6 +72,8 @@ mod tests {
         assert_eq!(declared_license_alias("boost"), Some("boost-1.0"));
         assert_eq!(declared_license_alias("PSF"), Some("python"));
         assert_eq!(declared_license_alias("Python"), Some("python"));
+        assert_eq!(declared_license_alias("BSD"), Some("bsd-new"));
+        assert_eq!(declared_license_alias("bsd"), Some("bsd-new"));
     }
 
     #[test]
@@ -83,6 +85,8 @@ mod tests {
         // Not a bare alias name.
         assert_eq!(declared_license_alias("Apache License, Version 2.0"), None);
         assert_eq!(declared_license_alias(""), None);
+        // Exact-match aliasing is what keeps BSD-4-Clause from collapsing.
+        assert_eq!(declared_license_alias("BSD with advertising"), None);
     }
 
     #[test]

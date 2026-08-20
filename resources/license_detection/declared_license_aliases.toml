@@ -25,9 +25,8 @@
 #   - "MPL"   : ambiguous between MPL-1.0/1.1/2.0.
 #   - "EPL"   : ambiguous between EPL-1.0 and EPL-2.0.
 #   - "CDDL"  : ambiguous between CDDL-1.0 and CDDL-1.1; no observed declared case.
-#   - "BSD" / "GPL" : already handled as clue-only index rules
-#               (bsd_bare_word_only / gpl_bare_word_only), where the bare word
-#               in file content is reliably a license reference.
+#   - "GPL"   : handled by the bundled gpl_bare_word_only clue-only index rule;
+#               the bare word in file content is reliably a license reference.
 #
 # Schema (array of tables):
 #   names      = case-insensitive declared strings that map to `expression`.
@@ -49,6 +48,11 @@ reason = "Informal spellings of Apache-2.0 used as operands in npm's legacy slas
 names = ["boost"]
 expression = "boost-1.0"
 reason = "Boost ships a single license, the Boost Software License 1.0 (SPDX BSL-1.0; ScanCode key boost-1.0); a declared 'Boost' has no other meaning. Observed in pyodide's bundled libboost conda metadata."
+
+[[alias]]
+names = ["bsd"]
+expression = "bsd-new"
+reason = "Bare \"BSD\" in a declared license field means BSD-3-Clause by convention, matching ScanCode. It is aliased rather than carried as an index rule because \"BSD\" is also the name of an operating system family: a bare-word index rule for it matched 301 times across erlang/otp with zero license context, all platform prose such as \"only available on Linux and BSD systems\". Exact-match aliasing also keeps \"BSD with advertising\" (BSD-4-Clause) from collapsing to bsd-new."
 
 [[alias]]
 names = ["psf", "python"]
