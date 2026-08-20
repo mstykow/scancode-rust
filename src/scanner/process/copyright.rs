@@ -554,8 +554,46 @@ fn normalize_html_copyright_entity(text: &str) -> std::borrow::Cow<'_, str> {
     COPYRIGHT_ENTITY_RE.replace_all(text, "(c)")
 }
 
+/// Strip one leading run of a single-character line-comment marker: `%`
+/// (Erlang, Matlab, TeX), `;` (Lisp, assembly, ini), `!` (Fortran), or `-` as
+/// the pair `--` (Ada, Haskell, Lua, SQL, VHDL).
+///
+/// Only the marker the line actually opens on is stripped, and only across its
+/// own repeated run (`%%`, `;;;`, `----`). That is what a wrapped notice needs —
+/// every continuation line repeats the marker, so an unstripped one survives
+/// into the middle of the value — while leaving punctuation that belongs to the
+/// notice alone: in `* -- nickg at modp dot com` the `*` is scaffolding but the
+/// `--` is the notice's own separator, so this pass declines the line and the
+/// caller's loop removes the `*` only.
+///
+/// A lone leading `-` is a bullet or a date range rather than a comment, and
+/// `-->` closes an XML comment, so both are left intact.
+fn strip_leading_comment_marker_run(line: &str) -> &str {
+    const RUN_MARKERS: [char; 4] = ['%', ';', '!', '-'];
+
+    let Some(marker) = line.chars().next().filter(|c| RUN_MARKERS.contains(c)) else {
+        return line;
+    };
+    let run = line.len() - line.trim_start_matches(marker).len();
+    if marker == '-' && (run < 2 || line[run..].starts_with('>')) {
+        return line;
+    }
+    line[run..].trim_start()
+}
+
+/// Strip the comment scaffolding off one raw source line so the native
+/// projection carries the notice text alone.
+///
+/// The stripped set covers the comment markers Provenant actually meets in
+/// scanned trees: the C/C++ and doc variants, block openers, XML, `*`
+/// continuations, and `#` handled by the loop below, plus the single-character
+/// markers handled once up front by [`strip_leading_comment_marker_run`].
+///
+/// Word-shaped markers (`REM`, `dnl`) and the VB `'` are deliberately absent: a
+/// notice can legitimately open on a quote or an all-caps acronym holder, so
+/// stripping those would eat notice text rather than scaffolding.
 fn strip_common_comment_wrappers(line: &str) -> String {
-    let mut trimmed = line.trim();
+    let mut trimmed = strip_leading_comment_marker_run(line.trim());
 
     loop {
         let next = trimmed
