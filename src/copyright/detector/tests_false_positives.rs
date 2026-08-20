@@ -954,3 +954,24 @@ fn test_bare_c_sign_notices_naming_a_holder_are_kept() {
         );
     }
 }
+
+#[test]
+fn test_holder_warranty_disclaimer_clauses_are_not_copyrights() {
+    // The all-caps W3C disclaimers, which name the holder as a verb's subject.
+    let content = "\
+<p>THIS SOFTWARE AND DOCUMENTATION IS PROVIDED \"AS IS,\" AND
+COPYRIGHT HOLDERS MAKE NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO, WARRANTIES OF
+MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE.</p>
+
+<p>COPYRIGHT HOLDERS WILL NOT BE LIABLE FOR ANY DIRECT, INDIRECT,
+SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF ANY USE OF THE
+SOFTWARE OR DOCUMENTATION.</p>
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+}

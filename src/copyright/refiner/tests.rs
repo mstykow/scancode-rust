@@ -3233,3 +3233,41 @@ fn test_changelog_copyright_year_update_is_junk_after_refine() {
         );
     }
 }
+
+#[test]
+fn test_junk_copyright_drops_holder_warranty_and_liability_disclaimers() {
+    // Warranty language names the holder as a verb's subject, not as a party.
+    for clause in [
+        "COPYRIGHT HOLDERS MAKE NO REPRESENTATIONS OR WARRANTIES, EXPRESS",
+        "Copyright holders make no representations or warranties",
+        "COPYRIGHT HOLDERS WILL NOT BE LIABLE FOR",
+        "Copyright holder shall not be liable for any damages",
+        "COPYRIGHT OWNER MAKES NO WARRANTY",
+        "Copyright owners be liable for any claim",
+    ] {
+        assert!(super::junk::is_junk_copyright(clause), "kept {clause:?}");
+    }
+
+    // The verb phrase the disclaimer leaves in the holder slot is junk too.
+    assert_eq!(refine_holder("MAKE NO REPRESENTATIONS"), None);
+    assert_eq!(refine_holder("makes no warranties"), None);
+}
+
+#[test]
+fn test_junk_copyright_keeps_notices_naming_the_holder_after_the_marker() {
+    // `copyright holders:` naming real parties must survive the disclaimer rule.
+    for notice in [
+        "Copyright 1994-2002 World Wide Web Consortium",
+        "Copyright (c) 2024 Example Corp.",
+        "Copyright holders: Alice Smith and Bob Jones",
+    ] {
+        assert!(
+            !super::junk::is_junk_copyright(notice),
+            "dropped {notice:?}"
+        );
+        assert!(
+            refine_copyright(notice).is_some(),
+            "refine dropped {notice:?}"
+        );
+    }
+}

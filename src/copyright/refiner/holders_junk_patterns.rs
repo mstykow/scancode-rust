@@ -34,6 +34,8 @@ pub(super) static HOLDERS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(||
         r"(?i)^version\s*,\s*etc\b",
         r"(?i)^\(d\),\s*\d+(?:\.\d+)*\.?$",
         r"(?i)\bliable for\b",
+        // The verb phrase a warranty disclaimer leaves in the holder slot.
+        r"(?i)^makes?\s+no\s+(?:representations?|warrant(?:y|ies))\b",
         r"(?i)\bappear in all copies\b",
         r"(?i)\bdisclaimer of warranty\b",
         r"(?i)\bdisclaimer for the program\b",
