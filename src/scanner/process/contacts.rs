@@ -57,7 +57,8 @@ pub(super) fn extract_email_url_information(
                         d.start_line,
                     )
             })
-            .filter(|d| seen_email_spans.insert((d.email.clone(), d.start_line, d.end_line)))
+            // Address identity ignores case even though the emitted value keeps it.
+            .filter(|d| seen_email_spans.insert((d.email.to_lowercase(), d.start_line, d.end_line)))
             .map(|d| OutputEmail {
                 email: d.email,
                 start_line: d.start_line,

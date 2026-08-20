@@ -45,16 +45,17 @@ pub fn find_emails(text: &str, config: &DetectionConfig) -> Vec<EmailDetection> 
                         continue;
                     }
                 }
-                let email = matched.as_str().to_lowercase();
-                if !is_good_email_domain(&email) {
+                // RFC 5321 makes the local part case-sensitive, so emit the source form.
+                let email = matched.as_str();
+                if !is_good_email_domain(email) {
                     continue;
                 }
-                if !classify_email(&email) {
+                if !classify_email(email) {
                     continue;
                 }
 
                 detections.push(EmailDetection {
-                    email,
+                    email: email.to_string(),
                     start_line: line_number,
                     end_line: line_number,
                 });
@@ -62,11 +63,12 @@ pub fn find_emails(text: &str, config: &DetectionConfig) -> Vec<EmailDetection> 
         }
     }
 
+    // Address identity ignores case even though the emitted value keeps it.
     let mut detections = if config.unique {
         let mut seen = std::collections::HashSet::<String>::new();
         detections
             .into_iter()
-            .filter(|d| seen.insert(d.email.clone()))
+            .filter(|d| seen.insert(d.email.to_lowercase()))
             .collect::<Vec<_>>()
     } else {
         detections
@@ -74,7 +76,7 @@ pub fn find_emails(text: &str, config: &DetectionConfig) -> Vec<EmailDetection> 
 
     if config.max_emails > 0 && detections.len() > config.max_emails {
         let mut seen = std::collections::HashSet::<String>::new();
-        detections.retain(|d| seen.insert(d.email.clone()));
+        detections.retain(|d| seen.insert(d.email.to_lowercase()));
         detections.truncate(config.max_emails);
     }
 
@@ -90,6 +92,55 @@ mod tests {
             .into_iter()
             .map(|d| d.email)
             .collect()
+    }
+
+    #[test]
+    fn test_find_emails_preserves_source_case() {
+        assert_eq!(
+            emails("mailto Richard.M.Bartel@ccMail.Census.GOV now"),
+            vec!["Richard.M.Bartel@ccMail.Census.GOV"]
+        );
+        assert_eq!(
+            emails("send to Paul.Green@stratus.com"),
+            vec!["Paul.Green@stratus.com"]
+        );
+    }
+
+    #[test]
+    fn test_find_emails_dedupes_case_variants_of_one_address() {
+        let config = DetectionConfig {
+            unique: true,
+            ..DetectionConfig::default()
+        };
+        let detections = find_emails(
+            "Paul.Green@stratus.com\npaul.green@stratus.com\nPAUL.GREEN@STRATUS.COM\n",
+            &config,
+        );
+        // First occurrence wins, so the emitted value stays the one the source shows first.
+        assert_eq!(
+            detections
+                .iter()
+                .map(|d| d.email.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Paul.Green@stratus.com"]
+        );
+    }
+
+    #[test]
+    fn test_find_emails_caps_on_case_insensitive_uniqueness() {
+        let config = DetectionConfig {
+            max_emails: 2,
+            max_urls: 0,
+            unique: false,
+        };
+        let detections = find_emails("a@corp.com\nA@Corp.com\nb@corp.com\nc@corp.com\n", &config);
+        assert_eq!(
+            detections
+                .iter()
+                .map(|d| d.email.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a@corp.com", "b@corp.com"]
+        );
     }
 
     #[test]

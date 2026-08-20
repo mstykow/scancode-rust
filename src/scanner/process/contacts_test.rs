@@ -197,7 +197,7 @@ fn test_extract_email_url_information_keeps_gettext_mo_contacts() {
         .expect("builder should produce file info");
 
     assert_eq!(file.emails.len(), 2, "emails: {:?}", file.emails);
-    assert_eq!(file.emails[0].email, "ll@li.org");
+    assert_eq!(file.emails[0].email, "LL@li.org");
     assert_eq!(file.emails[1].email, "cs@sweetgood.de");
 }
 
@@ -292,7 +292,7 @@ fn test_extract_email_url_information_keeps_short_uppercase_font_metadata_email(
         .expect("builder should produce file info");
 
     assert_eq!(file.emails.len(), 1, "emails: {:?}", file.emails);
-    assert_eq!(file.emails[0].email, "a@0.cc");
+    assert_eq!(file.emails[0].email, "A@0.CC");
     assert_eq!(file.urls.len(), 1, "urls: {:?}", file.urls);
     assert_eq!(
         file.urls[0].url,
@@ -351,4 +351,62 @@ fn test_extract_email_url_information_prefers_unique_text_emails_before_cap() {
     assert!(emails.contains(&"dev-subscribe@parquet.apache.org"));
     assert!(emails.contains(&"jaxrs-dev@eclipse.org"));
     assert!(!emails.contains(&"mvel2@2.5.2.final"));
+}
+
+#[test]
+fn test_extract_email_url_information_preserves_source_case_and_dedupes_variants() {
+    let mut builder = FileInfoBuilder::default();
+    let options = TextDetectionOptions {
+        collect_info: false,
+        detect_packages: false,
+        detect_application_packages: false,
+        detect_system_packages: false,
+        detect_packages_in_compiled: false,
+        detect_copyrights: false,
+        detect_generated: false,
+        detect_emails: true,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+    };
+
+    let text = concat!(
+        "mail Richard.M.Bartel@ccMail.Census.GOV and Paul.Green@stratus.com paul.green@stratus.com\n",
+        "again Paul.Green@stratus.com\n",
+    );
+
+    extract_email_url_information(
+        &mut builder,
+        Path::new("config.guess"),
+        text,
+        &options,
+        false,
+    );
+
+    let file = builder
+        .name("config.guess".to_string())
+        .base_name("config".to_string())
+        .extension(".guess".to_string())
+        .path("config.guess".to_string())
+        .file_type(FileType::File)
+        .size(1)
+        .build()
+        .expect("builder should produce file info");
+
+    let emails: Vec<(&str, usize)> = file
+        .emails
+        .iter()
+        .map(|email| (email.email.as_str(), email.start_line.get()))
+        .collect();
+    assert_eq!(
+        emails,
+        vec![
+            ("Richard.M.Bartel@ccMail.Census.GOV", 1),
+            ("Paul.Green@stratus.com", 1),
+            ("Paul.Green@stratus.com", 2),
+        ],
+        "emails: {:?}",
+        file.emails
+    );
 }

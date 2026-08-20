@@ -59,7 +59,7 @@ pub(super) const EMAIL_FIELDS: &[OutputFieldDoc] = &[
         rust_field: "email",
         value_shape: "string",
         presence: "Always emitted.",
-        meaning: "Extracted email address.",
+        meaning: "Extracted email address, in the case the source file used.",
     },
     OutputFieldDoc {
         json_name: "start_line",
