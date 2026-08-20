@@ -3,7 +3,7 @@
 
 use super::{
     collapse_angle_bracket_padding, extract_comment_author_supplements,
-    extract_copyright_information, extract_patch_header_author_supplements,
+    extract_copyright_information, extract_patch_header_author_supplements, inline_anchor_hrefs,
     is_binary_garbage_party_value, is_binary_string_copyright_candidate,
     is_font_metadata_label_copyright, strip_common_comment_wrappers,
 };
@@ -1512,4 +1512,118 @@ fn test_strip_common_comment_wrappers_keeps_notice_punctuation_under_scaffolding
         "- Copyright 1999, Example Corp."
     );
     assert_eq!(strip_common_comment_wrappers("-->"), "");
+}
+
+#[test]
+fn test_inline_anchor_hrefs_keeps_the_url_and_drops_the_tag() {
+    // The W3C notice shape bundled in erlang/otp's xmerl test data.
+    assert_eq!(
+        inline_anchor_hrefs(
+            "Copyright 1994-2002 <a href=\"http://www.w3.org/\">World Wide Web Consortium</a>, (<a href=\"http://www.lcs.mit.edu/\">MIT</a>)"
+        ),
+        "Copyright 1994-2002 http://www.w3.org/ World Wide Web Consortium, (http://www.lcs.mit.edu/ MIT)"
+    );
+
+    // An anchor with no href leaves only its text behind.
+    assert_eq!(
+        inline_anchor_hrefs("Copyright 2024 <a name=\"x\">Example Corp.</a>"),
+        "Copyright 2024 Example Corp."
+    );
+
+    // A literal `href=` inside an earlier attribute is not the anchor's href.
+    assert_eq!(
+        inline_anchor_hrefs(
+            "Copyright 2024 <a title=\"see href=elsewhere.test\" href=\"http://real.test/\">Example Corp.</a>"
+        ),
+        "Copyright 2024 http://real.test/ Example Corp."
+    );
+
+    // An entity-encoded href addresses its decoded target.
+    assert_eq!(
+        inline_anchor_hrefs(
+            "Copyright 2024 <a href=\"http://x.test/?a=1&amp;b=2\">Example Corp.</a>"
+        ),
+        "Copyright 2024 http://x.test/?a=1&b=2 Example Corp."
+    );
+
+    // An unquoted href is still read.
+    assert_eq!(
+        inline_anchor_hrefs("Copyright 2024 <a href=http://x.test/ >Example Corp.</a>"),
+        "Copyright 2024 http://x.test/ Example Corp."
+    );
+
+    // A `>` inside a quoted attribute is not the end of the tag.
+    assert_eq!(
+        inline_anchor_hrefs(
+            "Copyright 2024 <a title=\"a > b\" href=\"http://x.test/\">Example Corp.</a>"
+        ),
+        "Copyright 2024 http://x.test/ Example Corp."
+    );
+
+    // Numeric entities decode too, decimal and hex alike.
+    for href in ["?a=1&#38;b=2", "?a=1&#x26;b=2", "?a=1&amp;b=2"] {
+        assert_eq!(
+            inline_anchor_hrefs(&format!(
+                "Copyright 2024 <a href=\"http://x.test/{href}\">Example Corp.</a>"
+            )),
+            "Copyright 2024 http://x.test/?a=1&b=2 Example Corp.",
+            "for {href:?}"
+        );
+    }
+
+    // A decoded `&` does not combine with the following text into a new entity.
+    assert_eq!(
+        inline_anchor_hrefs(
+            "Copyright 2024 <a href=\"http://x.test/?a=1&amp;lt;b\">Example Corp.</a>"
+        ),
+        "Copyright 2024 http://x.test/?a=1&lt;b Example Corp."
+    );
+
+    // A value with no anchor is returned untouched, angle-bracket emails included.
+    for value in [
+        "Copyright 2024 Example Corp.",
+        "Copyright 2024 Jane Doe <jane@example.com>",
+        "Copyright 2024 Example <small>Corp.</small>",
+    ] {
+        assert_eq!(inline_anchor_hrefs(value), value, "changed {value:?}");
+    }
+}
+
+#[test]
+fn test_extract_copyright_information_html_anchor_notice_carries_no_markup() {
+    let text = "<p>Copyright \u{a9} 1994-2002 <a href=\"http://www.w3.org/\">World Wide Web Consortium</a>,\n(<a href=\"http://www.lcs.mit.edu/\">Massachusetts Institute of Technology</a>). All Rights Reserved.</p>\n";
+    let mut builder = FileInfoBuilder::default();
+
+    extract_copyright_information(&mut builder, Path::new("notice.html"), text, 120.0, false);
+
+    let file = builder
+        .name("notice.html".to_string())
+        .base_name("notice".to_string())
+        .extension(".html".to_string())
+        .path("notice.html".to_string())
+        .file_type(FileType::File)
+        .size(text.len() as u64)
+        .build()
+        .expect("builder should produce file info");
+
+    assert!(!file.copyrights.is_empty(), "no copyrights");
+    for c in &file.copyrights {
+        assert!(
+            !c.copyright.contains("<a ") && !c.copyright.contains("</a>"),
+            "markup survived: {:?}",
+            c.copyright
+        );
+        assert!(
+            c.copyright.contains("http://www.w3.org/"),
+            "href dropped: {:?}",
+            c.copyright
+        );
+    }
+    assert!(
+        file.holders
+            .iter()
+            .any(|h| h.holder.contains("World Wide Web Consortium")),
+        "holders: {:?}",
+        file.holders
+    );
 }
