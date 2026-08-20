@@ -249,6 +249,17 @@ pub(crate) fn detect_declared_license_from_text(
         return empty_declared_license_data();
     }
 
+    // A bare name that doubles as ordinary prose has no license index rule by
+    // design, so the curated alias table is the only thing that can resolve it.
+    if let Some(normalized) = resolve_declared_license_alias(text) {
+        let references: Vec<&str> = referenced_filename.into_iter().collect();
+        return build_declared_license_data_from_pair(
+            normalized.declared_license_expression,
+            normalized.declared_license_expression_spdx,
+            DeclaredLicenseMatchMetadata::single_line(text).with_referenced_filenames(&references),
+        );
+    }
+
     let Some(engine) = parser_license_engine() else {
         return empty_declared_license_data();
     };
@@ -1664,9 +1675,8 @@ mod tests {
 
     #[test]
     fn test_populate_declared_license_ambiguous_bare_bsd() {
-        // Bare "BSD" fails strict SPDX parsing and only matches a clue-only
-        // rule; on a declared manifest statement it must normalize to bsd-new
-        // (BSD-3-Clause), matching ScanCode.
+        // Bare "BSD" fails strict SPDX parsing and resolves through the declared
+        // alias table to bsd-new (BSD-3-Clause), matching ScanCode.
         let mut package = package_with(Some("BSD"), None, None);
         populate_declared_license_and_holder(&mut package);
 

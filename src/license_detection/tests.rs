@@ -671,6 +671,40 @@ fn test_engine_groups_same_line_bare_gpl_clue_with_exact_neighbors() {
 }
 
 #[test]
+fn test_engine_does_not_detect_bsd_the_operating_system_as_a_license() {
+    let engine = get_engine();
+
+    // "BSD" names an operating system family as often as a license, so bare
+    // occurrences in platform prose must not become license evidence. The
+    // declared-field meaning lives in the declared alias table instead.
+    for text in [
+        "Link level address (PF_LINK) on BSD:s.",
+        "> This function is only available on Linux and BSD systems (not macOS/Darwin or Windows).",
+        "# A BSD compatible install program",
+        "%% Parse BSD/OS irs.conf file",
+        "Linux's logrotate and BSD's newsyslog.",
+    ] {
+        let detections = engine
+            .detect_with_kind(text, false, false)
+            .expect("Detection should succeed");
+        assert!(
+            detections.is_empty(),
+            "bare BSD prose yielded license evidence for {text:?}: {:?}",
+            detections
+                .iter()
+                .map(|d| (
+                    d.license_expression.as_deref().unwrap_or("none"),
+                    d.matches
+                        .iter()
+                        .map(|m| m.rule_identifier.as_str())
+                        .collect::<Vec<_>>()
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
 fn test_engine_does_not_detect_graphics_pipeline_library_as_gpl() {
     let engine = get_engine();
 
