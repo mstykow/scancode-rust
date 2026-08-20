@@ -5,7 +5,7 @@ use super::{
     collapse_angle_bracket_padding, extract_comment_author_supplements,
     extract_copyright_information, extract_patch_header_author_supplements,
     is_binary_garbage_party_value, is_binary_string_copyright_candidate,
-    is_font_metadata_label_copyright,
+    is_font_metadata_label_copyright, strip_common_comment_wrappers,
 };
 use crate::copyright;
 use crate::models::{FileInfoBuilder, FileType};
@@ -1400,4 +1400,116 @@ fn test_extract_copyright_obfuscated_email_in_spaced_angle_brackets() {
     );
     assert_eq!(file.holders.len(), 1, "holders: {:?}", file.holders);
     assert_eq!(file.holders[0].holder, "Florian Loitsch");
+}
+
+#[test]
+fn test_extract_copyright_information_punctuation_comment_markers_stripped_from_native_value() {
+    // A notice wrapped across lines carries its comment marker on every line, so
+    // an unhandled marker survives in the middle of the native value as well as
+    // at its head. `%` (Erlang/Matlab/TeX), `;` (Lisp/assembly/ini), `--`
+    // (Ada/Haskell/Lua/SQL), and `!` (Fortran) each have to strip like `#`,
+    // `*`, and `//` already do. Repeated forms (`%%`, `;;`) come off too.
+    for (marker, file_name, extension) in [
+        ("%%", "fixture.hrl", ".hrl"),
+        ("%", "fixture.m", ".m"),
+        (";;", "fixture.el", ".el"),
+        (";", "fixture.ini", ".ini"),
+        ("--", "fixture.adb", ".adb"),
+    ] {
+        let text = format!(
+            "{marker} Portions created by Example are Copyright 1999, Example Utvecklings\n{marker} AB. All Rights Reserved.\n"
+        );
+        let mut builder = FileInfoBuilder::default();
+
+        extract_copyright_information(&mut builder, Path::new(file_name), &text, 120.0, false);
+
+        let file = builder
+            .name(file_name.to_string())
+            .base_name("fixture".to_string())
+            .extension(extension.to_string())
+            .path(file_name.to_string())
+            .file_type(FileType::File)
+            .size(text.len() as u64)
+            .build()
+            .expect("builder should produce file info");
+
+        assert_eq!(
+            file.copyrights.len(),
+            1,
+            "marker {marker:?} copyrights: {:?}",
+            file.copyrights
+        );
+        assert_eq!(
+            file.copyrights[0].copyright,
+            "Copyright 1999, Example Utvecklings AB. All Rights Reserved.",
+            "marker {marker:?}"
+        );
+    }
+}
+
+#[test]
+fn test_strip_common_comment_wrappers_leaves_word_shaped_markers_and_quotes() {
+    // `REM`, `dnl`, and the VB `'` stay: a notice can legitimately open on a
+    // quote or on an all-caps acronym holder, so stripping them would eat notice
+    // text rather than comment scaffolding.
+    for line in [
+        "REM Copyright 1999, Example Corp.",
+        "dnl Copyright 1999, Example Corp.",
+        "' Copyright 1999, Example Corp.",
+    ] {
+        assert_eq!(
+            strip_common_comment_wrappers(line),
+            line,
+            "unexpectedly stripped {line:?}"
+        );
+    }
+
+    // The punctuation markers do come off, including repeated forms.
+    for (line, expected) in [
+        (
+            "%% Copyright 1999, Example Corp.",
+            "Copyright 1999, Example Corp.",
+        ),
+        (
+            ";;; Copyright 1999, Example Corp.",
+            "Copyright 1999, Example Corp.",
+        ),
+        (
+            "-- Copyright 1999, Example Corp.",
+            "Copyright 1999, Example Corp.",
+        ),
+        (
+            "! Copyright 1999, Example Corp.",
+            "Copyright 1999, Example Corp.",
+        ),
+    ] {
+        assert_eq!(
+            strip_common_comment_wrappers(line),
+            expected,
+            "for {line:?}"
+        );
+    }
+}
+
+#[test]
+fn test_strip_common_comment_wrappers_keeps_notice_punctuation_under_scaffolding() {
+    // The single-character markers strip only as the run the line itself opens
+    // on. On a C continuation the `*` is scaffolding but the `--` underneath is
+    // the notice's own separator, so only the `*` comes off.
+    assert_eq!(
+        strip_common_comment_wrappers(" * -- nickg at modp dot com"),
+        "-- nickg at modp dot com"
+    );
+    assert_eq!(
+        strip_common_comment_wrappers(" # ; not a comment marker here"),
+        "; not a comment marker here"
+    );
+
+    // A lone leading `-` is a bullet or a date range, and `-->` closes an XML
+    // comment; neither is comment scaffolding this pass should eat.
+    assert_eq!(
+        strip_common_comment_wrappers("- Copyright 1999, Example Corp."),
+        "- Copyright 1999, Example Corp."
+    );
+    assert_eq!(strip_common_comment_wrappers("-->"), "");
 }
