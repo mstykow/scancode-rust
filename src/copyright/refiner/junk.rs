@@ -763,7 +763,7 @@ pub(super) fn contains_windows_versioninfo_token(s: &str) -> bool {
             || trimmed.to_ascii_lowercase().contains("legaltrademarks"))
 }
 
-pub(super) fn contains_xml_markup_declaration_token(s: &str) -> bool {
+pub(crate) fn contains_xml_markup_declaration_token(s: &str) -> bool {
     let lower = s.to_ascii_lowercase();
     lower.contains("<!element")
         || lower.contains("<!attlist")

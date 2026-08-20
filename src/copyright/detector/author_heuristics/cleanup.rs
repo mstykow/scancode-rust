@@ -9,7 +9,9 @@ use regex::Regex;
 use super::super::token_utils::normalize_whitespace;
 use crate::copyright::line_tracking::PreparedLines;
 use crate::copyright::prepare::prepare_text_line;
-use crate::copyright::refiner::{looks_like_name_with_parenthesized_url, refine_author};
+use crate::copyright::refiner::{
+    contains_xml_markup_declaration_token, looks_like_name_with_parenthesized_url, refine_author,
+};
 use crate::copyright::types::{AuthorDetection, CopyrightDetection};
 use crate::models::LineNumber;
 
@@ -454,6 +456,75 @@ pub(in super::super) fn drop_markup_element_value_authors(
             return true;
         };
         !window_contains_markup_element_author_value(&window, &author.author)
+    });
+}
+
+/// Drop authors detected on an XML/DTD markup declaration line, such as the
+/// `<!ELEMENT module (args?, description?, author*, copyright?,` and
+/// `<!ATTLIST author` content models embedded in Erlang edoc comments. There the
+/// `author` token names an element, not a person, and refinement has already
+/// dropped the declaration marker the value would otherwise be filtered on.
+pub(in super::super) fn drop_markup_declaration_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() || authors.is_empty() {
+        return;
+    }
+
+    authors.retain(|author| {
+        !(author.start_line.get()..=author.end_line.get()).any(|line_number| {
+            raw_lines
+                .get(line_number.saturating_sub(1))
+                .is_some_and(|line| contains_xml_markup_declaration_token(line))
+        })
+    });
+}
+
+/// Drop an author harvested by an author-label word that closes a prose
+/// sentence: `... have been regular contributors.  Brian Rosen did tremendous
+/// service ...` and the RFC running footer `Groves, et al.    Standards Track
+/// [Page 169]`. The capitalized words after the period open a new sentence or a
+/// new footer column, so the label does not introduce them.
+pub(in super::super) fn drop_authors_after_sentence_final_label(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    // The label is required to be lowercase and to follow a lowercase prose
+    // word, so a heading (`Authors.  Jane Doe`) still introduces its author.
+    static SENTENCE_FINAL_LABEL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\p{Ll}[\p{Ll}']*\s+(?:al|authors?|contributors?|maintainers?)\.\s+$").unwrap()
+    });
+
+    if raw_lines.is_empty() || authors.is_empty() {
+        return;
+    }
+
+    authors.retain(|author| {
+        let Some(name) = author.author.split_whitespace().next() else {
+            return true;
+        };
+        if !name.starts_with(char::is_uppercase) {
+            return true;
+        }
+        let line_number = author.start_line.get();
+        let Some(line) = raw_lines.get(line_number.saturating_sub(1)) else {
+            return true;
+        };
+        // The label can sit on the previous line when prose wraps, so both lines
+        // are searched for the sentence end that precedes the name.
+        let previous = line_number
+            .checked_sub(2)
+            .and_then(|index| raw_lines.get(index))
+            .copied()
+            .unwrap_or_default();
+        !line.match_indices(name).any(|(at, _)| {
+            line[..at]
+                .chars()
+                .next_back()
+                .is_none_or(|ch| !ch.is_alphanumeric())
+                && SENTENCE_FINAL_LABEL_RE.is_match(&format!("{previous} {}", &line[..at]))
+        })
     });
 }
 
