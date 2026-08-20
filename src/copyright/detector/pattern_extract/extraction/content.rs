@@ -58,7 +58,8 @@ pub fn extract_spdx_filecopyrighttext_c_without_year(
         }
 
         let raw = format!("Copyright (c) {tail}");
-        if let Some(refined) = refine_copyright(&raw) {
+        // Junk-screened like every other copyright build site.
+        if let Some(refined) = refine_copyright(&raw).filter(|r| !is_junk_copyright(r)) {
             copyrights.push(CopyrightDetection {
                 copyright: refined,
                 start_line: LineNumber::new(ln).unwrap(),

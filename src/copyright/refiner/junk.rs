@@ -1136,8 +1136,10 @@ pub(crate) fn is_path_like_code_fragment(s: &str) -> bool {
 /// this predicate. We require syntax specific to code: namespace `::`, a
 /// method/property call (`ident.ident(`), a C-style address-of argument closing
 /// a call or statement (` &copyRegion)` / ` &result;`), a keyword/assignment
-/// call argument (`create(pk=1`), or a Django-style ORM access (`.objects.`,
-/// `models.ForeignKey`/`ManyToManyField`/`OneToOneField`).
+/// call argument (`create(pk=1`), a Django-style ORM access (`.objects.`,
+/// `models.ForeignKey`/`ManyToManyField`/`OneToOneField`), a string literal
+/// spliced around bare variables (`"Copyright Acme ", Year, ". All ..."`),
+/// `#{...}` interpolation, or a spaced ` <- ` arrow.
 ///
 /// The strong structural signals (namespace, method call, address-of-in-call,
 /// ORM) are always honoured — including on a raw source span that happens to
@@ -1149,7 +1151,7 @@ pub(crate) fn looks_like_source_code(s: &str) -> bool {
     // Structural code signals that never appear in a real name or notice.
     static STRONG_SOURCE_CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
         compile_static_regex(
-            r"(?x)
+            r#"(?x)
             # namespace resolution: ident::ident
             \b[A-Za-z_][A-Za-z0-9_]*::[A-Za-z_~]
             # method or property call: foo.bar(...). The `(` must follow the
@@ -1164,7 +1166,15 @@ pub(crate) fn looks_like_source_code(s: &str) -> bool {
             # code. The trailing `)` also excludes name fragments such as
             # `Ernst &young` that are not followed by call punctuation.
           | (?:^|[\s(,])&[a-z][A-Za-z0-9_]*\s*\)
-            ",
+            # a notice spliced from string literals and bare variables:
+            # `"Copyright Acme ", Year, ". All ..."`. Requiring the quote to
+            # reopen is what keeps a quoted party (`"Acme", Inc.`) out.
+          | "\s*,\s*(?:[A-Za-z_$][A-Za-z0-9_$]*\s*,\s*)+"
+            # string interpolation: Elixir/Ruby/CoffeeScript `#{expr}`.
+          | \#\{
+            # a spaced ` <- ` binding/comprehension arrow.
+          | \s<-\s
+            "#,
         )
     });
     static ORM_RE: LazyLock<Regex> = LazyLock::new(|| {

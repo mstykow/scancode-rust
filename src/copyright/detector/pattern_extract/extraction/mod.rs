@@ -15,7 +15,7 @@ use crate::copyright::detector::token_utils::normalize_whitespace;
 use crate::copyright::line_tracking::{LineNumberIndex, PreparedLines};
 use crate::copyright::prepare::prepare_text_line;
 use crate::copyright::refiner::{
-    refine_copyright, refine_holder, refine_holder_in_copyright_context,
+    is_junk_copyright, refine_copyright, refine_holder, refine_holder_in_copyright_context,
 };
 use crate::copyright::types::{CopyrightDetection, HolderDetection};
 use crate::models::LineNumber;
