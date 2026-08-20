@@ -175,6 +175,7 @@ fn render_raw_copyright_from_text(
     // Acme</small>`); the source-faithful projection otherwise carries the markup
     // into the value. Only edge tags are removed, so `©`, angle-bracket emails,
     // URLs, and `<year>` markers inside the notice are preserved.
+    let rendered = inline_anchor_hrefs(&rendered);
     let rendered = strip_edge_html_tags(&rendered);
     // Normalize the HTML copyright entity to `(c)` so an `&copy;`-encoded notice
     // does not survive verbatim and split into a near-duplicate value. `(c)` is
@@ -200,6 +201,110 @@ fn render_raw_copyright_from_text(
     } else {
         project_native_copyright_value(&rendered, fallback)
     }
+}
+
+/// Replace an anchor with the URL it points at, dropping anchors that carry none.
+///
+/// The URL in `<a href="URL">Name</a>` is part of the attribution, so a linked
+/// notice renders as the same `<marker> <url> <name>` shape the detector already
+/// produces for a single-line linked notice.
+fn inline_anchor_hrefs(text: &str) -> String {
+    // Quoted segments may hold a `>` (`<a title="a > b" href="...">`), so the
+    // attribute run alternates quoted values with unquoted non-`>` text rather
+    // than treating the first `>` as the tag end.
+    static ANCHOR_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?is)<\s*(?P<close>/)?\s*a\b(?P<attrs>(?:"[^"]*"|'[^']*'|[^>"'])*)>"#)
+            .expect("valid regex")
+    });
+    // Consuming each quoted value whole is what keeps a literal `href=` inside an
+    // earlier attribute (`<a title="see href=elsewhere" href="real">`) from being
+    // read as the anchor's own href.
+    static ATTR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"(?is)(?P<name>[A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*(?:"(?P<dq>[^"]*)"|'(?P<sq>[^']*)'|(?P<bare>[^\s>]+))"#,
+        )
+        .expect("valid regex")
+    });
+    // Tidied only on values that carried an anchor, so every other native value
+    // stays byte-identical.
+    static SPACE_BEFORE_PUNCT_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[ \t]+(?P<p>[,.;:)\]])").expect("valid regex"));
+    static SPACE_AFTER_OPEN_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?P<b>[(\[])[ \t]+").expect("valid regex"));
+    static SPACE_RUN_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[ \t]{2,}").expect("valid regex"));
+
+    if !ANCHOR_TAG_RE.is_match(text) {
+        return text.to_string();
+    }
+
+    let replaced = ANCHOR_TAG_RE.replace_all(text, |caps: &regex::Captures| {
+        if caps.name("close").is_some() {
+            return " ".to_string();
+        }
+        let attrs = caps.name("attrs").map(|m| m.as_str()).unwrap_or("");
+        ATTR_RE
+            .captures_iter(attrs)
+            .find(|attr| {
+                attr.name("name")
+                    .is_some_and(|n| n.as_str().eq_ignore_ascii_case("href"))
+            })
+            .and_then(|attr| {
+                attr.name("dq")
+                    .or_else(|| attr.name("sq"))
+                    .or_else(|| attr.name("bare"))
+            })
+            .map(|url| format!(" {} ", decode_html_entities(url.as_str())))
+            .unwrap_or_else(|| " ".to_string())
+    });
+
+    let collapsed = SPACE_RUN_RE.replace_all(&replaced, " ");
+    let tidied = SPACE_BEFORE_PUNCT_RE.replace_all(&collapsed, "$p");
+    SPACE_AFTER_OPEN_RE
+        .replace_all(&tidied, "$b")
+        .trim()
+        .to_string()
+}
+
+/// Decode the HTML entities an `href` can carry, so the emitted URL is the
+/// anchor's real target (`?a=1&amp;b=2` and `?a=1&#38;b=2` both address
+/// `?a=1&b=2`). One left-to-right pass, so a decoded `&` cannot combine with the
+/// following text into a second entity.
+fn decode_html_entities(value: &str) -> String {
+    static ENTITY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)&(?:#(?P<dec>[0-9]{1,7})|#x(?P<hex>[0-9a-f]{1,6})|(?P<name>amp|lt|gt|quot|apos));")
+            .expect("valid regex")
+    });
+
+    if !value.contains('&') {
+        return value.to_string();
+    }
+    ENTITY_RE
+        .replace_all(value, |caps: &regex::Captures| {
+            if let Some(name) = caps.name("name") {
+                return match name.as_str().to_ascii_lowercase().as_str() {
+                    "amp" => "&",
+                    "lt" => "<",
+                    "gt" => ">",
+                    "quot" => "\"",
+                    _ => "'",
+                }
+                .to_string();
+            }
+            let code = caps
+                .name("dec")
+                .and_then(|m| m.as_str().parse::<u32>().ok())
+                .or_else(|| {
+                    caps.name("hex")
+                        .and_then(|m| u32::from_str_radix(m.as_str(), 16).ok())
+                });
+            match code.and_then(char::from_u32) {
+                Some(ch) => ch.to_string(),
+                // An unassigned code point is left as written rather than guessed at.
+                None => caps[0].to_string(),
+            }
+        })
+        .into_owned()
 }
 
 /// Strip presentational HTML tags from a source-faithful copyright value, e.g.
