@@ -60,6 +60,39 @@ pub(super) fn strip_trailing_parenthesized_obfuscated_email_in_holder(s: &str) -
     prefix.to_string()
 }
 
+/// Strip a trailing parenthesized cross-reference from a holder, as in
+/// `The ORT Project Authors (see <https://github.com/.../NOTICE>)`. The
+/// reference target is optional because earlier URL and angle-bracket stripping
+/// can already have emptied the parentheses.
+pub(super) fn strip_trailing_see_reference_in_holder(s: &str) -> String {
+    static SEE_REFERENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        compile_static_regex(
+            r"(?ix)
+            ^(?P<prefix>.+?)
+            \s*\(\s*
+            (?:see(?:\s+also)?|refer\s+to|consult)
+            \b[^()]*
+            \)?\s*\.?\s*$
+            ",
+        )
+    });
+
+    let trimmed = s.trim();
+    let Some(cap) = SEE_REFERENCE_TAIL_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let prefix = cap
+        .name("prefix")
+        .map(|m| m.as_str())
+        .unwrap_or("")
+        .trim_end_matches(&[',', ';', ':', ' '][..])
+        .trim();
+    if !prefix.is_empty() && prefix_has_holder_words(prefix) {
+        return prefix.to_string();
+    }
+    s.to_string()
+}
+
 pub(super) fn strip_leading_and_onwards_holder_prefix(s: &str) -> String {
     static AND_ONWARDS_RE: LazyLock<Regex> =
         LazyLock::new(|| compile_static_regex(r"(?i)^(?:and\s+)?onwards\b[\s,;:.-]*"));
@@ -154,6 +187,7 @@ pub(super) fn refine_holder_impl(s: &str, in_copyright_context: bool) -> Option<
     h = remove_some_extra_words_and_punct(&h);
     h = strip_trailing_incomplete_as_represented_by(&h);
     h = strip_trailing_credit_file_reference_in_holder(&h);
+    h = strip_trailing_see_reference_in_holder(&h);
     h = strip_trailing_contributor_clause(&h);
     h = strip_trailing_contact_clause(&h);
     h = strip_trailing_holder_prose_clause(&h);

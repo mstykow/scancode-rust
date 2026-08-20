@@ -5,6 +5,7 @@
 // Derived from ScanCode Toolkit (Apache-2.0); modified. See NOTICE.
 
 use crate::copyright::line_tracking::PreparedLines;
+use crate::copyright::refiner::has_copyright_year;
 use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetection};
 use crate::models::LineNumber;
 use regex::Regex;
@@ -311,6 +312,8 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
+    super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
+    super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
     seen.rebuild_authors_from(authors);
 }
 
@@ -481,6 +484,7 @@ fn drop_placeholder_and_code_junk_by_raw_line(
         is_embedded_c_sign_code_fragment_line(trimmed)
             || is_copyright_edit_note_line(trimmed)
             || is_copyright_holder_placeholder_line(trimmed)
+            || is_pattern_match_binding_line(trimmed)
     };
 
     copyrights.retain(|c| !is_junk_line(c.start_line));
@@ -505,6 +509,44 @@ fn is_copyright_holder_placeholder_line(line: &str) -> bool {
     });
 
     COPYRIGHT_HOLDER_PLACEHOLDER_RE.is_match(line.trim())
+}
+
+/// Whether the line binds values with a pattern-match or short-declaration
+/// operator (Erlang `#{<<"path">> := Path} = Copyright,`, Go `x := y`), which
+/// makes a bare `Copyright` token on it a variable rather than a notice. A
+/// quoted notice being assigned, or a year anywhere on the line, keeps it.
+fn is_pattern_match_binding_line(line: &str) -> bool {
+    line.contains(":=") && !has_quoted_copyright(line) && !has_copyright_year(line)
+}
+
+/// Whether `copyright` appears inside a quoted segment of the line, which makes
+/// it assigned text rather than an identifier. Walking the line tracks which
+/// delimiter opened the string and which are escaped, so neither an escaped
+/// quote nor an escaped backslash before a real one shifts the boundaries.
+fn has_quoted_copyright(line: &str) -> bool {
+    let mut open_quote: Option<char> = None;
+    let mut escaped = false;
+    let mut quoted = String::new();
+    for ch in line.chars() {
+        if escaped {
+            escaped = false;
+            if open_quote.is_some() {
+                quoted.push(ch);
+            }
+        } else if ch == '\\' {
+            escaped = true;
+        } else if matches!(ch, '"' | '\'') {
+            match open_quote {
+                Some(opener) if opener == ch => open_quote = None,
+                Some(_) => quoted.push(ch),
+                None => open_quote = Some(ch),
+            }
+        } else if open_quote.is_some() {
+            quoted.push(ch);
+        }
+    }
+
+    quoted.to_ascii_lowercase().contains("copyright")
 }
 
 fn is_embedded_c_sign_code_fragment_line(line: &str) -> bool {

@@ -975,3 +975,133 @@ SOFTWARE OR DOCUMENTATION.</p>
     );
     assert!(holders.is_empty(), "unexpected holders: {holders:?}");
 }
+
+#[test]
+fn test_dtd_markup_declaration_comments_are_not_authors() {
+    // Erlang edoc modules embed the edoc DTD in comments, where `author` names an
+    // element in a content model. The refined values ("copyright?",
+    // "EMPTY !ATTLIST") no longer carry the declaration marker, so the raw source
+    // line is what identifies them.
+    let content = "\
+%% @author Richard Carlsson <carlsson.richard@gmail.com>
+%%
+%% <!ELEMENT module (args?, description?, author*, copyright?,
+%%                   version?, since?, deprecated?, see*, reference*,
+%%                   functions)>
+%% <!ELEMENT author EMPTY>
+%% <!ATTLIST author
+%%   name CDATA #REQUIRED
+%%   email CDATA #IMPLIED>
+";
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(content);
+    let vals: Vec<&String> = authors.iter().map(|a| &a.author).collect();
+    assert_eq!(
+        vals,
+        vec!["Richard Carlsson <carlsson.richard@gmail.com>"],
+        "expected only the tagged author, got {vals:?}"
+    );
+}
+
+#[test]
+fn test_author_label_closing_a_sentence_does_not_name_the_next_sentence() {
+    // A lowercase `contributors.`/`et al.` that ends a sentence is no label for the
+    // capitalized words after the period: those open a new sentence, or — in an RFC
+    // running footer — a new column.
+    for text in [
+        "   The most active people have been Tom Taylor and Kevin Boyle, but\n   many other people have been regular\n   contributors.  Brian Rosen did tremendous service in putting together\n   the Megaco interoperability tests.\n",
+        "   many other people have been regular contributors.\n   Brian Rosen did tremendous service in putting together the tests.\n",
+        "Groves, et al.              Standards Track                   [Page 169]\n",
+    ] {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(text);
+        let vals: Vec<&String> = authors.iter().map(|a| &a.author).collect();
+        assert!(
+            vals.is_empty(),
+            "prose produced authors: {vals:?} for {text:?}"
+        );
+    }
+}
+
+#[test]
+fn test_labels_that_really_introduce_an_author_are_kept() {
+    // The sentence-final-label rule must keep a trailing collective author and a
+    // capitalized `Authors.` heading that does introduce the names beside it.
+    for (text, expected) in [
+        (
+            "This product includes software developed by Jane Doe and its contributors.\n",
+            "Jane Doe and its contributors",
+        ),
+        ("Authors.  Jane Doe wrote this.\n", "Jane Doe wrote"),
+    ] {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(text);
+        let vals: Vec<&String> = authors.iter().map(|a| &a.author).collect();
+        assert!(
+            vals.iter().any(|a| a.as_str() == expected),
+            "expected author {expected:?} in {vals:?} for {text:?}"
+        );
+    }
+}
+
+#[test]
+fn test_holder_drops_a_trailing_see_cross_reference() {
+    let content = "## Copyright (C) 2022 The ORT Project Authors (see <https://github.com/oss-review-toolkit/ort/blob/main/NOTICE>)\n";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    let vals: Vec<&String> = holders.iter().map(|h| &h.holder).collect();
+    assert_eq!(
+        vals,
+        vec!["The ORT Project Authors"],
+        "expected the bare holder, got {vals:?}"
+    );
+    // The statement itself keeps the whole notice, reference and all.
+    assert!(
+        copyrights.iter().any(|c| c.copyright
+            == "Copyright (c) 2022 The ORT Project Authors (see https://github.com/oss-review-toolkit/ort/blob/main/NOTICE )"),
+        "expected the full statement, got {copyrights:?}"
+    );
+}
+
+#[test]
+fn test_pattern_match_binding_lines_are_not_copyrights() {
+    // Erlang pattern matching binds a `Copyright` variable, so the word is an
+    // identifier and the next line's variable is not its holder.
+    let content = "\
+classify_copyright_result(Filename) ->
+    lists:foldl(fun (Copyright, Acc) ->
+                        #{<<\"statement\">> := CopyrightSt} = Copyright,
+                        #{<<\"path\">> := Path} = Location,
+                        Acc#{Path => CopyrightSt}
+                    end, #{}, Copyrights).
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+
+    // A real notice being assigned on such a line is kept, dated or not: the
+    // quotes, or a year, say the words are text rather than an identifier.
+    for (text, expected) in [
+        (
+            "\tnotice := \"Copyright (c) 2020 Acme Corp. All rights reserved.\"\n",
+            "Copyright (c) 2020 Acme Corp.",
+        ),
+        (
+            "\tnotice := \"Copyright Acme Corp. All rights reserved.\"\n",
+            "Copyright Acme Corp.",
+        ),
+        (
+            "\tnotice := \"Say \\\" then Copyright Acme Corp. All rights reserved.\"\n",
+            "Copyright Acme Corp.",
+        ),
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(text);
+        assert!(
+            copyrights.iter().any(|c| c.copyright == expected),
+            "expected {expected:?} for {text:?}, got {copyrights:?}"
+        );
+        assert!(
+            holders.iter().any(|h| h.holder == "Acme Corp."),
+            "expected the assigned holder for {text:?}, got {holders:?}"
+        );
+    }
+}
