@@ -1627,3 +1627,101 @@ fn test_extract_copyright_information_html_anchor_notice_carries_no_markup() {
         file.holders
     );
 }
+
+#[test]
+fn test_extract_copyright_information_drops_code_and_template_notice_values() {
+    // erlang/otp assembles its own headers in Erlang and Elixir, so the notice
+    // text reaches the detector as a string literal spliced around variables, a
+    // list comprehension, an interpolated sigil, or a documented placeholder.
+    for (name, text) in [
+        (
+            "license-header.es",
+            "[[\"Copyright Ericsson AB \", StartYear, LastUpdatedYear, \". All Rights Reserved.\"] | T]",
+        ),
+        (
+            "license-header.es",
+            "     end || Copyright <- Copyrights],\n    {Copyrights, Rest};",
+        ),
+        (
+            "make_atomics_api",
+            " * Copyright Ericsson AB \", Years, \". All Rights Reserved.",
+        ),
+        (
+            "ex_doc.exs",
+            "      ~s'<p>Copyright © 1996-#{current_datetime.year} <a href=\"https://www.ericsson.com\">Ericsson AB</a></p>'",
+        ),
+        (
+            "FILE-HEADERS.md",
+            "  - `SPDX-FileCopyrightText: Copyright (C) YYYY CopyrightHolder`",
+        ),
+    ] {
+        let mut builder = FileInfoBuilder::default();
+        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        let file = build_single_file(builder);
+        assert!(
+            file.copyrights.is_empty(),
+            "copyright leaked from {text:?}: {:?}",
+            file.copyrights
+                .iter()
+                .map(|c| &c.copyright)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            file.holders.is_empty(),
+            "holder leaked from {text:?}: {:?}",
+            file.holders.iter().map(|h| &h.holder).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn test_extract_copyright_information_keeps_notices_with_code_like_punctuation() {
+    let text = concat!(
+        "Copyright (c) 2024 Example Corp. (http://example.com)\n",
+        "Copyright 2024 Example, Inc. [All rights reserved]\n",
+        "Copyright (c) 2001 John \"Jack\" Doe, Inc.\n",
+        "Copyright 2020 \"Acme\", Inc.\n",
+        "%% Copyright Ericsson AB 2011-2025. All Rights Reserved.\n",
+    );
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("NOTICE"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    let values: Vec<&String> = file.copyrights.iter().map(|c| &c.copyright).collect();
+    for expected in [
+        "Copyright (c) 2024 Example Corp. (http://example.com)",
+        "Copyright (c) 2001 John \"Jack\" Doe, Inc.",
+        "Copyright 2020 \"Acme\", Inc.",
+        "Copyright Ericsson AB 2011-2025. All Rights Reserved.",
+    ] {
+        assert!(
+            values.iter().any(|v| v.as_str() == expected),
+            "missing {expected:?} in {values:?}"
+        );
+    }
+    assert!(
+        values
+            .iter()
+            .any(|v| v.starts_with("Copyright 2024 Example")),
+        "missing the bracketed-suffix notice in {values:?}"
+    );
+}
+
+#[test]
+fn test_extract_copyright_information_keeps_banner_on_a_line_shared_with_code() {
+    let text = "/*! Copyright (c) 2020 Acme Inc. All rights reserved. */ if (a || b) { c(); }";
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("bundle.js"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    assert!(
+        file.copyrights
+            .iter()
+            .any(|c| c.copyright.contains("Acme Inc.")),
+        "banner dropped: {:?}",
+        file.copyrights
+            .iter()
+            .map(|c| &c.copyright)
+            .collect::<Vec<_>>()
+    );
+}

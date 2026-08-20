@@ -3271,3 +3271,67 @@ fn test_junk_copyright_keeps_notices_naming_the_holder_after_the_marker() {
         );
     }
 }
+
+#[test]
+fn test_looks_like_source_code_rejects_notice_built_by_code() {
+    // Erlang/Elixir source that assembles a notice from string literals and
+    // variables, as found in erlang/otp's header tooling.
+    for code in [
+        r#"[["Copyright Ericsson AB ", StartYear, LastUpdatedYear, ". All Rights Reserved."] | T]"#,
+        r#"[["Copyright Ericsson AB ", LastUpdatedYear, ". All Rights Reserved."]]"#,
+        r#"Copyright Ericsson AB ", Years, ". All Rights Reserved."#,
+        "end || Copyright <- Copyrights], {Copyrights, Rest};",
+        r#"~s'<p>Copyright © 1996-#{current_datetime.year} Ericsson AB</p>'"#,
+    ] {
+        assert!(looks_like_source_code(code), "kept {code:?}");
+    }
+}
+
+#[test]
+fn test_looks_like_source_code_keeps_notices_with_quotes_brackets_and_pipes() {
+    for notice in [
+        "Copyright (c) 2024 Example Corp. (http://example.com)",
+        "Copyright 2024 Example, Inc. [All rights reserved]",
+        r#"Copyright (c) 2001 John "Jack" Doe, Inc."#,
+        r#"Copyright 2020 "Acme", Inc."#,
+        "| Copyright (c) 2020 Acme Ltd | MIT |",
+        "Copyright Ericsson AB 2011-2025. All Rights Reserved.",
+        // A banner sharing its line with ordinary code: `||` is too common in
+        // real source to treat as a code signal on its own.
+        "/*! Copyright (c) 2020 Acme Inc. All rights reserved. */ if (a || b) { c(); }",
+    ] {
+        assert!(!looks_like_source_code(notice), "dropped {notice:?}");
+    }
+}
+
+#[test]
+fn test_placeholder_year_after_any_copyright_marker_is_junk() {
+    for template in [
+        "Copyright YYYY CopyrightHolder",
+        "Copyright (c) YYYY CopyrightHolder",
+        "Copyright (C) YYYY-YYYY CopyrightHolder",
+        "Copyright © YYYY Example Corp.",
+        "(c) YYYY Example Corp.",
+    ] {
+        assert!(is_junk_copyright(template), "kept {template:?}");
+    }
+    // The holder the template leaves behind is a placeholder too.
+    assert_eq!(refine_holder("YYYY CopyrightHolder"), None);
+    assert_eq!(refine_holder("YYYY-YYYY CopyrightHolder"), None);
+    assert_eq!(refine_holder("YYYY-yyyy Full Name"), None);
+}
+
+#[test]
+fn test_placeholder_year_rule_keeps_real_years_and_holders() {
+    for notice in [
+        "Copyright (c) 2024 Example Corp.",
+        "Copyright © 1996-2024 Ericsson AB",
+        "(c) 2019 The ORT Project Authors",
+    ] {
+        assert!(!is_junk_copyright(notice), "dropped {notice:?}");
+    }
+    assert_eq!(
+        refine_holder("Yyyyaka Tanaka"),
+        Some("Yyyyaka Tanaka".to_string())
+    );
+}

@@ -234,7 +234,8 @@ pub(super) static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new
         r"(?i)^copyright protection\b",
         r"(?i)^copyright owner\b",
         r"(?i)^copyright [a-z]$",
-        r"(?i)^copyright yyyy\b",
+        // Any marker/sign combination followed by a `YYYY` placeholder year.
+        r"(?i)^(?:copyright|copr\.?|\(c\)|©)(?:\s*(?:\(c\)|©))*\s+y{4}\b",
         r"(?i)^copyright exceptions\b",
         r"(?i)^copyright or patent\b",
         r"(?i)^copyright is claimed\b",
@@ -545,7 +546,6 @@ pub(super) static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new
         r"(?i)^\(c\) io\\0",
         r"(?i)^\(c\) ecfieldelement\b",
         r"(?i)^\(c\) distributed\b",
-        r"(?i)^\(c\) yyyy\b",
         r"(?i)^\(c\) rebel\b",
         r"(?i)^\(c\) metastuff\b",
         r"(?i)^\(c\) mihai\b",
