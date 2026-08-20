@@ -13,8 +13,9 @@ pub fn drop_json_description_metadata_copyrights_and_holders(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
+    // A window that declares a copyright field is attributing, not describing.
     static JSON_COPYRIGHT_KEY_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r#"(?i)"copyrights?"\s*:"#).unwrap());
+        LazyLock::new(|| Regex::new(r#"(?i)"copyrights?(?:_?text|_?notice)?"\s*:"#).unwrap());
 
     let mut retained_spans: HashSet<(usize, usize)> = HashSet::new();
     copyrights.retain(|copyright| {

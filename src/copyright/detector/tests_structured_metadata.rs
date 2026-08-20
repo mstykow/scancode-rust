@@ -591,3 +591,52 @@ fn test_the_copyright_deadline_is_honoured_end_to_end() {
     );
     assert!(expired.is_empty(), "got {expired:?}");
 }
+
+#[test]
+fn test_json_description_keeps_spdx_copyright_text_field() {
+    // erlang/otp's `vendor.info` shape: a vendored component's own notice sits
+    // beside the description and download URL that would otherwise drop it.
+    let input = concat!(
+        "[\n",
+        "  {\n",
+        "    \"ID\": \"erts-ryu\",\n",
+        "    \"description\": \"ryu library\",\n",
+        "    \"copyrightText\": \"Copyright 2018 Ulf Adams\",\n",
+        "    \"downloadLocation\": \"https://github.com/ulfjack/ryu\",\n",
+        "    \"homepage\": \"https://github.com/ulfjack/ryu\"\n",
+        "  }\n",
+        "]\n"
+    );
+    let (c, h, _a) = detect_copyrights_from_text(input);
+    assert!(
+        c.iter()
+            .any(|cr| cr.copyright == "Copyright 2018 Ulf Adams"),
+        "copyrights: {c:?}"
+    );
+    assert!(
+        h.iter().any(|hr| hr.holder == "Ulf Adams"),
+        "holders: {h:?}"
+    );
+
+    let input = concat!(
+        "{\n",
+        "  \"description\": \"a library\",\n",
+        "  \"copyright_notice\": \"Copyright 2018 Ulf Adams\"\n",
+        "}\n"
+    );
+    let (c, _h, _a) = detect_copyrights_from_text(input);
+    assert!(
+        c.iter()
+            .any(|cr| cr.copyright == "Copyright 2018 Ulf Adams"),
+        "copyrights: {c:?}"
+    );
+}
+
+#[test]
+fn test_json_description_prose_without_a_copyright_field_still_drops() {
+    // No copyright field declared, so the prose-value drop still applies.
+    let input = r#"{"description": "Software Package Data Exchange (SPDX) is a set of standards for communicating the components, licenses, and copyrights associated with software.", "sponsor": {"@type": "Organization", "name": "FOSSology"}}"#;
+    let (c, h, _a) = detect_copyrights_from_text(input);
+    assert!(c.is_empty(), "copyrights: {c:?}");
+    assert!(h.is_empty(), "holders: {h:?}");
+}
