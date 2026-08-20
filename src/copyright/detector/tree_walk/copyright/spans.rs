@@ -28,25 +28,85 @@ use crate::copyright::types::{
 /// fallback from manufacturing copyrights out of ordinary prose that merely
 /// mentions the word "copyright".
 fn span_has_strong_holder_or_year(span: &[&Token]) -> bool {
-    span.iter().any(|t| {
-        // The copyright marker itself is never the holder; excluding it stops an
-        // all-uppercase `COPYRIGHT` token from validating its own span.
-        t.tag != PosTag::Copy
-            && (detector::token_utils::is_year_like_token(t)
-                || matches!(
-                    t.tag,
-                    PosTag::Nnp
-                        | PosTag::Pn
-                        | PosTag::Caps
-                        | PosTag::MixedCap
-                        | PosTag::Comp
-                        | PosTag::Uni
-                        | PosTag::Email
-                        | PosTag::Url
-                        | PosTag::Url2
-                )
-                || is_acronym_like(&t.value))
-    })
+    span.iter().any(|t| is_strong_holder_or_year_token(t))
+}
+
+/// Whether one token can anchor a copyright span: a year, a proper noun /
+/// company / university token, an email or URL, or an organization acronym.
+fn is_strong_holder_or_year_token(t: &Token) -> bool {
+    // The copyright marker itself is never the holder; excluding it stops an
+    // all-uppercase `COPYRIGHT` token from validating its own span.
+    t.tag != PosTag::Copy
+        && (detector::token_utils::is_year_like_token(t)
+            || matches!(
+                t.tag,
+                PosTag::Nnp
+                    | PosTag::Pn
+                    | PosTag::Caps
+                    | PosTag::MixedCap
+                    | PosTag::Comp
+                    | PosTag::Uni
+                    | PosTag::Email
+                    | PosTag::Url
+                    | PosTag::Url2
+            )
+            || is_acronym_like(&t.value))
+}
+
+/// Whether the token is a bare `(c)` copyright sign, the only copyright marker
+/// that is also an ordinary alphabetic list label.
+fn is_bare_c_sign(token: &Token) -> bool {
+    token.tag == PosTag::Copy
+        && token
+            .value
+            .trim_end_matches(',')
+            .eq_ignore_ascii_case("(c)")
+}
+
+/// Whether a span led by a bare `(c)` sign names its holder right after the
+/// marker.
+///
+/// `(c)` doubles as an alphabetic list label — `(a) … (b) … (c) …` — so a `(c)`
+/// heading a prose sentence is routinely a list item rather than a notice. A
+/// real bare-`(c)` notice names its holder immediately (`(c) Free Software
+/// Foundation, Inc.`, `(c) The Regents of the University of California`), which
+/// is what the `<COPY> <NAME>` grammar production the span fallback stands in
+/// for requires. Enumerated prose instead puts a common noun there and only
+/// reaches a proper noun deeper into the sentence (`(c) From the Internet side,
+/// the gateway SHOULD accept all valid address formats in SMTP commands …`),
+/// which the span-wide [`span_has_strong_holder_or_year`] check cannot tell
+/// apart. Only a leading determiner may sit between the marker and the holder.
+///
+/// A span carrying a year is exempt: the year already proves the marker is a
+/// copyright sign, and a list label never carries one.
+fn bare_c_span_names_holder_up_front(span: &[&Token]) -> bool {
+    const LEADING_DETERMINERS: &[&str] = &["the", "a", "an", "by"];
+
+    if span
+        .iter()
+        .any(|t| detector::token_utils::is_year_like_token(t))
+    {
+        return true;
+    }
+
+    span.iter()
+        .skip(1)
+        .find(|t| {
+            let word = t
+                .value
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_ascii_lowercase();
+            !LEADING_DETERMINERS.contains(&word.as_str())
+        })
+        .is_some_and(|t| is_strong_holder_or_year_token(t))
+}
+
+/// Whether a fallback span carries a usable holder anchor. `leads_with_bare_c`
+/// tightens the check to an up-front holder when the span opens on a bare `(c)`
+/// sign; see [`bare_c_span_names_holder_up_front`].
+fn span_has_holder_anchor(span: &[&Token], leads_with_bare_c: bool) -> bool {
+    span_has_strong_holder_or_year(span)
+        && (!leads_with_bare_c || bare_c_span_names_holder_up_front(span))
 }
 
 /// A compound organization acronym (`INRIA-ENPC`, `AT&T`, `K3D`) that the POS
@@ -248,11 +308,12 @@ pub fn extract_from_spans(
 
             let span = &all_leaves[start..i];
             if span.len() > 1 {
+                let leads_with_bare_c = start == copy_idx && is_bare_c_sign(token);
                 let allow_single_word_contributors = span
                     .iter()
                     .any(|t| detector::token_utils::is_year_like_token(t));
                 let filtered = detector::token_utils::strip_all_rights_reserved_slice(span);
-                if span_has_strong_holder_or_year(&filtered)
+                if span_has_holder_anchor(&filtered, leads_with_bare_c)
                     && let Some(det) = detector::token_utils::build_copyright_from_tokens(&filtered)
                 {
                     copyrights.push(det);
@@ -262,7 +323,7 @@ pub fn extract_from_spans(
                     continue;
                 }
 
-                if !skip_holder_from_span && span_has_strong_holder_or_year(&filtered) {
+                if !skip_holder_from_span && span_has_holder_anchor(&filtered, leads_with_bare_c) {
                     let holder_span = filtered.as_slice();
                     let holder_tokens: Vec<&Token> = holder_span
                         .iter()
@@ -501,8 +562,9 @@ pub fn extract_copyrights_from_spans(
                     .iter()
                     .any(|t| detector::token_utils::is_year_like_token(t));
 
+                let leads_with_bare_c = start == copy_idx && is_bare_c_sign(token);
                 let filtered = detector::token_utils::strip_all_rights_reserved_slice(span);
-                if span_has_strong_holder_or_year(&filtered)
+                if span_has_holder_anchor(&filtered, leads_with_bare_c)
                     && let Some(det) = detector::token_utils::build_copyright_from_tokens(&filtered)
                 {
                     copyrights.push(det);
@@ -512,7 +574,7 @@ pub fn extract_copyrights_from_spans(
                     continue;
                 }
 
-                if !skip_holder_from_span && span_has_strong_holder_or_year(&filtered) {
+                if !skip_holder_from_span && span_has_holder_anchor(&filtered, leads_with_bare_c) {
                     let holder_span = filtered.as_slice();
                     let holder_tokens: Vec<&Token> = holder_span
                         .iter()

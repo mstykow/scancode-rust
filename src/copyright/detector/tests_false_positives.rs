@@ -896,3 +896,61 @@ fn test_changelog_update_copyright_year_bullet_not_detected() {
     );
     assert!(holders.is_empty(), "unexpected holders: {holders:?}");
 }
+
+#[test]
+fn test_alphabetic_list_label_is_not_a_copyright_sign() {
+    // `(C)` is also the third label of an alphabetic list, so RFC and other
+    // specification prose puts one at the head of an ordinary sentence
+    // (RFC 1123 §5.3.7, shipped in erlang/otp). A bare `(c)` notice names its
+    // holder right after the marker; enumerated prose puts a common noun there
+    // and only reaches a proper noun (`Internet`, `SMTP`) deeper into the
+    // sentence, which the span fallback used to accept as the holder anchor.
+    let content = "\
+         (A)  Blah
+         (B)  Bleh
+         (C)  From the Internet side, the gateway SHOULD accept all
+              valid address formats in SMTP commands and in RFC-822
+              headers, and all valid RFC-822 messages.  Although a
+              gateway must accept an RFC-822 explicit source route
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+
+    // The list label alone — with no `(A)`/`(B)` siblings in view — is rejected
+    // on the same grounds, so a fragment or a lone clause is covered too.
+    let (copyrights, holders, _authors) =
+        detect_copyrights_from_text("(c)  From the Internet side, the gateway SHOULD accept all\n");
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+}
+
+#[test]
+fn test_bare_c_sign_notices_naming_a_holder_are_kept() {
+    // The list-label rule must not touch a real bare `(c)` notice: the holder
+    // follows the marker directly, behind a year, or behind a leading
+    // determiner such as `The`/`by`.
+    for (text, expected) in [
+        (
+            "(c) Free Software Foundation, Inc.",
+            "Free Software Foundation, Inc.",
+        ),
+        ("(C) 2004 Acme Corporation", "Acme Corporation"),
+        ("(C) IBM Corp", "IBM Corp"),
+        ("(c) by John Doe <john@example.com>", "John Doe"),
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(text);
+        assert!(!copyrights.is_empty(), "no copyright for {text:?}");
+        let vals: Vec<&String> = holders.iter().map(|h| &h.holder).collect();
+        assert!(
+            vals.iter().any(|h| h.as_str() == expected),
+            "expected holder {expected:?} in {vals:?} for {text:?}"
+        );
+    }
+}
