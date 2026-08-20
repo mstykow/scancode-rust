@@ -317,6 +317,10 @@ pub(super) static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new
         r"(?i)^\(Copyright notice\)",
         r"(?i)^COPYRIGHT HOLDER ALLOWS\b",
         r"(?i)^copyright holders?,? disclaims?\b",
+        // Warranty and liability disclaimers name the holder as a verb's subject
+        // rather than as a party, so the clause is not a notice.
+        r"(?i)^copyright (?:holders?|owners?)\s+makes?\s+no\b",
+        r"(?i)^copyright (?:holders?|owners?)\s+(?:will|shall|may|would|can|could)?\s*(?:not\s+)?be\s+liable\b",
         r"(?i)\bwe do not list the\b",
         r"(?i)\bno-warranty notice unaltered\b",
         r"(?i)\bprovides the program as\b",
