@@ -132,7 +132,7 @@ pub(super) fn extract_named_author_from_binary_line(line: &str) -> Option<String
     }
 
     let lower_line = line.to_ascii_lowercase();
-    let email_start = lower_line.find(email)?;
+    let email_start = lower_line.find(&email.to_ascii_lowercase())?;
     let raw_prefix = &line[..email_start];
     let has_author_marker = contains_binary_author_marker(raw_prefix);
     let prefix = take_suffix_after_last_author_marker(raw_prefix)?;
@@ -324,7 +324,10 @@ fn has_strong_binary_host_shape(host: &str) -> bool {
         return false;
     }
 
-    let relevant = if matches!(labels.first(), Some(&"www" | &"ftp")) {
+    let relevant = if labels
+        .first()
+        .is_some_and(|label| label.eq_ignore_ascii_case("www") || label.eq_ignore_ascii_case("ftp"))
+    {
         &labels[1..]
     } else {
         &labels[..]

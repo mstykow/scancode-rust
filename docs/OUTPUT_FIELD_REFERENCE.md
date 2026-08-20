@@ -187,11 +187,11 @@ File-level copyright evidence record.
 
 File-level email evidence record.
 
-| JSON field   | Value shape | Key presence    | Meaning                                       |
-| ------------ | ----------- | --------------- | --------------------------------------------- |
-| `email`      | `string`    | Always emitted. | Extracted email address.                      |
-| `start_line` | `integer`   | Always emitted. | First line where the email evidence appeared. |
-| `end_line`   | `integer`   | Always emitted. | Last line where the email evidence appeared.  |
+| JSON field   | Value shape | Key presence    | Meaning                                                    |
+| ------------ | ----------- | --------------- | ---------------------------------------------------------- |
+| `email`      | `string`    | Always emitted. | Extracted email address, in the case the source file used. |
+| `start_line` | `integer`   | Always emitted. | First line where the email evidence appeared.              |
+| `end_line`   | `integer`   | Always emitted. | Last line where the email evidence appeared.               |
 
 ## `OutputHolder`
 
