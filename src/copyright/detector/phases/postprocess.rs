@@ -594,34 +594,63 @@ fn is_pattern_match_binding_line(line: &str) -> bool {
     line.contains(":=") && !has_quoted_copyright(line) && !has_copyright_year(line)
 }
 
-/// Whether `copyright` appears inside a quoted segment of the line, which makes
-/// it assigned text rather than an identifier. Walking the line tracks which
-/// delimiter opened the string and which are escaped, so neither an escaped
-/// quote nor an escaped backslash before a real one shifts the boundaries.
+/// Whether one quoted segment of the line spells out a copyright notice, which
+/// makes it assigned text rather than an identifier. A quoted key name is not
+/// such a notice: Erlang's `~"copyrights" := Cs` binds a map key, and JSON-shaped
+/// keys read the same way. Segments are tested one by one, so two neighbouring
+/// strings cannot combine into a marker that neither of them contains.
 fn has_quoted_copyright(line: &str) -> bool {
+    quoted_segments(line).iter().any(|segment| {
+        segment.to_ascii_lowercase().contains("copyright") && !is_bare_identifier(segment)
+    })
+}
+
+/// Whether `s` is a lone identifier-shaped token — the shape of a map key or
+/// struct field (`copyrights`, `copyright_notice`), never of a notice, which
+/// always carries punctuation or a party name alongside its marker.
+fn is_bare_identifier(s: &str) -> bool {
+    let trimmed = s.trim();
+    !trimmed.is_empty()
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_alphanumeric() || matches!(ch, '_' | '-'))
+}
+
+/// The quoted string literals of `line`, without their delimiters. Walking the
+/// line tracks which delimiter opened the string and which characters are
+/// escaped, so neither an escaped quote nor an escaped backslash before a real
+/// one shifts the boundaries; an unterminated final string still yields its text.
+fn quoted_segments(line: &str) -> Vec<String> {
+    let mut segments = Vec::new();
     let mut open_quote: Option<char> = None;
     let mut escaped = false;
-    let mut quoted = String::new();
+    let mut current = String::new();
     for ch in line.chars() {
         if escaped {
             escaped = false;
             if open_quote.is_some() {
-                quoted.push(ch);
+                current.push(ch);
             }
         } else if ch == '\\' {
             escaped = true;
         } else if matches!(ch, '"' | '\'') {
             match open_quote {
-                Some(opener) if opener == ch => open_quote = None,
-                Some(_) => quoted.push(ch),
+                Some(opener) if opener == ch => {
+                    open_quote = None;
+                    segments.push(std::mem::take(&mut current));
+                }
+                Some(_) => current.push(ch),
                 None => open_quote = Some(ch),
             }
         } else if open_quote.is_some() {
-            quoted.push(ch);
+            current.push(ch);
         }
     }
+    if open_quote.is_some() {
+        segments.push(current);
+    }
 
-    quoted.to_ascii_lowercase().contains("copyright")
+    segments
 }
 
 fn is_embedded_c_sign_code_fragment_line(line: &str) -> bool {

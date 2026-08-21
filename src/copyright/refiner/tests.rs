@@ -3462,6 +3462,31 @@ fn test_format_string_directives_are_junk() {
 }
 
 #[test]
+fn test_format_directive_beats_a_literal_year_in_the_template() {
+    // A year inside a format string is part of the template, so it cannot
+    // exempt the value from the directive rule.
+    for value in [
+        "Copyright Ericsson AB 2020-~p. All Rights Reserved.",
+        "Copyright Ericsson AB 2021-~p. All Rights Reserved.",
+        "Copyright 2007, Ericsson AB.~n",
+    ] {
+        assert!(is_junk_copyright(value), "kept {value:?}");
+    }
+    assert_eq!(refine_holder("Ericsson AB 2020-~p"), None);
+    assert_eq!(refine_holder("Ericsson AB.~n"), None);
+
+    // A dated notice with no directive keeps both its value and its holder.
+    for value in [
+        "Copyright Ericsson AB 1996-2026. All Rights Reserved.",
+        "Copyright Ericsson AB 2020-2024.",
+    ] {
+        assert!(!is_junk_copyright(value), "dropped {value:?}");
+    }
+    // Year stripping is a later step; what matters here is that the holder survives.
+    assert!(refine_holder("Ericsson AB 1996-2026").is_some());
+}
+
+#[test]
 fn test_placeholder_year_after_a_real_party_name_is_junk() {
     for template in [
         "Copyright Ericsson AB YYYY.",
