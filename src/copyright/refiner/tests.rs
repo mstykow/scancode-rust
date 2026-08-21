@@ -3383,3 +3383,93 @@ fn test_placeholder_year_rule_keeps_real_years_and_holders() {
         Some("Yyyyaka Tanaka".to_string())
     );
 }
+
+#[test]
+fn test_modal_verb_where_the_party_belongs_is_junk() {
+    // Documentation that states how a notice must be written, not a notice.
+    for value in [
+        "Copyright and can have as prefix the SPDX annotation",
+        "Copyright must start with Copyright",
+        "(c) may be omitted",
+    ] {
+        assert!(is_junk_copyright(value), "kept {value:?}");
+    }
+    assert_eq!(
+        refine_holder("can have as prefix the SPDX annotation"),
+        None
+    );
+    // The copula still introduces a party, and a capitalized name is not a modal.
+    assert!(!opens_with_modal_instead_of_party(
+        "Copyright is held by Acme Corp."
+    ));
+    assert!(!opens_with_modal_instead_of_party(
+        "Copyright 2020 Will Smith"
+    ));
+    assert_eq!(refine_holder("May Kwan"), Some("May Kwan".to_string()));
+    assert_eq!(refine_holder("Will Smith"), Some("Will Smith".to_string()));
+}
+
+#[test]
+fn test_holder_that_is_prose_at_both_ends_is_junk() {
+    for value in [
+        "detection heuristics of REUSE tool in",
+        "the copyright holders or",
+    ] {
+        assert_eq!(refine_holder(value), None, "kept {value:?}");
+    }
+    // A value that still names a capitalized party is left to the clause
+    // strippers, and a trailing middle initial is not the article `a`.
+    assert!(!is_truncated_lowercase_prose_holder(
+        "Wind River Systems Inc Implemented by"
+    ));
+    assert!(!is_truncated_lowercase_prose_holder(
+        "Matthew Wilcox willy at"
+    ));
+    assert!(!is_truncated_lowercase_prose_holder("Jane A."));
+    assert!(!is_truncated_lowercase_prose_holder("Ericsson AB"));
+    assert_eq!(
+        refine_holder("Ericsson AB"),
+        Some("Ericsson AB".to_string())
+    );
+    assert_eq!(
+        refine_holder("Meta Platforms, Inc. and affiliates"),
+        Some("Meta Platforms, Inc. and affiliates".to_string())
+    );
+}
+
+#[test]
+fn test_copyright_tooling_vocabulary_is_junk() {
+    for value in [
+        "copyright detection heuristics of REUSE tool in",
+        "Copyright detector",
+        "Copyright scanner",
+    ] {
+        assert!(is_junk_copyright(value), "kept {value:?}");
+    }
+    // A dated notice is never reclassified by the tooling vocabulary.
+    assert!(!is_junk_copyright(
+        "Copyright (c) 2020 Copyright Detection Inc."
+    ));
+}
+
+#[test]
+fn test_format_string_directives_are_junk() {
+    // Erlang `io:format` control sequences make the words a diagnostic template.
+    assert!(is_junk_copyright("Copyright ~ts in ~ts for ~ts~n C"));
+    assert_eq!(refine_holder("ts in ~ts for ~ts~n"), None);
+    // A tilde that is not a directive leaves a real notice alone.
+    assert!(!is_junk_copyright("Copyright (c) 2020 ~ Acme Corp."));
+}
+
+#[test]
+fn test_placeholder_year_after_a_real_party_name_is_junk() {
+    for template in [
+        "Copyright Ericsson AB YYYY.",
+        "Copyright Ericsson AB YYYY-YYYY.",
+    ] {
+        assert!(is_junk_copyright(template), "kept {template:?}");
+    }
+    assert_eq!(refine_holder("Ericsson AB YYYY."), None);
+    assert_eq!(refine_holder("Ericsson AB YYYY-YYYY."), None);
+    assert!(!is_junk_copyright("Copyright Ericsson AB 2011-2025."));
+}

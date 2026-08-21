@@ -485,6 +485,7 @@ fn drop_placeholder_and_code_junk_by_raw_line(
             || is_copyright_edit_note_line(trimmed)
             || is_copyright_holder_placeholder_line(trimmed)
             || is_pattern_match_binding_line(trimmed)
+            || is_notice_template_line(trimmed)
     };
 
     copyrights.retain(|c| !is_junk_line(c.start_line));
@@ -509,6 +510,80 @@ fn is_copyright_holder_placeholder_line(line: &str) -> bool {
     });
 
     COPYRIGHT_HOLDER_PLACEHOLDER_RE.is_match(line.trim())
+}
+
+/// Whether the line shows copyright *templates* only: every copyright marker on
+/// it has a `YYYY` placeholder in its year slot. Documentation that quotes the
+/// required header reads that way, and the line — not the value — is what shows
+/// it, because refinement strips the placeholder off the value
+/// (`` `Copyright Acme AB YYYY.` `` yields the apparently real
+/// `Copyright Acme AB`, whatever spacing or punctuation the source used).
+///
+/// Every marker must be a template: a detection records no column and so cannot
+/// be tied to one marker, which means a line that also asserts a real notice —
+/// dated or not — keeps all of its detections.
+fn is_notice_template_line(line: &str) -> bool {
+    static MARKER_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\bcopyright\b|\bcopr\.?|\(c\)|\u{a9}").expect("valid marker regex")
+    });
+
+    let mut saw_marker = false;
+    for marker in MARKER_RE.find_iter(line) {
+        saw_marker = true;
+        if !year_slot_is_placeholder(&line[marker.end()..]) {
+            return false;
+        }
+    }
+
+    saw_marker
+}
+
+/// Whether the year slot of the notice opening at a marker holds a `YYYY`
+/// placeholder. The slot is the first year-like token in the run of party-name
+/// tokens after the marker, and the run stops at the end of the notice: at a
+/// lowercase prose word, or at a sentence or clause boundary. So `YYYY` in the
+/// text following a notice never supplies that notice's year, whether the text
+/// is lowercase (`Copyright Acme Corp. Release dates use the YYYY format.`),
+/// title-cased (`... Corp. Release Dates Use YYYY`), or behind a semicolon or
+/// colon (`... Corp; dates use YYYY`).
+fn year_slot_is_placeholder(tail: &str) -> bool {
+    static PLACEHOLDER_YEAR_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\by{4}\b").expect("valid placeholder year regex"));
+    static PLAIN_YEAR_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\b(?:19|20)\d{2}\b").expect("valid plain year regex"));
+
+    let mut previous_ended_sentence = false;
+    let mut previous_ended_clause = false;
+    for token in tail.split_whitespace() {
+        let opens_new_sentence =
+            previous_ended_sentence && token.chars().next().is_some_and(char::is_uppercase);
+        if previous_ended_clause || opens_new_sentence {
+            return false;
+        }
+        if PLACEHOLDER_YEAR_RE.is_match(token) {
+            return true;
+        }
+        if PLAIN_YEAR_RE.is_match(token) || !is_party_name_token(token) {
+            return false;
+        }
+        // `Inc.`/`Ltd.` end a token without ending the notice, so a period only
+        // closes the sentence when the next token opens one.
+        previous_ended_sentence = token.ends_with('.');
+        previous_ended_clause = token.ends_with([';', ':']);
+    }
+
+    false
+}
+
+/// Whether a token can belong to the party name between a marker and its year:
+/// a capitalized word, a bare `c` from a `(c)` sign, or pure punctuation such as
+/// a dash or `&`. Anything else — notably a lowercase prose word — is not part of
+/// the notice's party name.
+fn is_party_name_token(token: &str) -> bool {
+    let word = token.trim_matches(|c: char| !c.is_alphanumeric());
+    word.is_empty()
+        || word.eq_ignore_ascii_case("c")
+        || word.chars().next().is_some_and(char::is_uppercase)
 }
 
 /// Whether the line binds values with a pattern-match or short-declaration
