@@ -249,6 +249,54 @@ fn test_refine_author_truncates_trailing_prose_after_contact() {
 }
 
 #[test]
+fn test_refine_author_truncates_prose_sentence_after_a_name() {
+    assert_eq!(
+        refine_author(
+            "Mauricio Arango, Andrew Dugan, Ike Elliott, Christian Huitema, and Scott Pickett. Flemming Andreasen does not appear"
+        ),
+        Some(
+            "Mauricio Arango, Andrew Dugan, Ike Elliott, Christian Huitema, and Scott Pickett"
+                .to_string()
+        )
+    );
+    assert_eq!(
+        refine_author("Intel Corporation. Intel specifically disclaims all warranties"),
+        Some("Intel Corporation".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_keeps_names_across_a_period_that_closes_no_prose() {
+    // A tail that is itself a name, and a period that belongs to a company
+    // abbreviation, are both left alone.
+    assert_eq!(
+        refine_author("Jane Doe. John Smith"),
+        Some("Jane Doe. John Smith".to_string())
+    );
+    assert_eq!(
+        refine_author("Jane Doe, John Smith."),
+        Some("Jane Doe, John Smith".to_string())
+    );
+    assert_eq!(
+        refine_author("Sun Microsystems, Inc. All Rights Reserved"),
+        Some("Sun Microsystems, Inc.".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_rejects_table_of_contents_dot_leaders() {
+    assert_eq!(
+        refine_author("Addresses............................................212 Full"),
+        None
+    );
+    // A three-dot ellipsis is prose punctuation, not a dot-leader run.
+    assert_eq!(
+        refine_author("Jane Doe, John Smith ... 2019"),
+        Some("Jane Doe, John Smith ... 2019".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_preserves_full_written_by_author_list() {
     assert_eq!(
         refine_author("Jean-Marc Valin, Gregory Maxwell, and Timothy B. Terriberry"),
