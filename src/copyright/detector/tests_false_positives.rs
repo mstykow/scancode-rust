@@ -1105,3 +1105,18 @@ classify_copyright_result(Filename) ->
         );
     }
 }
+
+#[test]
+fn test_table_of_contents_dot_leader_line_is_not_an_author() {
+    // RFC 3525 table of contents: the `Authors'` label heads a dot-leader run and
+    // a page number, and the collected span also picks up the next entry's first
+    // word. ScanCode emits nothing.
+    let input = concat!(
+        "   Acknowledgments...............................................211\n",
+        "   Authors' Addresses............................................212\n",
+        "   Full Copyright Statement......................................213\n",
+    );
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}

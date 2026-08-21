@@ -16,6 +16,7 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = strip_trailing_parenthesized_email_contact(&a);
     a = strip_trailing_at_handle(&a);
     a = truncate_trailing_collective_contributors_prose(&a);
+    a = truncate_prose_sentence_after_name(&a);
     a = strip_leading_maintainers_label(&a);
     a = strip_trailing_javadoc_tags(&a);
     a = strip_trailing_paren_years(&a);
@@ -630,6 +631,46 @@ fn truncate_trailing_collective_contributors_prose(s: &str) -> String {
     } else {
         s.to_string()
     }
+}
+
+/// Truncate an author value at a sentence boundary the collector ran past, as in
+/// the RFC 3525 acknowledgements `... and Scott Pickett. Flemming Andreasen does
+/// not appear`. Only a name-shaped head followed by a prose tail is an over-run
+/// span; a prose head, or a tail that is itself a name, is left to other rules.
+fn truncate_prose_sentence_after_name(s: &str) -> String {
+    // These carry a name-internal period, so theirs does not close a sentence.
+    const NAME_ABBREVIATIONS: &[&str] = &[
+        "inc", "ltd", "llc", "plc", "co", "corp", "gmbh", "jr", "sr", "dr", "mr", "mrs", "ms",
+        "prof", "st", "univ", "dept", "ed", "eds",
+    ];
+    static SENTENCE_BOUNDARY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<head>.*?(?P<last>\p{Lu}[\p{L}'\x{2019}-]+))\.\s+(?P<tail>\p{Lu}.*)$")
+            .expect("valid author prose-sentence truncation regex")
+    });
+
+    let trimmed = s.trim();
+    let Some(cap) = SENTENCE_BOUNDARY_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let head = cap.name("head").map(|m| m.as_str()).unwrap_or("").trim();
+    let tail = cap.name("tail").map(|m| m.as_str()).unwrap_or("").trim();
+    let last = cap
+        .name("last")
+        .map(|m| m.as_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    if NAME_ABBREVIATIONS.contains(&last.as_str()) {
+        return s.to_string();
+    }
+    if head.split_whitespace().count() < 2 || looks_like_prose_fragment_author(head) {
+        return s.to_string();
+    }
+    if !looks_like_prose_fragment_author(tail) {
+        return s.to_string();
+    }
+
+    head.to_string()
 }
 
 fn looks_like_leading_the_institution_author(s: &str) -> bool {

@@ -988,3 +988,42 @@ fn test_single_by_conjoined_name_list_stays_one_author() {
         "primary author missing: {values:?}"
     );
 }
+
+#[test]
+fn test_acknowledgements_author_list_stops_at_the_sentence_boundary() {
+    // RFC 3525 acknowledgements: the `authors,` label introduces a genuine name
+    // list, but the collected span used to run past `Pickett.` and swallow the
+    // next sentence. The list itself must survive.
+    let input = concat!(
+        "   Megaco/H.248 owes a large initial debt to the MGCP protocol (RFC\n",
+        "   2705), and thus to its authors, Mauricio Arango, Andrew Dugan, Ike\n",
+        "   Elliott, Christian Huitema, and Scott Pickett.  Flemming Andreasen\n",
+        "   does not appear on this list of authors, but was a major contributor\n",
+    );
+    let (_c, _h, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+    assert_eq!(
+        values,
+        vec!["Mauricio Arango, Andrew Dugan, Ike Elliott, Christian Huitema, and Scott Pickett"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_author_list_closed_by_a_period_is_kept() {
+    for input in [
+        "Authors: Jane Doe, John Smith.\n",
+        "@author Jane Doe. John Smith\n",
+    ] {
+        let (_c, _h, authors) = detect_copyrights_from_text(input);
+        let values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+
+        assert!(
+            values
+                .iter()
+                .any(|a| a.contains("Jane Doe") && a.contains("John Smith")),
+            "author list lost for {input:?}: {authors:?}"
+        );
+    }
+}

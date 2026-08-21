@@ -402,9 +402,21 @@ pub(super) fn is_junk_copyright_code_fragment(s: &str) -> bool {
     (has_code_markers || has_prose_markers) && !has_copyright_year(trimmed)
 }
 
+/// Return true if `s` carries table-of-contents structure — a run of dot leaders
+/// closed by a page number, as in the RFC 3525 entry `Authors'
+/// Addresses............212`, which is never part of a name. Three dots stay out
+/// of scope so a prose ellipsis does not match.
+fn contains_toc_dot_leader_page_number(s: &str) -> bool {
+    static TOC_DOT_LEADER_RE: LazyLock<Regex> =
+        LazyLock::new(|| compile_static_regex(r"\.{4,}\s*\d"));
+    TOC_DOT_LEADER_RE.is_match(s)
+}
+
 /// Return true if `s` matches any known junk author pattern.
 pub(super) fn is_junk_author(s: &str) -> bool {
-    AUTHORS_JUNK_PATTERNS.iter().any(|re| re.is_match(s)) || looks_like_source_code(s)
+    AUTHORS_JUNK_PATTERNS.iter().any(|re| re.is_match(s))
+        || looks_like_source_code(s)
+        || contains_toc_dot_leader_page_number(s)
 }
 
 /// Return true if `s` matches any known junk holder pattern.
