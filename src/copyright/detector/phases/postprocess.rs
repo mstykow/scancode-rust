@@ -486,10 +486,98 @@ fn drop_placeholder_and_code_junk_by_raw_line(
             || is_copyright_holder_placeholder_line(trimmed)
             || is_pattern_match_binding_line(trimmed)
             || is_notice_template_line(trimmed)
+            || is_delimited_data_row_line(trimmed)
+            || is_documentation_tag_reference_line(trimmed)
+    };
+    // The tagged type is the copyright field's own: on its line, or on the next one.
+    let declares_tagged_type = |start: LineNumber| {
+        raw_lines
+            .iter()
+            .skip(start.get().saturating_sub(1))
+            .take(2)
+            .any(|raw| is_tagged_type_field_declaration_line(raw.trim()))
     };
 
-    copyrights.retain(|c| !is_junk_line(c.start_line));
-    holders.retain(|h| !is_junk_line(h.start_line));
+    copyrights.retain(|c| !is_junk_line(c.start_line) && !declares_tagged_type(c.start_line));
+    holders.retain(|h| !is_junk_line(h.start_line) && !declares_tagged_type(h.start_line));
+}
+
+/// Every form a copyright marker takes at the head of a notice.
+static COPYRIGHT_MARKER_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\bcopyright\b|\bcopr\.?|\(c\)|\u{a9}").expect("valid marker regex")
+});
+
+/// Whether the line is a positional data row: many short `;`-delimited fields,
+/// as in a Unicode character-database entry, which makes a `copyright` word on
+/// it a data cell rather than a notice. Every field has to read as a plain cell —
+/// short, and free of the abbreviating periods of prose (`Inc.`) and of code
+/// punctuation — which keeps a semicolon-separated notice and a banner on a
+/// minified stylesheet out of scope, and a dated notice is never a data row
+/// however many fields it is punctuated into.
+fn is_delimited_data_row_line(line: &str) -> bool {
+    const MIN_FIELDS: usize = 8;
+    const MAX_FIELD_LEN: usize = 48;
+    const CODE_PUNCTUATION: &[char] = &[
+        '{', '}', '(', ')', '[', ']', '/', '\\', '*', '=', ':', '|', '"', '.',
+    ];
+
+    if has_copyright_year(line) {
+        return false;
+    }
+
+    let mut fields = 0usize;
+    for field in line.split(';') {
+        let field = field.trim();
+        if field.len() > MAX_FIELD_LEN || field.contains(CODE_PUNCTUATION) {
+            return false;
+        }
+        fields += 1;
+    }
+
+    fields >= MIN_FIELDS
+}
+
+/// Whether the line names a documentation tag (`` `@copyright' `` in edoc,
+/// javadoc, or doxygen prose) rather than asserting a notice. The tag is closed
+/// off by its own quote or inline-code delimiter, so it carries no party name,
+/// and the closing delimiter is what keeps an open quote that does introduce one
+/// (`"@Copyright` above a chip label's party and year) out of scope.
+///
+/// A marker elsewhere on the line that does open on a party name is a real
+/// notice, dated or not, and keeps the line — the tag alone has to account for
+/// every notice-looking marker on it.
+fn is_documentation_tag_reference_line(line: &str) -> bool {
+    static QUOTED_DOC_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?i)["'`\u{2018}\u{201c}][@\\]copyright["'`\u{2019}\u{201d}]"#)
+            .expect("valid doc tag regex")
+    });
+
+    QUOTED_DOC_TAG_RE.is_match(line)
+        && !has_copyright_year(line)
+        && !COPYRIGHT_MARKER_RE.find_iter(line).any(|marker| {
+            !line[..marker.start()].ends_with(['@', '\\'])
+                && opens_on_party_name(&line[marker.end()..])
+        })
+}
+
+/// Whether the text after a marker opens on a capitalized party name, skipping
+/// the bare `c` of a `(c)` sign and any punctuation between them.
+fn opens_on_party_name(tail: &str) -> bool {
+    tail.split_whitespace()
+        .map(|token| token.trim_matches(|c: char| !c.is_alphanumeric()))
+        .find(|word| !word.is_empty() && !word.eq_ignore_ascii_case("c"))
+        .is_some_and(|word| word.starts_with(char::is_uppercase))
+}
+
+/// Whether the line declares a tagged type field (`[0] IMPLICIT SET OF`), the
+/// ASN.1 notation that makes a neighboring `copyright` field name a schema
+/// member rather than a notice.
+fn is_tagged_type_field_declaration_line(line: &str) -> bool {
+    static TAGGED_TYPE_FIELD_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\[\s*\d+\s*\]\s+(?:IMPLICIT|EXPLICIT)\b").expect("valid tagged type regex")
+    });
+
+    TAGGED_TYPE_FIELD_RE.is_match(line)
 }
 
 fn is_copyright_holder_placeholder_line(line: &str) -> bool {
@@ -521,21 +609,34 @@ fn is_copyright_holder_placeholder_line(line: &str) -> bool {
 ///
 /// Every marker must be a template: a detection records no column and so cannot
 /// be tied to one marker, which means a line that also asserts a real notice —
-/// dated or not — keeps all of its detections.
+/// dated or not — keeps all of its detections. The one marker that opens no
+/// notice at all is `copyright notice`, a term of art naming the form rather
+/// than claiming it.
 fn is_notice_template_line(line: &str) -> bool {
-    static MARKER_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)\bcopyright\b|\bcopr\.?|\(c\)|\u{a9}").expect("valid marker regex")
-    });
-
-    let mut saw_marker = false;
-    for marker in MARKER_RE.find_iter(line) {
-        saw_marker = true;
-        if !year_slot_is_placeholder(&line[marker.end()..]) {
+    let mut saw_template = false;
+    for marker in COPYRIGHT_MARKER_RE.find_iter(line) {
+        let tail = &line[marker.end()..];
+        if names_a_notice_form(tail) {
+            continue;
+        }
+        if !year_slot_is_placeholder(tail) {
             return false;
         }
+        saw_template = true;
     }
 
-    saw_marker
+    saw_template
+}
+
+/// Whether the marker is the term of art `copyright notice(s)` — the phrase
+/// refers to notices instead of asserting one, so it never supplies a party name.
+fn names_a_notice_form(tail: &str) -> bool {
+    tail.split_whitespace().next().is_some_and(|word| {
+        matches!(
+            word.trim_end_matches([',', ':', ';', '.']),
+            "notice" | "notices"
+        )
+    })
 }
 
 /// Whether the year slot of the notice opening at a marker holds a `YYYY`
@@ -546,11 +647,33 @@ fn is_notice_template_line(line: &str) -> bool {
 /// is lowercase (`Copyright Acme Corp. Release dates use the YYYY format.`),
 /// title-cased (`... Corp. Release Dates Use YYYY`), or behind a semicolon or
 /// colon (`... Corp; dates use YYYY`).
+///
+/// A fill-in slot written longhand collapses to `YYYY` before the walk and takes
+/// the same positional path. Only two forms count: a substitution variable
+/// (`[$date-of-software]`, `${year}`), which is text some tool is meant to
+/// replace, and a slot that instructs the reader to supply the date
+/// (`<insert year>`). A bare slot name (`<year>`, `{YEAR}`) is deliberately out
+/// of scope — it is how a project writes its own credit line, and the party it
+/// names is real.
 fn year_slot_is_placeholder(tail: &str) -> bool {
+    static DATE_FILL_IN_SLOT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?ix)
+            \$ \{? [\w.-]* \b (?: year | date ) \b [\w.-]*
+            |
+            [\[<{] [^\[\]<>{}]{0,20}
+            \b (?: insert | enter | fill | specify | your ) \b
+            [^\[\]<>{}]{0,20} \b (?: year | date ) \b [^\[\]<>{}]{0,20} [\]>}]
+            ",
+        )
+        .expect("valid date fill-in slot regex")
+    });
     static PLACEHOLDER_YEAR_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\by{4}\b").expect("valid placeholder year regex"));
     static PLAIN_YEAR_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"\b(?:19|20)\d{2}\b").expect("valid plain year regex"));
+
+    let tail = DATE_FILL_IN_SLOT_RE.replace_all(tail, " YYYY ");
 
     let mut previous_ended_sentence = false;
     let mut previous_ended_clause = false;

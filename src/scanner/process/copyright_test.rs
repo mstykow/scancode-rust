@@ -1708,6 +1708,196 @@ fn test_extract_copyright_information_keeps_notices_with_code_like_punctuation()
 }
 
 #[test]
+fn test_extract_copyright_information_drops_fill_in_year_notice_templates() {
+    // License texts that instruct how to write a notice put a substitution
+    // variable or a fill-in instruction where the year belongs, with or without
+    // a prose lead-in quoting the template.
+    for (name, text) in [
+        (
+            "LicenseRef-scancode-ietf-trust.txt",
+            "Copyright (c) <insert year> IETF Trust and the persons identified as the document authors.  All",
+        ),
+        (
+            "LicenseRef-scancode-ietf-trust.txt",
+            "BSD License: Copyright (c) <insert year> IETF Trust and the persons identified as authors of the code.",
+        ),
+        (
+            "W3C-19980720.txt",
+            "redistributed or derivative code: \"Copyright \u{a9} [$date-of-software] World Wide",
+        ),
+        (
+            "w3c-copyright-19990405.html",
+            "    doesn't exist, a notice of the form: \"Copyright \u{a9} [$date-of-document] <a href=\"http://www.w3.org/\">World Wide Web Consortium</a>,",
+        ),
+        (
+            "LicenseRef-scancode-w3c-docs-19990405.txt",
+            "The pre-existing copyright notice of the original author, or if it doesn't exist, a notice of the form: \"Copyright \u{a9} [$date-of-document] World Wide Web Consortium, (Massachusetts Institute of Technology).",
+        ),
+        ("NOTICE", "Copyright ${year} Acme Corp."),
+    ] {
+        let mut builder = FileInfoBuilder::default();
+        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        let file = build_single_file(builder);
+        assert!(
+            file.copyrights.is_empty(),
+            "copyright leaked from {text:?}: {:?}",
+            file.copyrights
+                .iter()
+                .map(|c| &c.copyright)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            file.holders.is_empty(),
+            "holder leaked from {text:?}: {:?}",
+            file.holders.iter().map(|h| &h.holder).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn test_extract_copyright_information_keeps_notices_beside_fill_in_templates() {
+    // A bare slot name is how a project writes its own credit line, so the party
+    // it names stays; so do real notices in the same files as the templates, and
+    // a line that both asserts a notice and quotes the template form.
+    for (name, text, expected_holder) in [
+        (
+            "W3C-19980720.txt",
+            "Copyright \u{a9} 1994-2002 World Wide Web Consortium, (Massachusetts Institute of",
+            "World Wide Web Consortium",
+        ),
+        (
+            "LicenseRef-scancode-w3c-docs-19990405.txt",
+            "Copyright \u{a9}  World Wide Web Consortium, (Massachusetts Institute of Technology,",
+            "World Wide Web Consortium",
+        ),
+        (
+            "NOTICE",
+            "Portions of this software are copyright \u{a9} <year> The FreeType Project (www.freetype.org).",
+            "The FreeType Project",
+        ),
+        (
+            "Nokia",
+            "Copyright \u{a9} <year> Nokia and others. All Rights Reserved.",
+            "Nokia and others",
+        ),
+        (
+            "not-real-copyrights",
+            "Copyright \" {YEAR} United States Government as represented by",
+            "United States Government",
+        ),
+        (
+            "FILE-HEADERS.md",
+            "Copyright Acme AB. New files must read Copyright Acme AB <insert year>.",
+            "Acme AB",
+        ),
+        (
+            "arcnet-hardware.txt",
+            "C2 -- \"@Copyright\n       Waterloo Microsystems Inc.\n       1985\"",
+            "Waterloo Microsystems Inc.",
+        ),
+        (
+            "overview.edoc",
+            "The `@copyright' tag documents the Copyright (c) Acme Corp notice.",
+            "Acme Corp",
+        ),
+        (
+            "HEADERS.md",
+            "The copyright notice reads: Copyright (c) Acme Corp",
+            "Acme Corp",
+        ),
+    ] {
+        let mut builder = FileInfoBuilder::default();
+        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        let file = build_single_file(builder);
+        assert!(
+            file.holders
+                .iter()
+                .any(|h| h.holder.contains(expected_holder)),
+            "holder {expected_holder:?} dropped from {text:?}: {:?}",
+            file.holders.iter().map(|h| &h.holder).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn test_extract_copyright_information_drops_schema_fields_and_data_rows() {
+    for (name, text) in [
+        (
+            "Document-Profile-Descriptor.asn1",
+            concat!(
+                "Other-User-Information ::= SET {\n",
+                "  copyright\n",
+                "    [0] IMPLICIT SET OF\n",
+                "                   SET {copyright-information\n",
+                "                          [0] IMPLICIT SET OF Character-Data OPTIONAL,\n",
+                "                        copyright-dates\n",
+                "                          [1] IMPLICIT SET OF Date-and-Time OPTIONAL} OPTIONAL,\n",
+            ),
+        ),
+        (
+            "UnicodeData.txt",
+            concat!(
+                "2116;NUMERO SIGN;So;0;ON;<compat> 004E 006F;;;;N;NUMERO;;;;\n",
+                "2117;SOUND RECORDING COPYRIGHT;So;0;ON;;;;;N;;;;;\n",
+                "2118;SCRIPT CAPITAL P;Sm;0;ON;;;;;N;SCRIPT P;;;;\n",
+            ),
+        ),
+        (
+            "overview.edoc",
+            concat!(
+                "<dt><a name=\"mtag-copyright\">`@copyright'</a></dt>\n",
+                "      <dd>Specifies the module copyrights. The content can be\n",
+                "      arbitrary text; for example:\n",
+            ),
+        ),
+    ] {
+        let mut builder = FileInfoBuilder::default();
+        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        let file = build_single_file(builder);
+        assert!(
+            file.copyrights.is_empty(),
+            "copyright leaked from {name}: {:?}",
+            file.copyrights
+                .iter()
+                .map(|c| &c.copyright)
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn test_extract_copyright_information_keeps_semicolon_dense_notices() {
+    // Enough fields to look like a data row; the abbreviating periods and the
+    // stylesheet's code punctuation say otherwise.
+    for (name, text) in [
+        (
+            "NOTICE",
+            concat!(
+                "Copyright (c) 2020 Acme Inc.; 2021 Beta Ltd.; 2022 Gamma S.A.; 2023 Delta Oy;",
+                " 2024 Eps AB; 2025 Zeta AS; 2026 Eta B.V.; 2027 Theta Inc."
+            ),
+        ),
+        (
+            "bundle.min.css",
+            "/*! Copyright 2020 Acme Inc */body{margin:0;padding:0;color:red;border:0;top:0;left:0;right:0;bottom:0}",
+        ),
+        (
+            "CREDITS",
+            "Copyright 2020 Acme Inc;2021 Beta;2022 Gamma;2023 Delta;2024 Eps;2025 Zeta;2026 Eta;2027 Theta",
+        ),
+    ] {
+        let mut builder = FileInfoBuilder::default();
+        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        let file = build_single_file(builder);
+        assert!(
+            file.holders.iter().any(|h| h.holder.contains("Acme Inc")),
+            "holder dropped from {name}: {:?}",
+            file.holders.iter().map(|h| &h.holder).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
 fn test_extract_copyright_information_keeps_banner_on_a_line_shared_with_code() {
     let text = "/*! Copyright (c) 2020 Acme Inc. All rights reserved. */ if (a || b) { c(); }";
     let mut builder = FileInfoBuilder::default();
