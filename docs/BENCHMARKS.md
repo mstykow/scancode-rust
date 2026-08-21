@@ -12,7 +12,7 @@ The chart below uses a log-log scatter plot: file count on the x-axis, wall-cloc
 
 ![Scan duration vs. file count for Provenant and ScanCode](scan-duration-vs-files.svg)
 
-> Provenant is faster on 254 of 254 recorded runs, with a **19.7× median speedup** and **19.7× geometric-mean speedup** overall; the median gap grows from **9.1×** on sub-100-file targets to **37.9×** on 10k+ file targets.
+> Provenant is faster on 254 of 254 recorded runs, with a **19.7× median speedup** and **19.7× geometric-mean speedup** overall; the median gap grows from **9.1×** on sub-100-file targets to **37.2×** on 10k+ file targets.
 > Generated from the benchmark timing rows in this document via `cargo run --manifest-path xtask/Cargo.toml --bin generate-benchmark-chart`.
 
 ## Current benchmark examples
@@ -322,12 +322,12 @@ The quick index below links to benchmark sections. Each benchmark entry then rec
 - Timing: Provenant `4.88s`; ScanCode `51.28s`
 - Direct Hex package and dependency extraction (`1` vs `0` packages, `13` vs `0` dependencies): a `pkg:hex/plug` package from `mix.exs` carrying locked `plug_crypto`, `telemetry`, `ex_doc`, and sibling Hex pins from `mix.lock` that ScanCode leaves at zero, with Unicode-preserving `Loïc Hoguin` holder normalization
 
-##### [erlang/otp @ 6146f0d](https://github.com/erlang/otp/tree/6146f0df6794451472fac4735e694ec1f56b873e) — **38.99× faster**
+##### [erlang/otp @ 6146f0d](https://github.com/erlang/otp/tree/6146f0df6794451472fac4735e694ec1f56b873e) — **32.84× faster**
 
 - Files: 11,803
-- Run context: 2026-08-20 · macOS 26.6.1 · Apple M5 Pro · 64 GB · arm64 · 4 proc
-- Timing: Provenant `51.90s`; ScanCode `2023.39s`
-- Broader OTP package and dependency visibility (`51` vs `0` packages, `16` vs `9` dependencies): one `pkg:hex/<app>` package per committed `lib/*/src/*.app.src` (`41`, with bounded `%PLACEHOLDER%` handling that keeps canonical manifests such as `diameter.app.src` scannable) alongside `10` `pkg:autotools` packages from per-application `configure.ac` build manifests and the `mix.lock` Hex pins ScanCode leaves unread, plus lower-noise detection across the doc and test tree, where ScanCode reads Erlang identifiers as licenses (`mpl-2.0` from `ModemDescriptor_mpl`, `boost-1.0` from the `bsl` bit-shift operator), a code comment as `proprietary-license`, Erlang variables as copyright holders (`(c), Ctxt, Ren, Env`), and an Erlang `.app` filename as `http://ftp.app/`, with more precise license composition on the vendored `ryu` sources — whose alternative grant reads `(apache-2.0 OR boost-1.0)` rather than a conjunction — third-party `vendor.info` notices recorded without the trailing JSON key ScanCode appends, and Unicode-preserving party names such as `Björn Gustavsson`, `Mickaël Rémond`, and `Claes Wikström`
+- Run context: 2026-08-21 · macOS 26.6.1 · Apple M5 Pro · 64 GB · arm64 · 4 proc
+- Timing: Provenant `61.62s`; ScanCode `2023.39s`
+- Broader OTP package and dependency visibility (`51` vs `0` packages, `16` vs `9` dependencies): one `pkg:hex/<app>` package per committed `lib/*/src/*.app.src` (`41`, with bounded `%PLACEHOLDER%` handling that keeps canonical manifests such as `diameter.app.src` scannable) alongside `10` `pkg:autotools` packages from per-application `configure.ac` build manifests and the `mix.lock` Hex pins ScanCode leaves unread, plus markedly lower-noise party and license detection across the doc and test tree, where ScanCode reads Erlang identifiers as licenses (`mpl-2.0` on `24` sites from `ModemDescriptor_mpl`, `boost-1.0` from the `bsl` bit-shift operator, `bsd-new` from `bsd style pthread_set_name_np`), a code comment as `proprietary-license`, Erlang variables as copyright holders (`(c), Ctxt, Ren, Env`), and an Erlang `.app` filename as `http://ftp.app/`; more precise license composition on the vendored `ryu` sources, whose alternative grant reads `(apache-2.0 OR boost-1.0)` rather than a conjunction; third-party `vendor.info` notices recorded without the trailing JSON key ScanCode appends; and source-faithful parties throughout — email addresses in their original case (`Paul.Green@stratus.com`) and Unicode-preserving names such as `Björn Gustavsson`, `Mickaël Rémond`, and `Claes Wikström`
 
 ##### [livebook-dev/livebook @ 77cbcd9](https://github.com/livebook-dev/livebook/tree/77cbcd98df133045f5a4adf7273e4cd077307714) — **17.14× faster**
 
