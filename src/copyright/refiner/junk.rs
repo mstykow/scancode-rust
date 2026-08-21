@@ -211,6 +211,64 @@ fn prefix_names_holder(prefix: &str) -> bool {
         })
 }
 
+/// Return true if a modal verb stands where the party name belongs, once the
+/// copyright markers and any leading conjunction are skipped (`Copyright and can
+/// have as prefix ...`, `can have as prefix ...`). Documentation that states how
+/// a notice must be written reads that way; a real notice never does.
+///
+/// Only modals are treated this way, not the copula: `Copyright is held by Acme
+/// Corp.` still names a party. Requiring the modal to be lowercase keeps
+/// capitalized personal names (`May`, `Will`, `Can`) out of scope.
+pub(super) fn opens_with_modal_instead_of_party(s: &str) -> bool {
+    const MODALS: &[&str] = &[
+        "can", "cannot", "could", "may", "might", "must", "shall", "should", "will", "would",
+    ];
+    const SKIPPABLE: &[&str] = &[
+        "copyright",
+        "copyrights",
+        "copyrighted",
+        "copr",
+        "copr.",
+        "(c)",
+        "©",
+        "c",
+        "and",
+        "or",
+        "but",
+    ];
+
+    s.split_whitespace()
+        .map(|word| word.trim_matches(|c: char| c == ',' || c == ';' || c == ':'))
+        .find(|word| !SKIPPABLE.contains(&word.to_ascii_lowercase().as_str()))
+        .is_some_and(|word| MODALS.contains(&word))
+}
+
+/// Return true if a holder is prose at both ends: it opens on a lowercase common
+/// word and closes on a dangling function word (`detection heuristics of REUSE
+/// tool in`). A party name is a complete noun phrase, so a value that trails off
+/// into a preposition, conjunction, or article is prose the marker swept in.
+///
+/// The lowercase opener is what keeps a value that still names a capitalized
+/// party (`Wind River Systems Inc Implemented by`, `Matthew Wilcox willy at`)
+/// with the trailing-clause strippers rather than discarding it. The tail
+/// comparison is case-sensitive for the same reason: a trailing middle initial
+/// (`Jane A`) is not the article `a`.
+pub(super) fn is_truncated_lowercase_prose_holder(s: &str) -> bool {
+    const DANGLING_TAIL_WORDS: &[&str] = &[
+        "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into", "of", "on", "onto",
+        "or", "over", "per", "the", "to", "under", "upon", "via", "with", "within", "without",
+    ];
+
+    let trimmed = s.trim().trim_end_matches(['.', ',', ';', ':']);
+    if !trimmed.starts_with(char::is_lowercase) {
+        return false;
+    }
+
+    trimmed
+        .rsplit_once(char::is_whitespace)
+        .is_some_and(|(_, last)| DANGLING_TAIL_WORDS.contains(&last))
+}
+
 /// Return true if `s` matches any known junk copyright pattern.
 pub fn is_junk_copyright(s: &str) -> bool {
     if looks_like_structured_copyright_notice_with_year(s) {
@@ -224,6 +282,7 @@ pub fn is_junk_copyright(s: &str) -> bool {
         || is_junk_c_sign_path_fragment(s)
         || is_creative_commons_license_prose(s)
         || spans_prose_sentence_boundary(s)
+        || opens_with_modal_instead_of_party(s)
         || contains_unicode_segmentation_markers(s)
         || is_bare_markup_tag(s)
         || looks_like_source_code(s)
@@ -326,8 +385,12 @@ pub(crate) fn has_copyright_year(s: &str) -> bool {
 }
 
 pub(super) fn is_junk_copyright_scan_phrase(s: &str) -> bool {
-    static COPYRIGHT_SCAN_RE: LazyLock<Regex> =
-        LazyLock::new(|| compile_static_regex(r"(?i)\bcopyright\s+scan(?:s|ner|ning)?\b"));
+    // Compliance-tooling vocabulary: text about *finding* notices, never a notice.
+    static COPYRIGHT_SCAN_RE: LazyLock<Regex> = LazyLock::new(|| {
+        compile_static_regex(
+            r"(?i)\bcopyright\s+(?:scan(?:s|ner|ning)?|detect(?:ion|or|ing)|heuristics?)\b",
+        )
+    });
 
     !has_copyright_year(s) && COPYRIGHT_SCAN_RE.is_match(s)
 }
@@ -427,6 +490,8 @@ pub(crate) fn is_junk_holder(s: &str) -> bool {
         || is_creative_commons_license_prose(s)
         || looks_like_source_code(s)
         || starts_with_sentence_connective(s)
+        || opens_with_modal_instead_of_party(s)
+        || is_truncated_lowercase_prose_holder(s)
         || contains_unicode_segmentation_markers(s)
         || is_bare_markup_tag(s)
         || s.eq_ignore_ascii_case("MIT")
@@ -576,8 +641,13 @@ pub(super) fn is_junk_copyright_symbol_garbage(s: &str) -> bool {
 }
 
 pub(super) fn contains_regex_or_template_marker(s: &str) -> bool {
+    // Erlang/`io:format` control sequences: the words around them are a template.
+    static FORMAT_DIRECTIVE_RE: LazyLock<Regex> =
+        LazyLock::new(|| compile_static_regex(r"~(?:t?[psw]|n)\b"));
+
     let trimmed = s.trim();
-    trimmed.contains("(?")
+    FORMAT_DIRECTIVE_RE.is_match(trimmed)
+        || trimmed.contains("(?")
         || trimmed.contains("?:")
         || trimmed.contains(r"\d")
         || trimmed.contains(r"\s")

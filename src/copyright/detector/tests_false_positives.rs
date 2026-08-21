@@ -1120,3 +1120,198 @@ fn test_table_of_contents_dot_leader_line_is_not_an_author() {
 
     assert!(authors.is_empty(), "authors: {authors:?}");
 }
+
+#[test]
+fn test_notice_format_documentation_is_not_a_notice() {
+    // Documentation *about* the required header: prose that states the rule, and
+    // template lines whose year slot is a `YYYY` placeholder. The last line
+    // quotes the template mid-sentence, so refinement drops the placeholder and
+    // only the raw line still shows that the notice is a template.
+    let content = "\
+The copyright notice must start with `Copyright`, and can have as prefix the SPDX annotation `SPDX-FileCopyrightText: `
+followed by the holders of the copyright, as follows:
+
+1. To be used exclusively by OTP team
+   - `Copyright Ericsson AB YYYY. All Rights Reserved.`
+   - `Copyright Ericsson AB YYYY-YYYY. All Rights Reserved.`
+
+> For any contributions made by the Erlang/OTP team, the copyright statement must
+> be `Copyright Ericsson AB YYYY. All Rights Reserved.`. The `license-header.es` script
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+}
+
+#[test]
+fn test_real_notices_beside_the_format_documentation_are_kept() {
+    // The same document carries genuine notices, dated and undated, which the
+    // template and prose rules must leave untouched.
+    let content = "\
+Copyright Ericsson AB 2025. All Rights Reserved.
+SPDX-FileCopyrightText: Copyright (C) 2019 The ORT Project Authors
+Copyright (c) Meta Platforms, Inc. and affiliates.
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| c.copyright.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "Copyright Ericsson AB 2025",
+            "Copyright (c) 2019 The ORT Project Authors",
+            "Copyright (c) Meta Platforms, Inc. and affiliates",
+        ],
+        "expected the real notices, got {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| h.holder.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "Ericsson AB",
+            "The ORT Project Authors",
+            "Meta Platforms, Inc. and affiliates",
+        ],
+        "expected the real holders, got {holders:?}"
+    );
+}
+
+#[test]
+fn test_compliance_tooling_prose_and_format_strings_are_not_notices() {
+    // An Erlang compliance script: a comment about running a copyright *scanner*,
+    // and a diagnostic format string whose `~ts`/`~n` directives make its words a
+    // template. Only the file's own header notice is a notice.
+    let content = "\
+%% Copyright Ericsson AB 2024-2026. All Rights Reserved.
+%%
+%% Ignore copyright detection heuristics of REUSE tool in this file.
+%%    throw({warn, \"Invalid Copyright: '~ts' in '~ts for ~ts~n'\", [C, Filename, Regex]});
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| c.copyright.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Copyright Ericsson AB 2024-2026"],
+        "expected only the header notice, got {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| h.holder.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Ericsson AB"],
+        "expected only the header holder, got {holders:?}"
+    );
+}
+
+#[test]
+fn test_placeholder_elsewhere_on_the_line_does_not_condemn_a_genuine_notice() {
+    // The placeholder must fill this notice's own year slot: an unrelated one
+    // further along the line leaves an undated but genuine notice alone.
+    let content = "# Copyright Acme Corp. Release dates in this file use the YYYY format.\n";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert_eq!(
+        copyrights
+            .iter()
+            .map(|c| c.copyright.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Copyright Acme Corp."],
+        "expected the undated notice, got {copyrights:?}"
+    );
+    assert_eq!(
+        holders
+            .iter()
+            .map(|h| h.holder.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Acme Corp."],
+        "expected the undated holder, got {holders:?}"
+    );
+}
+
+#[test]
+fn test_unrelated_year_on_the_line_does_not_excuse_a_quoted_template() {
+    // The year that matters is the detection's own: a real year elsewhere in the
+    // prose must not make the quoted template read as a dated notice.
+    let content = "> In 2025 the notice must read `Copyright Acme AB YYYY. All Rights Reserved.`\n";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+}
+
+#[test]
+fn test_line_that_asserts_and_then_templates_the_same_notice_keeps_the_assertion() {
+    // A detection records only its line, so when the value occurs twice the
+    // placeholder cannot be pinned to one of them; the assertion wins.
+    let content = "# Copyright Acme AB. New files must read Copyright Acme AB YYYY.\n";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright Acme AB"),
+        "expected the asserted notice, got {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Acme AB"),
+        "expected the asserted holder, got {holders:?}"
+    );
+}
+
+#[test]
+fn test_template_is_recognized_however_its_notice_is_spaced_or_punctuated() {
+    // The year slot is read off the source line, so a template survives none of
+    // the spellings that refinement would normalize away in the value.
+    for content in [
+        "# Copyright  Acme  AB  YYYY.\n",
+        "# Copyright Acme AB, YYYY.\n",
+        "> the notice must read `Copyright  Acme  AB  YYYY. All Rights Reserved.`. See below\n",
+        "> the notice must read `Copyright Acme AB, YYYY. All Rights Reserved.`. See below\n",
+        "> the notice must read `\u{a9} Acme  AB YYYY. All Rights Reserved.`. See below\n",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+        assert!(
+            copyrights.is_empty(),
+            "template produced copyrights {copyrights:?} for {content:?}"
+        );
+        assert!(
+            holders.is_empty(),
+            "template produced holders {holders:?} for {content:?}"
+        );
+    }
+}
+
+#[test]
+fn test_placeholder_prose_behind_any_punctuation_keeps_the_notice() {
+    // The year slot ends where the notice does — at a lowercase prose word, or at
+    // a sentence or clause boundary — so no punctuation and no title-cased prose
+    // can pull an unrelated `YYYY` into the notice.
+    for content in [
+        "# Copyright Acme Corp; dates use YYYY\n",
+        "# Copyright Acme Corp: dates use YYYY\n",
+        "# Copyright Acme Corp \u{2014} dates use YYYY\n",
+        "# Copyright Acme Corp (dates use YYYY)\n",
+        "# Copyright Acme Corp. Release Dates Use YYYY\n",
+        "# Copyright Acme Corp; Dates Use YYYY\n",
+        "# Copyright Acme Corp: Dates Use YYYY\n",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+        assert!(
+            copyrights.iter().any(|c| c.copyright.contains("Acme Corp")),
+            "expected the notice, got {copyrights:?} for {content:?}"
+        );
+        assert!(
+            holders.iter().any(|h| h.holder.contains("Acme Corp")),
+            "expected the holder, got {holders:?} for {content:?}"
+        );
+    }
+}

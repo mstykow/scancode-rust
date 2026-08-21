@@ -203,8 +203,10 @@ pub(super) static HOLDERS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(||
         r"(?i)\bpkg\.(author|homepage)\b",
         r"(?i)\bdate\.year\b",
         r"(?i)\bYYYY-MM-DD\b",
-        // A `YYYY` placeholder in the year slot means the party name is one too.
+        // A `YYYY` placeholder in the year slot — before or after the name —
+        // means the party name is a template too.
         r"(?i)^y{4}(?:\s*-\s*y{4})?\b",
+        r"(?i)\by{4}(?:\s*-\s*y{4})?\.?$",
         r"(?i)<\s*pkg\.[a-zA-Z0-9_.-]+\s*>",
         r"(?i)^http://www\.quirksmode\b",
         r"[→⟶]",
