@@ -22,6 +22,8 @@ ignored_rules = [
   "gpl-2.0-plus_with_freertos-exception-2.0_1.RULE",
   # Bare CAL-1.0 tokenization false-positives on calibration macros; see ScanCode issue #4740 and PR #4759.
   "cal-1.0_10.RULE",
+  # Tokenizing "BSD-style" to [bsd, style] makes this clue rule match platform prose such as "BSD-style sockets API"; declared_license_aliases.toml serves the declared-field meaning instead.
+  "bsd-new_878.RULE",
 ]
 
 ignored_licenses = []
