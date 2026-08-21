@@ -55,6 +55,11 @@ expression = "bsd-new"
 reason = "Bare \"BSD\" in a declared license field means BSD-3-Clause by convention, matching ScanCode. It is aliased rather than carried as an index rule because \"BSD\" is also the name of an operating system family: a bare-word index rule for it matched 301 times across erlang/otp with zero license context, all platform prose such as \"only available on Linux and BSD systems\". Exact-match aliasing also keeps \"BSD with advertising\" (BSD-4-Clause) from collapsing to bsd-new."
 
 [[alias]]
+names = ["bsd-style", "bsd style"]
+expression = "bsd-new"
+reason = "A declared \"BSD-style\" states the package is under the BSD license without pinning a clause count; ScanCode resolves it to bsd-new (BSD-3-Clause), the safer of the two. It is aliased rather than carried as an index rule because tokenization drops the hyphen, so a bare [bsd, style] rule matches ordinary platform prose: across the retained compare-run corpus the upstream bsd-new_878.RULE clue fired on 155 distinct lines, the large majority of them prose such as \"BSD-style sockets API\" (mbedtls), \"BSD-style lwIP TCP/IP stack\" (curl), \"BSD-style EOF\" (pexpect), \"BSD style MD5 password\" (openssl) and \"Define if you have bsd style pthread_set_name_np\" (erlang/otp). Genuine file-content references keep their own longer rules (bsd-new_1115, bsd-new_1169, bsd-new_1175)."
+
+[[alias]]
 names = ["psf", "python"]
 expression = "python"
 reason = "The Python Software Foundation License (SPDX Python-2.0) is conventionally written 'PSF' or 'Python' in declared license fields; ScanCode maps the PSF family to the 'python' license. Observed in pyodide conda package metadata. Safe only because this is declared-field-only — the bare word 'Python' is a false positive in file content (it is the language name), which is exactly why this is an alias and not an index rule."

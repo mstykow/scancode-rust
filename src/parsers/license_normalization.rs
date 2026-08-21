@@ -331,8 +331,8 @@ pub(crate) fn detect_declared_license_name(name: &str) -> Option<NormalizedDecla
 /// Promotes a clue-only whole-statement detection into a confident declared
 /// expression.
 ///
-/// Free-text detection keeps bare ambiguous license names (e.g. "BSD", "GPL",
-/// "BSD-style") as expression-less *clues* so they never become hard detections
+/// Free-text detection keeps bare ambiguous license names (e.g. "GPL", "AGPL")
+/// as expression-less *clues* so they never become hard detections
 /// in arbitrary file text. A declared manifest statement is a bounded,
 /// trustworthy license field, so when the statement is exactly such a name we
 /// honor the clue's license expression — the declared-context analog of
@@ -340,10 +340,10 @@ pub(crate) fn detect_declared_license_name(name: &str) -> Option<NormalizedDecla
 ///
 /// Stays conservative: requires a single detection whose single match is a
 /// whole-statement *hash* match (the statement's tokens are exactly a rule's
-/// tokens). This is what distinguishes a true bare name such as "BSD" or
-/// "BSD-style" from a fragment match where the bare name is only part of a
-/// longer statement (e.g. "BSD with advertising", which means BSD-4-Clause, must
-/// NOT collapse to bsd-new). A statement with no clue match, or whose clue match
+/// tokens). This is what distinguishes a true bare name such as "GPL" from a
+/// fragment match where the bare name is only part of a longer statement, which
+/// must not collapse to the bare name's license. A statement with no clue match,
+/// or whose clue match
 /// only covers a fragment, yields `None` so the declared expression stays an
 /// honest `null`.
 fn promote_whole_statement_clue(
@@ -1689,6 +1689,28 @@ mod tests {
             Some("BSD-3-Clause")
         );
         assert_eq!(package.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_populate_declared_license_bsd_style() {
+        // A declared "BSD-style" has no index rule (the bare two-word rule
+        // false-positives on prose) and resolves through the alias table.
+        for declared in ["BSD-style", "BSD style"] {
+            let mut package = package_with(Some(declared), None, None);
+            populate_declared_license_and_holder(&mut package);
+
+            assert_eq!(
+                package.declared_license_expression.as_deref(),
+                Some("bsd-new"),
+                "declared {declared:?}"
+            );
+            assert_eq!(
+                package.declared_license_expression_spdx.as_deref(),
+                Some("BSD-3-Clause"),
+                "declared {declared:?}"
+            );
+            assert_eq!(package.license_detections.len(), 1, "declared {declared:?}");
+        }
     }
 
     #[test]

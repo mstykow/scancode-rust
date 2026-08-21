@@ -705,6 +705,71 @@ fn test_engine_does_not_detect_bsd_the_operating_system_as_a_license() {
 }
 
 #[test]
+fn test_engine_does_not_detect_bsd_style_prose_as_a_license() {
+    let engine = get_engine();
+
+    // Tokenization drops the hyphen, so a bare "BSD-style" rule also matches
+    // ordinary platform prose. The declared-field meaning lives in the declared
+    // alias table instead.
+    for text in [
+        "/* Define if you have bsd style pthread_set_name_np */",
+        "  /* Define to use BSD-style lwIP TCP/IP stack. */",
+        "// BSD-style safe and consistent string copy functions.",
+        "// This file implements BSD-style setproctitle() for Linux.",
+        "   'BSD style MD5 password with random salt');",
+        " * @legacy: true if this is BSD style",
+        "                    # BSD-style EOF",
+        "install-sh\t    - BSD style install script",
+        " *          BSD-style sockets API.",
+    ] {
+        let detections = engine
+            .detect_with_kind(text, false, false)
+            .expect("Detection should succeed");
+        assert!(
+            detections.is_empty(),
+            "BSD-style prose yielded license evidence for {text:?}: {:?}",
+            detections
+                .iter()
+                .map(|d| (
+                    d.license_expression.as_deref().unwrap_or("none"),
+                    d.matches
+                        .iter()
+                        .map(|m| m.rule_identifier.as_str())
+                        .collect::<Vec<_>>()
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn test_engine_still_detects_bsd_style_license_references() {
+    let engine = get_engine();
+
+    // Genuine "BSD-style license" references keep their own longer rules, so
+    // dropping the bare two-word clue rule costs no real detection.
+    for text in [
+        "Licensed under a BSD-style license.",
+        "Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.",
+        "The source files are distributed under the BSD-style license found in the LICENSE file.",
+    ] {
+        let detections = engine
+            .detect_with_kind(text, false, false)
+            .expect("Detection should succeed");
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.license_expression.as_deref() == Some("bsd-new")),
+            "expected a bsd-new detection for {text:?}, got {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or("none"))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
 fn test_engine_does_not_detect_graphics_pipeline_library_as_gpl() {
     let engine = get_engine();
 

@@ -74,6 +74,8 @@ mod tests {
         assert_eq!(declared_license_alias("Python"), Some("python"));
         assert_eq!(declared_license_alias("BSD"), Some("bsd-new"));
         assert_eq!(declared_license_alias("bsd"), Some("bsd-new"));
+        assert_eq!(declared_license_alias("BSD-style"), Some("bsd-new"));
+        assert_eq!(declared_license_alias("BSD style"), Some("bsd-new"));
     }
 
     #[test]
@@ -87,6 +89,8 @@ mod tests {
         assert_eq!(declared_license_alias(""), None);
         // Exact-match aliasing is what keeps BSD-4-Clause from collapsing.
         assert_eq!(declared_license_alias("BSD with advertising"), None);
+        // BSD-style prose must not resolve, only the bare declared name.
+        assert_eq!(declared_license_alias("BSD-style sockets API"), None);
     }
 
     #[test]
