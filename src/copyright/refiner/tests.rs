@@ -3414,9 +3414,14 @@ fn test_holder_that_is_prose_at_both_ends_is_junk() {
     for value in [
         "detection heuristics of REUSE tool in",
         "the copyright holders or",
+        // A modal opens the predicate a party name never has.
+        "in documents granted to the IETF Trust by contributors to Alternate Stream as though granted pursuant to RFC 5378, and shall",
+        "licenses of copyrights in documents which may",
     ] {
         assert_eq!(refine_holder(value), None, "kept {value:?}");
     }
+    assert!(!is_truncated_lowercase_prose_holder("Marshall Will"));
+    assert!(!is_truncated_lowercase_prose_holder("Jane May"));
     // A value that still names a capitalized party is left to the clause
     // strippers, and a trailing middle initial is not the article `a`.
     assert!(!is_truncated_lowercase_prose_holder(

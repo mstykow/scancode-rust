@@ -254,9 +254,11 @@ pub(super) fn opens_with_modal_instead_of_party(s: &str) -> bool {
 /// comparison is case-sensitive for the same reason: a trailing middle initial
 /// (`Jane A`) is not the article `a`.
 pub(super) fn is_truncated_lowercase_prose_holder(s: &str) -> bool {
+    // Modals are dangling tails too: they open the predicate a party name never has.
     const DANGLING_TAIL_WORDS: &[&str] = &[
-        "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into", "of", "on", "onto",
-        "or", "over", "per", "the", "to", "under", "upon", "via", "with", "within", "without",
+        "a", "an", "and", "as", "at", "but", "by", "can", "for", "from", "in", "into", "may",
+        "must", "of", "on", "onto", "or", "over", "per", "shall", "should", "the", "to", "under",
+        "upon", "via", "will", "with", "within", "without", "would",
     ];
 
     let trimmed = s.trim().trim_end_matches(['.', ',', ';', ':']);
