@@ -1107,6 +1107,71 @@ classify_copyright_result(Filename) ->
 }
 
 #[test]
+fn test_sigil_quoted_map_keys_do_not_rescue_a_pattern_match_binding_line() {
+    // Erlang's `~"..."` binary sigil quotes a map *key* here, so the quoted word
+    // names a field and the line still binds variables rather than text.
+    let content = "\
+restore_from_cache(Files, [#{ ~\"scanner\" := Scanner, ~\"summary\" := Summary} | T]) ->
+    #{ ~\"copyrights\" := Copyrights, ~\"licenses\" := Licenses} = Summary,
+    ok.
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+
+    // A quoted notice on such a line carries more than the bare marker, so it is
+    // still read as assigned text.
+    let assigned = "    #{ ~\"notice\" := \"Copyright Acme Corp. All rights reserved.\" },\n";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(assigned);
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright Acme Corp."),
+        "expected the assigned notice, got {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Acme Corp."),
+        "expected the assigned holder, got {holders:?}"
+    );
+}
+
+#[test]
+fn test_erlang_format_string_that_builds_a_notice_is_not_a_notice() {
+    // A `~p`/`~n` control sequence makes the surrounding words a template, and
+    // the literal year it interpolates around does not make it a real notice.
+    let content = "\
+      %% Copyright Ericsson AB 2020-~p. All Rights Reserved.
+\t\" * Portions created by Ericsson are Copyright 2007, Ericsson AB.~n\"
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+    assert!(
+        copyrights.is_empty(),
+        "unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "unexpected holders: {holders:?}");
+
+    // The same file's own dated header stays a notice, tildes elsewhere or not.
+    let header = "\
+      %% Copyright Ericsson AB 1996-2026. All Rights Reserved.
+    io:format(\"~ts~n\", [Chars]).
+";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(header);
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright Ericsson AB 1996-2026"),
+        "expected the header notice, got {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Ericsson AB"),
+        "expected the header holder, got {holders:?}"
+    );
+}
+
+#[test]
 fn test_table_of_contents_dot_leader_line_is_not_an_author() {
     // RFC 3525 table of contents: the `Authors'` label heads a dot-leader run and
     // a page number, and the collected span also picks up the next entry's first

@@ -450,7 +450,7 @@ pub(super) fn is_junk_copyright_code_fragment(s: &str) -> bool {
         || contains_malformed_spaced_year(trimmed);
     let has_prose_markers = is_obvious_prose_fragment(trimmed);
 
-    if has_windows_versioninfo_markers {
+    if has_windows_versioninfo_markers || contains_format_control_directive(trimmed) {
         return true;
     }
 
@@ -583,6 +583,7 @@ pub(super) fn is_junk_holder_code_fragment(s: &str) -> bool {
     let has_prose_markers = is_obvious_prose_fragment(trimmed);
 
     has_windows_versioninfo_markers
+        || contains_format_control_directive(trimmed)
         || ((has_code_markers || has_prose_markers) && !has_copyright_year(trimmed))
 }
 
@@ -640,13 +641,21 @@ pub(super) fn is_junk_copyright_symbol_garbage(s: &str) -> bool {
         || (tail.len() >= 10 && non_ascii_count >= 4 && ascii_alpha_count <= 2 && symbol_count >= 2)
 }
 
-pub(super) fn contains_regex_or_template_marker(s: &str) -> bool {
-    // Erlang/`io:format` control sequences: the words around them are a template.
+/// Whether `s` carries an Erlang/`io:format` control sequence (`~ts`, `~n`,
+/// `~p`, `~w`). A notice never interpolates, so the words around one build a
+/// string — and a literal year inside a format string is part of the template
+/// rather than evidence of a real notice, which is why callers must not exempt
+/// such a value on the strength of its year.
+pub(super) fn contains_format_control_directive(s: &str) -> bool {
     static FORMAT_DIRECTIVE_RE: LazyLock<Regex> =
         LazyLock::new(|| compile_static_regex(r"~(?:t?[psw]|n)\b"));
 
+    FORMAT_DIRECTIVE_RE.is_match(s.trim())
+}
+
+pub(super) fn contains_regex_or_template_marker(s: &str) -> bool {
     let trimmed = s.trim();
-    FORMAT_DIRECTIVE_RE.is_match(trimmed)
+    contains_format_control_directive(trimmed)
         || trimmed.contains("(?")
         || trimmed.contains("?:")
         || trimmed.contains(r"\d")
