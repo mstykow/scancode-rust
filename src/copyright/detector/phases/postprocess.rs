@@ -309,11 +309,17 @@ fn run_author_extraction_and_repairs(
     authors.extend(new_a);
 
     let mut new_a = super::author_heuristics::extract_comment_author_label_authors(raw_lines);
+    new_a.retain(|candidate| {
+        !authors
+            .iter()
+            .any(|author| author.start_line == candidate.start_line)
+    });
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
     super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
     super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
+    super::author_heuristics::drop_weak_single_word_prose_authors(raw_lines, authors);
     seen.rebuild_authors_from(authors);
 }
 

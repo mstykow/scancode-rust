@@ -90,6 +90,82 @@ fn test_extract_comment_author_label_authors_keeps_obfuscated_angle_contact() {
 }
 
 #[test]
+fn test_extract_comment_author_label_authors_requires_comment_evidence() {
+    let raw_lines = vec![
+        "! Author: Hunter Goatley",
+        "| Author: Bill Davidsen",
+        "author: package metadata value",
+    ];
+    let authors = extract_comment_author_label_authors(&raw_lines);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Hunter Goatley"), "authors: {values:?}");
+    assert!(values.contains(&"Bill Davidsen"), "authors: {values:?}");
+    assert!(
+        !values.contains(&"package metadata value"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_detect_comment_author_label_when_grammar_has_no_author() {
+    let input = "!  Program: CVTHELP.TPU\n!  Author: Hunter Goatley\n!  Date: January 12, 1992\n";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.author == "Hunter Goatley"),
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_comment_author_after_year_only_copyright_remains_holder_only() {
+    let raw_lines = vec![
+        "* Copyright (C) 2016-2018",
+        "* Author: Matt Ranostay <matt.ranostay@konsulko.com>",
+    ];
+    let authors = extract_comment_author_label_authors(&raw_lines);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_drop_weak_single_word_authors_uses_local_attribution_evidence() {
+    let raw_lines = vec![
+        "Contributors, please see AUTHORS",
+        "let the script author decide",
+        "Written by chunchu",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "please".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::ONE,
+        },
+        AuthorDetection {
+            author: "decide".to_string(),
+            start_line: LineNumber::new(2).expect("valid line"),
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "chunchu".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(3).expect("valid line"),
+        },
+    ];
+
+    drop_weak_single_word_prose_authors(&raw_lines, &mut authors);
+
+    assert_eq!(authors.len(), 1, "authors: {authors:?}");
+    assert_eq!(authors[0].author, "chunchu");
+}
+
+#[test]
 fn test_extract_comment_author_label_authors_detects_doxygen_author_tags() {
     let raw_lines = vec![
         "*> \\author Univ. of California Berkeley",

@@ -2171,10 +2171,13 @@ pub(in super::super) fn extract_comment_author_label_authors(
         LazyLock::new(|| Regex::new(r"(?i)^\\author\s+(?P<who>.+?)\s*$").unwrap());
     static YEAR_ONLY_COPY_LINE_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?ix)^copyright\s*\(c\)\s*[0-9\s,\-–/]+$").unwrap());
+    static COMMENT_PREFIX_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^\s*(?:#+|;+|//+|/\*+|\*+|!+|--+|>+|\|+|\.\!+)\s*").unwrap());
     let normalize_comment_line = |line: &str| {
         line.trim()
             .trim_start_matches(|ch: char| {
-                ch.is_whitespace() || matches!(ch, '#' | ';' | '/' | '*' | '!' | '-' | '>')
+                ch.is_whitespace()
+                    || matches!(ch, '#' | ';' | '/' | '*' | '!' | '-' | '>' | '|' | '.')
             })
             .trim()
             .to_string()
@@ -2223,9 +2226,20 @@ pub(in super::super) fn extract_comment_author_label_authors(
                 continue;
             }
 
-            if who.contains('<') && who.contains('>') && who_lower.contains(" at ") {
+            let has_comment_prefix = COMMENT_PREFIX_RE.is_match(raw_line);
+            let has_obfuscated_angle_contact =
+                who.contains('<') && who.contains('>') && who_lower.contains(" at ");
+            if has_obfuscated_angle_contact {
                 authors.push(AuthorDetection {
                     author: who.to_string(),
+                    start_line,
+                    end_line: start_line,
+                });
+            } else if has_comment_prefix
+                && let Some(author) = refine_author_with_optional_handle_suffix(who)
+            {
+                authors.push(AuthorDetection {
+                    author,
                     start_line,
                     end_line: start_line,
                 });

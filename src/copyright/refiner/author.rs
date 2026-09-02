@@ -195,11 +195,12 @@ fn looks_like_prose_fragment_author(s: &str) -> bool {
         return true;
     }
 
-    if contains_email_address(trimmed) {
+    let contains_email = contains_email_address(trimmed);
+    if contains_email && trimmed.split_whitespace().count() <= 6 {
         return false;
     }
 
-    if contains_html_like_fragment(trimmed) {
+    if contains_html_like_fragment(trimmed) && !contains_email {
         return true;
     }
 
@@ -1292,19 +1293,38 @@ fn truncate_trailing_clause_after_contact(s: &str) -> String {
         return s.to_string();
     }
 
-    let tail_lower = tail.to_ascii_lowercase();
+    let prose_tail = tail
+        .trim_start_matches(|ch: char| ch.is_whitespace() || matches!(ch, '\'' | '"' | '-' | '–'))
+        .trim();
+    let tail_lower = prose_tail.to_ascii_lowercase();
     let prose_like_tail = [
         "the ", "a ", "an ", "i ", "since ", "this ", "these ", "those ", "is ", "was ", "visit ",
         "for ", "from ",
     ]
     .iter()
     .any(|prefix_text| tail_lower.starts_with(prefix_text));
+    let is_author_qualifier = tail_lower == "et al"
+        || tail_lower == "et al."
+        || looks_like_conjoined_author_tail(prose_tail)
+        || ((tail_lower.starts_with("(http://") || tail_lower.starts_with("(https://"))
+            && tail_lower.ends_with(')'))
+        || (prose_tail.starts_with("(@") && prose_tail.ends_with(')'));
 
-    if prose_like_tail {
+    if !is_author_qualifier && (prose_like_tail || looks_like_prose_fragment_author(prose_tail)) {
         return prefix.to_string();
     }
 
     s.to_string()
+}
+
+fn looks_like_conjoined_author_tail(tail: &str) -> bool {
+    static CONJOINED_NAME_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^(?:and|or)\s+(?:\p{Lu}[\p{L}'’.-]*|(?:de|da|del|la|van|von))(?:\s+(?:\p{Lu}[\p{L}'’.-]*|(?:de|da|del|la|van|von))){1,5}(?:\s*<[^>\s]+@[^>\s]+>)?$",
+        )
+        .expect("valid conjoined author regex")
+    });
+    CONJOINED_NAME_RE.is_match(tail.trim().trim_end_matches('.'))
 }
 
 /// Truncate a trailing website/homepage label followed by a URL.

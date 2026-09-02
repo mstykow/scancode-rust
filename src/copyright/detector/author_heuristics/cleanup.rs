@@ -528,6 +528,41 @@ pub(in super::super) fn drop_authors_after_sentence_final_label(
     });
 }
 
+/// Drop a weak, single-word author when it was harvested from surrounding
+/// prose rather than from an explicit attribution. Lowercase mononyms remain
+/// valid when the source gives them strong local evidence such as `Author:` or
+/// `written by`.
+pub(in super::super) fn drop_weak_single_word_prose_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    authors.retain(|author| {
+        let candidate = author.author.trim();
+        if candidate.split_whitespace().count() != 1
+            || !candidate.chars().all(|ch| ch.is_alphabetic())
+            || !candidate.chars().all(char::is_lowercase)
+        {
+            return true;
+        }
+
+        let Some(raw_line) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
+            return true;
+        };
+        if raw_line.split_whitespace().count() <= 2 {
+            return true;
+        }
+
+        let lower = raw_line.to_lowercase();
+        let candidate_lower = candidate.to_lowercase();
+        let has_explicit_label = ["author:", "author :", "authors:", "authors :"]
+            .iter()
+            .any(|label| lower.contains(&format!("{label} {candidate_lower}")));
+        let has_by_attribution = lower.contains(&format!("by {candidate_lower}"));
+
+        has_explicit_label || has_by_attribution
+    });
+}
+
 fn window_contains_markup_element_author_value(window: &str, author: &str) -> bool {
     let normalized = normalize_whitespace(window);
     if !(normalized.contains('<') && normalized.contains('>')) {

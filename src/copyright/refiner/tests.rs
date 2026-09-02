@@ -249,6 +249,18 @@ fn test_refine_author_truncates_trailing_prose_after_contact() {
 }
 
 #[test]
+fn test_refine_author_keeps_conjoined_name_after_contact() {
+    assert_eq!(
+        refine_author("John Smith <js@example.com> and Jane Doe"),
+        Some("John Smith <js@example.com> and Jane Doe".to_string())
+    );
+    assert_eq!(
+        refine_author("John Smith <js@example.com> and this module is maintained"),
+        Some("John Smith <js@example.com>".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_truncates_prose_sentence_after_a_name() {
     assert_eq!(
         refine_author(
@@ -2418,6 +2430,42 @@ fn test_refine_author_empty() {
 fn test_refine_author_junk() {
     assert_eq!(refine_author("james hacker"), None);
     assert_eq!(refine_author("who hopes"), None);
+}
+
+#[test]
+fn test_refine_author_does_not_let_email_bypass_prose_evidence() {
+    assert_eq!(
+        refine_author(
+            "Development questions, bug reports, and patches should be sent to the Module-Build mailing list at <module-build@perl.org>"
+        ),
+        None
+    );
+    assert_eq!(
+        refine_author("Jane Smith <jane@example.com>"),
+        Some("Jane Smith <jane@example.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("maintainer@example.com"),
+        Some("maintainer@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "Ken Williams <kwilliams@cpan.org> ' - 'Development questions, bug reports, and patches should be sent to the Module-Build mailing list at <module-build@perl.org>"
+        ),
+        Some("Ken Williams <kwilliams@cpan.org>".to_string())
+    );
+    assert_eq!(
+        refine_author("Nasca Iacob <sy@another-d-mention.ro> (https://github.com/cthackers)"),
+        Some("Nasca Iacob <sy@another-d-mention.ro> (https://github.com/cthackers)".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "Donald Becker (becker@scyld.com), Rowan Hughes (x-csrdh@jcu.edu.au), David Hinds (dahinds@users.sourceforge.net), and Erik Stahlman (erik@vt.edu). Donald wrote the code"
+        ),
+        Some(
+            "Donald Becker (becker@scyld.com), Rowan Hughes (x-csrdh@jcu.edu.au), David Hinds (dahinds@users.sourceforge.net), and Erik Stahlman (erik@vt.edu)".to_string()
+        )
+    );
 }
 
 #[test]
