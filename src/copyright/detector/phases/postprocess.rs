@@ -317,6 +317,9 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
 
+    super::author_heuristics::repair_chained_attribution_authors(prepared_cache, authors);
+    seen.rebuild_authors_from(authors);
+
     let mut new_a = super::author_heuristics::extract_comment_author_label_authors(raw_lines);
     new_a.retain(|candidate| {
         !authors

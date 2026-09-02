@@ -375,7 +375,7 @@ fn extract_line_local_attribution_author(
 ) -> Option<String> {
     static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:written|authored|revised|overhauled|updated|modified|implemented)\s+by\s+(?P<who>.+)$",
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by)\s+(?P<who>.+)$",
         )
         .unwrap()
     });
@@ -392,6 +392,13 @@ fn extract_line_local_attribution_author(
     });
 
     let normalized = strip_leading_dash_bullet(line);
+    let normalized_lower = normalized.to_ascii_lowercase();
+    if normalized_lower.find(" by ").is_some_and(|by_index| {
+        let prefix = &normalized_lower[..by_index];
+        prefix.contains("copyright") || prefix.contains("(c)")
+    }) {
+        return None;
+    }
     let captures = ACTION_BY_RE
         .captures(normalized)
         .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))?;
@@ -462,6 +469,97 @@ pub(in super::super) fn extract_line_local_attribution_authors(
             })
         })
         .collect()
+}
+
+pub(in super::super) fn repair_chained_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    static ACTIVE_SENTENCE_CHAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:written|authored|developed|created)\s+by\s+(?P<first>[^.]{2,100})\.\s+(?P<second>[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){1,4})\s+(?:created|authored|wrote|developed|implemented|updated|modified|refactored)\b",
+        )
+        .unwrap()
+    });
+    static WRAPPED_ROLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:support|implementation|code|patch(?:es)?|maintenance|maintainership|documentation)\s*$",
+        )
+        .unwrap()
+    });
+    static LEADING_BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^by\s+(?P<who>.+)$").unwrap());
+
+    let mut recovered = Vec::new();
+    for line in prepared_cache.iter_non_empty() {
+        let Some(captures) = ACTIVE_SENTENCE_CHAIN_RE.captures(line.prepared) else {
+            continue;
+        };
+        let Some(first) = captures
+            .name("first")
+            .and_then(|matched| refine_author(matched.as_str().trim_matches(&[' ', ',', ';'][..])))
+        else {
+            continue;
+        };
+        let Some(second) = captures
+            .name("second")
+            .and_then(|matched| refine_author(matched.as_str()))
+        else {
+            continue;
+        };
+
+        authors.retain(|author| {
+            !(author.start_line <= line.line_number
+                && author.end_line >= line.line_number
+                && author.author.contains(&first)
+                && author.author.contains(&second))
+        });
+        recovered.push(AuthorDetection {
+            author: first,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+        recovered.push(AuthorDetection {
+            author: second,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        if !WRAPPED_ROLE_RE.is_match(previous.prepared.trim()) {
+            continue;
+        }
+        let Some(captures) = LEADING_BY_RE.captures(next.prepared.trim()) else {
+            continue;
+        };
+        let Some(who) = captures.name("who").map(|matched| matched.as_str()) else {
+            continue;
+        };
+        let lower = who.to_ascii_lowercase();
+        let has_contact = who.contains('@')
+            || who.contains('<')
+            || (lower.contains(" at ") && lower.contains(" dot "));
+        if !has_contact {
+            continue;
+        }
+        let who = trim_attribution_tail(who);
+        let Some(author) = refine_author(&who) else {
+            continue;
+        };
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    recovered.retain(|candidate| {
+        !authors
+            .iter()
+            .any(|author| author.author == candidate.author)
+    });
+    authors.extend(recovered);
 }
 
 fn has_adjacent_copyright_hint(

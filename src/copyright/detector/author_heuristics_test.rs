@@ -1339,6 +1339,7 @@ fn test_consecutive_line_local_attributions_remain_distinct() {
         "Overhauled by Holger Waechtler\n",
         "Driver support by Michael Hunold <hunold@example.com>\n",
         "Support by Charles Bailey bailey@example.edu. OS/2 support\n",
+        "Ported to HID by Benjamin Tissoires <benjamin@example.com>\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
     let values: Vec<&str> = authors
@@ -1357,6 +1358,10 @@ fn test_consecutive_line_local_attributions_remain_distinct() {
         "authors: {values:?}"
     );
     assert!(
+        values.contains(&"Benjamin Tissoires <benjamin@example.com>"),
+        "authors: {values:?}"
+    );
+    assert!(
         values
             .iter()
             .all(|author| !author.contains("Overhauled by")),
@@ -1370,10 +1375,57 @@ fn test_line_local_attribution_does_not_match_passive_prose() {
         "The implementation was revised by adding one check.\n",
         "The default support is maintained by the package manager.\n",
         "Changes were introduced by default.\n",
+        "DTMF code (c) 1996 by Christian Mock (cm@example.com).\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
 
     assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_chained_active_attributions_are_distinct_authors() {
+    let input = concat!(
+        "AUTHORS\n",
+        "The implementation was written by Brandon L Black. ",
+        "Nicholas Clark created the pluggable interface.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Brandon L Black"), "authors: {values:?}");
+    assert!(values.contains(&"Nicholas Clark"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Black. Nicholas")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_wrapped_contribution_role_supports_leading_by_author() {
+    let input = concat!(
+        "AUTHORS\n",
+        "Support by Charles Bailey <charles@example.com>. OS/2 support\n",
+        "by Ilya Zakharevich <ilya@example.com>.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(&"Charles Bailey <charles@example.com>"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.contains(&"Ilya Zakharevich <ilya@example.com>"),
+        "authors: {values:?}"
+    );
 }
 
 #[test]
