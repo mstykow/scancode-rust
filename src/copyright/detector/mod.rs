@@ -723,6 +723,9 @@ use tree_walk::{
 mod tests;
 
 #[cfg(test)]
+mod diagnostics;
+
+#[cfg(test)]
 #[path = "tests_false_positives.rs"]
 mod tests_false_positives;
 
