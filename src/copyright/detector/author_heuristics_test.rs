@@ -135,11 +135,15 @@ fn test_comment_author_after_year_only_copyright_remains_holder_only() {
 }
 
 #[test]
-fn test_drop_weak_single_word_authors_uses_local_attribution_evidence() {
+fn test_drop_weak_authors_uses_bounded_local_attribution_evidence() {
     let raw_lines = vec![
         "Contributors, please see AUTHORS",
         "let the script author decide",
         "Written by chunchu",
+        "re-indented in 2006 by commit 95b2444",
+        "there are no missing authors in AUTHORS",
+        "The one maintained by the Perl development team",
+        "Changes by Gisle: optree dump",
     ];
     let mut authors = vec![
         AuthorDetection {
@@ -157,12 +161,33 @@ fn test_drop_weak_single_word_authors_uses_local_attribution_evidence() {
             start_line: LineNumber::new(3).expect("valid line"),
             end_line: LineNumber::new(3).expect("valid line"),
         },
+        AuthorDetection {
+            author: "commit".to_string(),
+            start_line: LineNumber::new(4).expect("valid line"),
+            end_line: LineNumber::new(4).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "in AUTHORS".to_string(),
+            start_line: LineNumber::new(5).expect("valid line"),
+            end_line: LineNumber::new(5).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "the Perl".to_string(),
+            start_line: LineNumber::new(6).expect("valid line"),
+            end_line: LineNumber::new(6).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Gisle".to_string(),
+            start_line: LineNumber::new(7).expect("valid line"),
+            end_line: LineNumber::new(7).expect("valid line"),
+        },
     ];
 
-    drop_weak_single_word_prose_authors(&raw_lines, &mut authors);
+    drop_weak_prose_authors(&raw_lines, &mut authors);
 
-    assert_eq!(authors.len(), 1, "authors: {authors:?}");
+    assert_eq!(authors.len(), 2, "authors: {authors:?}");
     assert_eq!(authors[0].author, "chunchu");
+    assert_eq!(authors[1].author, "Gisle");
 }
 
 #[test]
@@ -1283,6 +1308,7 @@ fn test_changes_by_attribution_is_detected_inline_and_across_lines() {
         "This platform file is based on unix.c; changes by Ruslan Nickolaev (nruslan@hotbox.ru)\n",
         "This other port is based on unix.c; changes\n",
         " by Chris Herborth (chrish@pobox.com).\n",
+        "Changes by Gisle: optree dump.\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
     let values: Vec<&str> = authors
@@ -1298,6 +1324,56 @@ fn test_changes_by_attribution_is_detected_inline_and_across_lines() {
         values.contains(&"Chris Herborth (chrish@pobox.com)"),
         "authors: {values:?}"
     );
+    assert!(values.contains(&"Gisle"), "authors: {values:?}");
+    assert!(
+        values.iter().all(|author| !author.contains("optree dump")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_consecutive_line_local_attributions_remain_distinct() {
+    let input = concat!(
+        "Copyright (C) 2004 Example Corp.\n",
+        "Written by Ralph Metzler\n",
+        "Overhauled by Holger Waechtler\n",
+        "Driver support by Michael Hunold <hunold@example.com>\n",
+        "Support by Charles Bailey bailey@example.edu. OS/2 support\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Ralph Metzler"), "authors: {values:?}");
+    assert!(values.contains(&"Holger Waechtler"), "authors: {values:?}");
+    assert!(
+        values.contains(&"Michael Hunold <hunold@example.com>"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.contains(&"Charles Bailey bailey@example.edu"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Overhauled by")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_line_local_attribution_does_not_match_passive_prose() {
+    let input = concat!(
+        "The implementation was revised by adding one check.\n",
+        "The default support is maintained by the package manager.\n",
+        "Changes were introduced by default.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
 }
 
 #[test]

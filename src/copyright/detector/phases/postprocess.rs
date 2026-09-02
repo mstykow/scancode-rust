@@ -148,6 +148,11 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(authors, a_before);
     seen.rebuild_authors_from(authors);
 
+    let mut new_a =
+        super::author_heuristics::extract_line_local_attribution_authors(prepared_cache);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let a_before = authors.len();
     super::author_heuristics::extract_multiline_written_by_author_blocks(prepared_cache, authors);
     seen.dedup_new_authors(authors, a_before);
@@ -323,7 +328,7 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
     super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
     super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
-    super::author_heuristics::drop_weak_single_word_prose_authors(raw_lines, authors);
+    super::author_heuristics::drop_weak_prose_authors(raw_lines, authors);
     super::author_heuristics::repair_complete_by_line_author_boundaries(raw_lines, authors);
     super::author_heuristics::repair_hyphenated_prose_tail_authors(raw_lines, authors);
     super::author_heuristics::drop_embedded_authors_title_phrases(raw_lines, authors);

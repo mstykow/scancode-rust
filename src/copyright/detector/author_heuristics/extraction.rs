@@ -369,6 +369,101 @@ fn extract_written_by_subject(line: &str) -> Option<String> {
         .and_then(|cap| cap.name("who").map(|m| m.as_str().trim().to_string()))
 }
 
+fn extract_line_local_attribution_author(
+    line: &str,
+    allow_without_contact: bool,
+) -> Option<String> {
+    static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:written|authored|revised|overhauled|updated|modified|implemented)\s+by\s+(?P<who>.+)$",
+        )
+        .unwrap()
+    });
+    static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+        )
+        .unwrap()
+    });
+    static COPYRIGHT_TAIL_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\s*(?:,\s*copyright\b|\(c\)\s*\d{4})\b.*$").unwrap());
+    static CONTACT_SENTENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+)[A-Z].*$").unwrap()
+    });
+
+    let normalized = strip_leading_dash_bullet(line);
+    let captures = ACTION_BY_RE
+        .captures(normalized)
+        .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))?;
+    let who = captures.name("who")?.as_str().trim();
+    let has_contact = who.contains('@')
+        || who.contains('<')
+        || (who.to_ascii_lowercase().contains(" at ")
+            && who.to_ascii_lowercase().contains(" dot "));
+    if !allow_without_contact && !has_contact {
+        return None;
+    }
+    let who = trim_following_sentence_clause(who);
+    let who = COPYRIGHT_TAIL_RE.replace(&who, "");
+    let who = CONTACT_SENTENCE_TAIL_RE
+        .captures(&who)
+        .and_then(|captures| captures.name("head").map(|head| head.as_str().to_string()))
+        .unwrap_or_else(|| who.into_owned());
+    let who = trim_attribution_tail(&who);
+    let who = who.find('>').map_or(who.as_str(), |contact_end| {
+        let tail = who[contact_end + 1..].trim_start();
+        if tail.starts_with('.') || tail.starts_with(';') {
+            &who[..=contact_end]
+        } else {
+            who.as_str()
+        }
+    });
+    let who = who.trim_end_matches('.').trim();
+    let who_lower = who.to_ascii_lowercase();
+    if who_lower.ends_with(" and") || who_lower.ends_with(" or") {
+        return None;
+    }
+    refine_author(who)
+}
+
+pub(in super::super) fn extract_line_local_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    prepared_cache
+        .iter_non_empty()
+        .filter_map(|line| {
+            let author =
+                extract_line_local_attribution_author(line.prepared, false).or_else(|| {
+                    let normalized = strip_leading_dash_bullet(line.prepared);
+                    let lower = normalized.to_ascii_lowercase();
+                    let could_be_action_attribution = lower.contains(" by ")
+                        && [
+                            "written",
+                            "authored",
+                            "revised",
+                            "overhauled",
+                            "updated",
+                            "modified",
+                            "implemented",
+                            "originally",
+                            "original driver",
+                        ]
+                        .iter()
+                        .any(|prefix| lower.starts_with(prefix));
+                    (could_be_action_attribution
+                        && has_adjacent_copyright_hint(prepared_cache, line.line_number))
+                    .then(|| extract_line_local_attribution_author(line.prepared, true))
+                    .flatten()
+                })?;
+            Some(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            })
+        })
+        .collect()
+}
+
 fn has_adjacent_copyright_hint(
     prepared_cache: &PreparedLines<'_>,
     line_number: LineNumber,
@@ -641,14 +736,7 @@ pub(in super::super) fn extract_changes_by_authors(
             .map(|matched| matched.as_str())
             .unwrap_or("")
             .trim();
-        if who
-            .chars()
-            .filter(|ch| ch.is_alphabetic())
-            .all(|ch| ch.is_uppercase())
-        {
-            continue;
-        }
-        if let Some(author) = refine_author(who) {
+        if let Some(author) = refine_changes_by_party(who) {
             authors.push(AuthorDetection {
                 author,
                 start_line: line.line_number,
@@ -674,14 +762,7 @@ pub(in super::super) fn extract_changes_by_authors(
             .map(|matched| matched.as_str())
             .unwrap_or("")
             .trim();
-        if who
-            .chars()
-            .filter(|ch| ch.is_alphabetic())
-            .all(|ch| ch.is_uppercase())
-        {
-            continue;
-        }
-        if let Some(author) = refine_author(who) {
+        if let Some(author) = refine_changes_by_party(who) {
             authors.push(AuthorDetection {
                 author,
                 start_line: line.line_number,
@@ -691,6 +772,31 @@ pub(in super::super) fn extract_changes_by_authors(
     }
 
     authors
+}
+
+fn refine_changes_by_party(who: &str) -> Option<String> {
+    let party = who
+        .split_once(':')
+        .map(|(head, _)| head)
+        .unwrap_or(who)
+        .trim();
+    if party.is_empty()
+        || party
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+    {
+        return None;
+    }
+
+    refine_author(party).or_else(|| {
+        let mut letters = party.chars().filter(|ch| ch.is_alphabetic());
+        let first = letters.next()?;
+        (party.split_whitespace().count() == 1
+            && first.is_uppercase()
+            && letters.all(|ch| ch.is_lowercase()))
+        .then(|| party.to_string())
+    })
 }
 
 fn looks_like_contributed_person_name_token(word: &str) -> bool {
@@ -975,6 +1081,24 @@ pub(in super::super) fn extract_multiline_written_by_author_blocks(
                 || lower.starts_with("implemented ")
                 || lower.starts_with("copied from ")
         });
+
+        let line_local_authors: Vec<AuthorDetection> = block_lines
+            .iter()
+            .filter_map(|(line_number, raw_line)| {
+                let author = extract_line_local_attribution_author(raw_line, true)?;
+                Some(AuthorDetection {
+                    author,
+                    start_line: *line_number,
+                    end_line: *line_number,
+                })
+            })
+            .collect();
+        if line_local_authors.len() >= 2 {
+            authors.retain(|author| author.start_line < start_line || author.end_line > end_line);
+            authors.extend(line_local_authors);
+            line_number = next_line_number;
+            continue;
+        }
 
         if prefer_combined_block {
             let combined_raw = block_lines
