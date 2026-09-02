@@ -19,4 +19,5 @@ holders:
   - CJ, cjtsai@ali.com.tw, Maintainer
   - Michel Aubry, Maintainer
   - MontaVista Software, Inc.
-authors: []
+authors:
+  - Clear Zhang <Clear.Zhang@ali.com.tw>

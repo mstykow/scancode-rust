@@ -381,7 +381,7 @@ fn extract_line_local_attribution_author(
     });
     static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
@@ -489,6 +489,18 @@ pub(in super::super) fn repair_chained_attribution_authors(
     });
     static LEADING_BY_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)^by\s+(?P<who>.+)$").unwrap());
+    static CONJOINED_CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:support|implementation|code|patch(?:es)?|maintenance|maintainership|documentation)\s+by\s+(?P<who>.+?),?\s+and\s*$",
+        )
+        .unwrap()
+    });
+    static TRAILING_SECOND_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:expanded|updated|modified|integrated|supplemented|maintained|ported|adapted)\s+by\s+(?P<head>[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4})\s*$",
+        )
+        .unwrap()
+    });
 
     let mut recovered = Vec::new();
     for line in prepared_cache.iter_non_empty() {
@@ -547,6 +559,67 @@ pub(in super::super) fn repair_chained_attribution_authors(
         let Some(author) = refine_author(&who) else {
             continue;
         };
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        let Some(captures) = CONJOINED_CONTACT_RE.captures(previous.prepared.trim()) else {
+            continue;
+        };
+        let Some(first) = captures.name("who").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let second = next.prepared.trim().trim_end_matches('.').trim();
+        if (!first.contains('@') && !first.contains('<'))
+            || (!second.contains('@') && !second.contains('<'))
+        {
+            continue;
+        }
+        let Some(author) = refine_author(&format!("{first}, and {second}")) else {
+            continue;
+        };
+        authors.retain(|existing| {
+            !(existing.start_line == previous.line_number && author.starts_with(&existing.author))
+        });
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        let Some(captures) = TRAILING_SECOND_BY_RE.captures(previous.prepared.trim()) else {
+            continue;
+        };
+        let Some(head) = captures.name("head").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let tail = next.prepared.trim().trim_end_matches('.').trim();
+        let tail_words: Vec<&str> = tail.split_whitespace().collect();
+        if tail_words.is_empty()
+            || tail_words.len() > 3
+            || !tail_words.iter().all(|word| {
+                word.chars()
+                    .find(|ch| ch.is_alphabetic())
+                    .is_some_and(|ch| ch.is_uppercase())
+                    && word
+                        .chars()
+                        .all(|ch| ch.is_alphabetic() || matches!(ch, '\'' | '’' | '-' | '.'))
+            })
+        {
+            continue;
+        }
+        let Some(author) = refine_author(&format!("{head} {tail}")) else {
+            continue;
+        };
+        authors.retain(|existing| {
+            !(existing.start_line == previous.line_number && author.starts_with(&existing.author))
+        });
         recovered.push(AuthorDetection {
             author,
             start_line: previous.line_number,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use crate::copyright::prepare::prepare_text_line;
 
 pub fn strip_trailing_license_tail(s: &str) -> Option<String> {
     let lower = s.to_ascii_lowercase();
@@ -352,7 +353,6 @@ pub fn drop_single_line_copyrights_shadowed_by_multiline_same_start(
     if copyrights.len() < 2 {
         return;
     }
-
     static YEARS_EMAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r"(?ix)^copyright\s*\(c\)\s*(?P<years>[0-9\s,\-–]{4,32})\s+(?P<email>[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,15})\b",
@@ -607,6 +607,71 @@ pub fn drop_shadowed_multiline_prefix_copyrights(copyrights: &mut Vec<CopyrightD
                         .get(short.len())
                         .is_some_and(|b| b.is_ascii_whitespace() || b.is_ascii_punctuation())
             })
+        })
+    });
+}
+
+fn looks_like_copyright_section_heading(prefix: &str) -> bool {
+    let mut saw_subject = false;
+    let mut saw_pod_directive = false;
+    prefix.split_whitespace().all(|raw_token| {
+        let token = raw_token
+            .trim_matches(|ch: char| !ch.is_alphanumeric() && ch != '=')
+            .to_ascii_lowercase();
+        if token.starts_with("=head")
+            && token.strip_prefix("=head").is_some_and(|level| {
+                !level.is_empty() && level.chars().all(|ch| ch.is_ascii_digit())
+            })
+        {
+            saw_pod_directive = true;
+            return true;
+        }
+        if matches!(token.as_str(), "copyright" | "license" | "licence") {
+            saw_subject = true;
+            return true;
+        }
+        matches!(token.as_str(), "and" | "legal" | "notice" | "notices")
+    }) && saw_subject
+        && saw_pod_directive
+}
+
+/// Drop a multi-line extraction that consists only of a section heading plus
+/// a complete copyright already extracted on the final line.
+pub fn drop_section_heading_multiline_copyrights_shadowed_by_final_line(
+    raw_lines: &[&str],
+    copyrights: &mut Vec<CopyrightDetection>,
+) {
+    if copyrights.len() < 2 {
+        return;
+    }
+    let originals = copyrights.clone();
+    copyrights.retain(|candidate| {
+        if candidate.start_line == candidate.end_line {
+            return true;
+        }
+        !originals.iter().any(|single| {
+            if single.start_line != candidate.end_line || single.end_line != candidate.end_line {
+                return false;
+            }
+            let candidate_text = prepare_text_line(&candidate.copyright);
+            let single_text = prepare_text_line(&single.copyright);
+            if candidate_text == single_text {
+                let heading_start = candidate.start_line.get().saturating_sub(1);
+                let heading_end = candidate.end_line.get().saturating_sub(1);
+                return raw_lines
+                    .get(heading_start..heading_end)
+                    .is_some_and(|lines| {
+                        lines.iter().all(|line| {
+                            let prepared = prepare_text_line(line);
+                            prepared.trim().is_empty()
+                                || looks_like_copyright_section_heading(&prepared)
+                        })
+                    });
+            }
+            candidate_text
+                .strip_suffix(&single_text)
+                .map(str::trim)
+                .is_some_and(looks_like_copyright_section_heading)
         })
     });
 }

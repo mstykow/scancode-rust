@@ -1429,6 +1429,107 @@ fn test_wrapped_contribution_role_supports_leading_by_author() {
 }
 
 #[test]
+fn test_contact_backed_conjoined_attribution_continues_on_next_line() {
+    let input = concat!(
+        "AUTHORS\n",
+        "Mac support by Paul Schinder C<< <paul@example.com> >>, and\n",
+        "Thomas Wegner C<< <thomas@example.com> >>.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values
+            .contains(&"Paul Schinder <paul@example.com>, and Thomas Wegner <thomas@example.com>"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_second_by_author_name_continues_across_pod_lines() {
+    let input = concat!(
+        "AUTHORS\n",
+        "Originally written by Yves Orton, expanded by E<AElig>var ArnfjE<ouml>rE<eth>\n",
+        "Bjarmason.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Yves Orton"), "authors: {values:?}");
+    assert!(
+        values.contains(&"Ævar Arnfjörð Bjarmason"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.iter().all(|author| author != &"Ævar Arnfjörð"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_pod_contact_author_stops_at_following_sentence() {
+    let input = concat!(
+        "This project was maintained by Dan Kogai I<< <dankogai@cpan.org> >>.  ",
+        "See AUTHORS for everyone involved.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert_eq!(values, vec!["Dan Kogai <dankogai@cpan.org>"]);
+}
+
+#[test]
+fn test_wrapped_contact_author_stops_before_new_attribution() {
+    let input = concat!(
+        "Widget was written by Raphael Manfredi\n",
+        "F<E<lt>Raphael_Manfredi@pobox.comE<gt>>\n",
+        "Maintenance is now done by the Widget team.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(&"Raphael Manfredi <Raphael_Manfredi@pobox.com>"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.iter().all(|author| !author.contains("Maintenance")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_pod_copyright_heading_does_not_duplicate_final_line() {
+    let input = concat!(
+        "=head1 COPYRIGHT\n",
+        "\n",
+        "Copyright 2002-2014 Dan Kogai I<< <dankogai@cpan.org> >>.\n",
+    );
+    let (copyrights, _holders, _authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = copyrights
+        .iter()
+        .map(|copyright| copyright.copyright.as_str())
+        .collect();
+
+    assert_eq!(
+        values,
+        vec!["Copyright 2002-2014 Dan Kogai <dankogai@cpan.org>"]
+    );
+}
+
+#[test]
 fn test_changes_by_prose_does_not_create_an_author() {
     let input = concat!(
         "The value changes by adding one to the previous result.\n",

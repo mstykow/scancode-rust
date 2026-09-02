@@ -424,20 +424,173 @@ fn should_keep_angle_bracket_content(m: &str) -> bool {
 }
 
 fn unwrap_simple_pod_formatting(text: &str) -> String {
+    static POD_DOUBLE_FORMATTING_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\b[BCFILS]<<\s+(?P<text>.*?)\s+>>")
+            .expect("valid double-angle POD formatting regex")
+    });
     static POD_FORMATTING_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b[BCFILS]<(?P<text>[^/<>][^<>]*)>").expect("valid POD formatting regex")
+        Regex::new(r"\b[BCFILS]<(?P<text>(?:E<[^<>]+>|[^/<>])(?:E<[^<>]+>|[^<>])*)>")
+            .expect("valid POD formatting regex")
     });
 
     let mut unwrapped = text.to_string();
     for _ in 0..3 {
-        if !POD_FORMATTING_RE.is_match(&unwrapped) {
+        let has_double = POD_DOUBLE_FORMATTING_RE.is_match(&unwrapped);
+        let has_single = POD_FORMATTING_RE.is_match(&unwrapped);
+        if !has_double && !has_single {
             break;
         }
+        unwrapped = POD_DOUBLE_FORMATTING_RE
+            .replace_all(&unwrapped, "$text")
+            .into_owned();
         unwrapped = POD_FORMATTING_RE
             .replace_all(&unwrapped, "$text")
             .into_owned();
     }
     unwrapped
+}
+
+fn decode_pod_character_escapes(text: &str) -> String {
+    static POD_ESCAPE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"E<(?P<name>[A-Za-z][A-Za-z0-9]*|0x[0-9A-Fa-f]+|\d+)>")
+            .expect("valid POD character escape regex")
+    });
+
+    POD_ESCAPE_RE
+        .replace_all(text, |captures: &regex::Captures| {
+            let whole = captures
+                .get(0)
+                .map(|matched| matched.as_str())
+                .unwrap_or("");
+            let name = captures
+                .name("name")
+                .map(|matched| matched.as_str())
+                .unwrap_or("");
+            let decoded = if let Some(hex) = name.strip_prefix("0x") {
+                u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
+            } else if name.chars().all(|ch| ch.is_ascii_digit()) {
+                name.parse::<u32>().ok().and_then(char::from_u32)
+            } else {
+                decode_named_pod_character(name)
+            };
+            decoded
+                .map(|ch| ch.to_string())
+                .unwrap_or_else(|| whole.to_string())
+        })
+        .into_owned()
+}
+
+fn decode_named_pod_character(name: &str) -> Option<char> {
+    Some(match name {
+        "lt" => '<',
+        "gt" => '>',
+        "amp" => '&',
+        "quot" => '"',
+        "apos" => '\'',
+        "sol" => '/',
+        "verbar" => '|',
+        "lchevron" | "laquo" => '«',
+        "rchevron" | "raquo" => '»',
+        "nbsp" => '\u{00A0}',
+        "iexcl" => '¡',
+        "cent" => '¢',
+        "pound" => '£',
+        "curren" => '¤',
+        "yen" => '¥',
+        "brvbar" => '¦',
+        "sect" => '§',
+        "uml" => '¨',
+        "copy" => '©',
+        "ordf" => 'ª',
+        "not" => '¬',
+        "shy" => '\u{00AD}',
+        "reg" => '®',
+        "macr" => '¯',
+        "deg" => '°',
+        "plusmn" => '±',
+        "sup2" => '²',
+        "sup3" => '³',
+        "acute" => '´',
+        "micro" => 'µ',
+        "para" => '¶',
+        "middot" => '·',
+        "cedil" => '¸',
+        "sup1" => '¹',
+        "ordm" => 'º',
+        "frac14" => '¼',
+        "frac12" => '½',
+        "frac34" => '¾',
+        "iquest" => '¿',
+        "Agrave" => 'À',
+        "Aacute" => 'Á',
+        "Acirc" => 'Â',
+        "Atilde" => 'Ã',
+        "Auml" => 'Ä',
+        "Aring" => 'Å',
+        "AElig" => 'Æ',
+        "Ccedil" => 'Ç',
+        "Egrave" => 'È',
+        "Eacute" => 'É',
+        "Ecirc" => 'Ê',
+        "Euml" => 'Ë',
+        "Igrave" => 'Ì',
+        "Iacute" => 'Í',
+        "Icirc" => 'Î',
+        "Iuml" => 'Ï',
+        "ETH" => 'Ð',
+        "Ntilde" => 'Ñ',
+        "Ograve" => 'Ò',
+        "Oacute" => 'Ó',
+        "Ocirc" => 'Ô',
+        "Otilde" => 'Õ',
+        "Ouml" => 'Ö',
+        "times" => '×',
+        "Oslash" => 'Ø',
+        "Ugrave" => 'Ù',
+        "Uacute" => 'Ú',
+        "Ucirc" => 'Û',
+        "Uuml" => 'Ü',
+        "Yacute" => 'Ý',
+        "THORN" => 'Þ',
+        "szlig" => 'ß',
+        "agrave" => 'à',
+        "aacute" => 'á',
+        "acirc" => 'â',
+        "atilde" => 'ã',
+        "auml" => 'ä',
+        "aring" => 'å',
+        "aelig" => 'æ',
+        "ccedil" => 'ç',
+        "egrave" => 'è',
+        "eacute" => 'é',
+        "ecirc" => 'ê',
+        "euml" => 'ë',
+        "igrave" => 'ì',
+        "iacute" => 'í',
+        "icirc" => 'î',
+        "iuml" => 'ï',
+        "eth" => 'ð',
+        "ntilde" => 'ñ',
+        "ograve" => 'ò',
+        "oacute" => 'ó',
+        "ocirc" => 'ô',
+        "otilde" => 'õ',
+        "ouml" => 'ö',
+        "divide" => '÷',
+        "oslash" => 'ø',
+        "ugrave" => 'ù',
+        "uacute" => 'ú',
+        "ucirc" => 'û',
+        "uuml" => 'ü',
+        "yacute" => 'ý',
+        "thorn" => 'þ',
+        "yuml" => 'ÿ',
+        "euro" => '€',
+        "infin" => '∞',
+        "zwnj" => '\u{200C}',
+        "zwj" => '\u{200D}',
+        _ => return None,
+    })
 }
 
 /// Prepare a text `line` for copyright detection.
@@ -446,8 +599,8 @@ fn unwrap_simple_pod_formatting(text: &str) -> String {
 /// copyright/author detection. This mirrors the Python `prepare_text_line()`
 /// function from ScanCode Toolkit.
 pub fn prepare_text_line(line: &str) -> String {
-    let mut s = line.replace("E<lt>", "<").replace("E<gt>", ">");
-    s = unwrap_simple_pod_formatting(&s);
+    let mut s = unwrap_simple_pod_formatting(line);
+    s = decode_pod_character_escapes(&s);
 
     s.retain(|ch| ch != '\0');
 
@@ -1059,6 +1212,29 @@ mod tests {
         assert_eq!(
             prepare_text_line("The C<$buffer> is modified by C<inflate>. On completion"),
             "The $buffer is modified by inflate. On completion"
+        );
+    }
+
+    #[test]
+    fn test_perl_pod_named_and_numeric_character_escapes_are_decoded() {
+        assert_eq!(
+            decode_pod_character_escapes(
+                "E<AElig>var Bjarnason, JE<ouml>rg, E<0x00D8>ystein, E<47>, E<copy>, E<euro>"
+            ),
+            "Ævar Bjarnason, Jörg, Øystein, /, ©, €"
+        );
+        assert_eq!(decode_pod_character_escapes("E<unknown>"), "E<unknown>");
+        assert_eq!(
+            prepare_text_line("E<AElig>var Bjarnason, JE<ouml>rg, E<0x00D8>ystein"),
+            "Ævar Bjarnason, Jörg, Øystein"
+        );
+    }
+
+    #[test]
+    fn test_perl_pod_double_angle_formatting_is_unwrapped() {
+        assert_eq!(
+            prepare_text_line("Charles Bailey C<< <bailey@example.com> >>"),
+            "Charles Bailey <bailey@example.com>"
         );
     }
 

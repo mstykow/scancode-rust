@@ -272,6 +272,7 @@ fn run_author_extraction_and_repairs(
     );
     super::author_heuristics::drop_shadowed_compound_email_authors(authors);
     super::author_heuristics::drop_shadowed_prefix_authors(authors);
+    super::author_heuristics::drop_same_span_contact_sentence_overruns(authors);
     seen.rebuild_authors_from(authors);
 
     super::postprocess_transforms::merge_implemented_by_lines(
@@ -984,6 +985,9 @@ fn run_final_variant_and_cleanup_repairs(
     );
     super::postprocess_transforms::drop_markup_declaration_and_versioninfo_copyrights_and_holders(
         raw_lines, copyrights, holders,
+    );
+    super::postprocess_transforms::drop_section_heading_multiline_copyrights_shadowed_by_final_line(
+        raw_lines, copyrights,
     );
     super::postprocess_transforms::drop_copyright_like_holders(holders);
     drop_placeholder_and_code_junk_by_raw_line(raw_lines, copyrights, holders);

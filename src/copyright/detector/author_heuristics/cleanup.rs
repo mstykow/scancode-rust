@@ -303,6 +303,38 @@ pub(in super::super) fn drop_shadowed_prefix_authors(authors: &mut Vec<AuthorDet
     });
 }
 
+pub(in super::super) fn drop_same_span_contact_sentence_overruns(
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.len() < 2 {
+        return;
+    }
+    let originals = authors.clone();
+    authors.retain(|author| {
+        let candidate = author.author.trim();
+        !originals.iter().any(|other| {
+            if other.start_line != author.start_line || other.end_line != author.end_line {
+                return false;
+            }
+            let clean = other.author.trim();
+            if clean.len() >= candidate.len() || !clean.contains('@') {
+                return false;
+            }
+            let Some(tail) = candidate.strip_prefix(clean) else {
+                return false;
+            };
+            let tail = tail.trim_start();
+            matches!(tail.chars().next(), Some('.' | ';'))
+                && tail
+                    .trim_start_matches(['.', ';'])
+                    .trim_start()
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_uppercase)
+        })
+    });
+}
+
 pub(in super::super) fn drop_shadowed_compound_email_authors(authors: &mut Vec<AuthorDetection>) {
     if authors.is_empty() {
         return;
@@ -790,38 +822,47 @@ pub(in super::super) fn repair_contact_author_before_new_attribution(
         if author.end_line <= author.start_line {
             continue;
         }
-        let Some(first_raw) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
-            continue;
-        };
-        let Some(next_raw) = raw_lines.get(author.start_line.get()) else {
-            continue;
-        };
-        let first = prepare_text_line(first_raw);
-        let first_lower = first.to_ascii_lowercase();
-        let next = prepare_text_line(next_raw).to_ascii_lowercase();
-        let has_contact =
-            first.contains('@') || (first_lower.contains(" at ") && first_lower.contains(" dot "));
-        if !has_contact
-            || !next.contains(" by ")
-            || next.starts_with("and ")
-            || next.starts_with("or ")
+        let start_index = author.start_line.get().saturating_sub(1);
+        let end_index = author.end_line.get().min(raw_lines.len());
+        let mut prefix = Vec::new();
+
+        for (index, raw_line) in raw_lines
+            .iter()
+            .enumerate()
+            .take(end_index)
+            .skip(start_index)
         {
-            continue;
-        }
-        let Some(captures) = TRAILING_BY_RE.captures(&first) else {
-            continue;
-        };
-        let who = captures
-            .name("who")
-            .map(|matched| matched.as_str())
-            .unwrap_or("")
-            .trim();
-        let Some(refined) = refine_author(who) else {
-            continue;
-        };
-        if author.author.starts_with(&refined) {
-            author.author = refined;
-            author.end_line = author.start_line;
+            let prepared = prepare_text_line(raw_line);
+            if index > start_index {
+                let lower = prepared.to_ascii_lowercase();
+                let opens_new_attribution = lower.contains(" by ")
+                    && !lower.starts_with("and ")
+                    && !lower.starts_with("or ");
+                let joined = prefix.join(" ");
+                let joined_lower = joined.to_ascii_lowercase();
+                let has_contact = joined.contains('@')
+                    || joined.contains('<')
+                    || (joined_lower.contains(" at ") && joined_lower.contains(" dot "));
+                if opens_new_attribution && has_contact {
+                    let Some(captures) = TRAILING_BY_RE.captures(&joined) else {
+                        break;
+                    };
+                    let who = captures
+                        .name("who")
+                        .map(|matched| matched.as_str())
+                        .unwrap_or("")
+                        .trim();
+                    let Some(refined) = refine_author(who) else {
+                        break;
+                    };
+                    if author.author.starts_with(&refined) {
+                        author.author = refined;
+                        author.end_line = LineNumber::new(index).expect("valid source line");
+                    }
+                    break;
+                }
+            }
+            prefix.push(prepared);
         }
     }
 }
