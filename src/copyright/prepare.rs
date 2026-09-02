@@ -423,13 +423,31 @@ fn should_keep_angle_bracket_content(m: &str) -> bool {
     false
 }
 
+fn unwrap_simple_pod_formatting(text: &str) -> String {
+    static POD_FORMATTING_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\b[BCFILS]<(?P<text>[^/<>][^<>]*)>").expect("valid POD formatting regex")
+    });
+
+    let mut unwrapped = text.to_string();
+    for _ in 0..3 {
+        if !POD_FORMATTING_RE.is_match(&unwrapped) {
+            break;
+        }
+        unwrapped = POD_FORMATTING_RE
+            .replace_all(&unwrapped, "$text")
+            .into_owned();
+    }
+    unwrapped
+}
+
 /// Prepare a text `line` for copyright detection.
 ///
 /// Applies a sequence of normalizations to clean up raw text before
 /// copyright/author detection. This mirrors the Python `prepare_text_line()`
 /// function from ScanCode Toolkit.
 pub fn prepare_text_line(line: &str) -> String {
-    let mut s = line.to_string();
+    let mut s = line.replace("E<lt>", "<").replace("E<gt>", ">");
+    s = unwrap_simple_pod_formatting(&s);
 
     s.retain(|ch| ch != '\0');
 
@@ -1026,6 +1044,22 @@ mod tests {
     #[test]
     fn test_html_entity_amp() {
         assert_eq!(prepare_text_line("foo &amp; bar"), "foo & bar");
+    }
+
+    #[test]
+    fn test_perl_pod_angle_escapes() {
+        assert_eq!(
+            prepare_text_line("Maintained by Jane Doe E<lt>jane@example.comE<gt>"),
+            "Maintained by Jane Doe <jane@example.com>"
+        );
+    }
+
+    #[test]
+    fn test_perl_pod_visible_formatting_is_unwrapped() {
+        assert_eq!(
+            prepare_text_line("The C<$buffer> is modified by C<inflate>. On completion"),
+            "The $buffer is modified by inflate. On completion"
+        );
     }
 
     #[test]

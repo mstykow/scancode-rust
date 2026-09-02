@@ -30,7 +30,7 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = truncate_omap_dual_mode_clause(&a);
     a = strip_initials_before_angle_email(&a);
     a = normalize_obfuscated_angle_contact(&a);
-    a = strip_trailing_comma_year_after_angle_email(&a);
+    a = strip_trailing_year_after_angle_email(&a);
     a = strip_trailing_comma_year(&a);
     a = strip_trailing_comma_month_year(&a);
     a = strip_trailing_on_date(&a);
@@ -922,12 +922,15 @@ fn strip_trailing_comma_and(s: &str) -> String {
     s.to_string()
 }
 
-fn strip_trailing_comma_year_after_angle_email(s: &str) -> String {
-    static COMMA_YEAR_AFTER_ANGLE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"^(?P<prefix>.+<[^>\s]*@[^>\s]*>)\s*,\s*(?P<year>19\d{2}|20\d{2})\s*$").unwrap()
+fn strip_trailing_year_after_angle_email(s: &str) -> String {
+    static YEAR_AFTER_ANGLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^(?P<prefix>.+<[^>\s]*@[^>\s]*>)\s*,?\s*(?P<year>(?:19|20)\d{2}(?:-(?:(?:19|20)\d{2})?)?)\s*$",
+        )
+        .unwrap()
     });
     let trimmed = s.trim();
-    if let Some(cap) = COMMA_YEAR_AFTER_ANGLE_RE.captures(trimmed) {
+    if let Some(cap) = YEAR_AFTER_ANGLE_RE.captures(trimmed) {
         let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
         if !prefix.is_empty() {
             return prefix.to_string();

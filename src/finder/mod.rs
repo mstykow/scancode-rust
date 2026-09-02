@@ -6,8 +6,22 @@ mod host;
 mod junk_data;
 mod urls;
 
+use std::borrow::Cow;
+
 pub use emails::find_emails;
 pub use urls::find_urls;
+
+/// Decode the POD angle-bracket escapes that delimit contacts and links.
+///
+/// Detection is line-based, so replacing these formatting tokens before the
+/// email/URL regexes run preserves line attribution while preventing the final
+/// `E` in `E<gt>` from being swallowed as part of a TLD.
+fn decode_pod_angle_escapes(text: &str) -> Cow<'_, str> {
+    if !text.contains("E<lt>") && !text.contains("E<gt>") {
+        return Cow::Borrowed(text);
+    }
+    Cow::Owned(text.replace("E<lt>", "<").replace("E<gt>", ">"))
+}
 
 #[derive(Debug, Clone)]
 pub struct DetectionConfig {
@@ -109,6 +123,17 @@ mod tests {
 
         assert_eq!(urls.len(), 1, "urls: {urls:#?}");
         assert_eq!(urls[0].url, "http://ftp.gnu.org/gnu/tar/");
+    }
+
+    #[test]
+    fn test_find_urls_decodes_perl_pod_angle_escapes() {
+        let urls = find_urls(
+            "Project page L<E<lt>https://www.perl.comE<gt>>",
+            &DetectionConfig::default(),
+        );
+
+        assert_eq!(urls.len(), 1, "urls: {urls:#?}");
+        assert_eq!(urls[0].url, "https://www.perl.com/");
     }
 
     #[test]

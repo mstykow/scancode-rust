@@ -1937,6 +1937,18 @@ fn test_refine_author_strips_trailing_comma_year() {
 }
 
 #[test]
+fn test_refine_author_strips_year_range_after_angle_email() {
+    assert_eq!(
+        refine_author("Peter John Acklam <pjacklam@gmail.com> 2010-2021"),
+        Some("Peter John Acklam <pjacklam@gmail.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("Peter John Acklam <pjacklam@gmail.com>, 2011-"),
+        Some("Peter John Acklam <pjacklam@gmail.com>".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_strips_better_known_as_clause() {
     let result =
         refine_author("Alexander Peslyak, better known as Solar Designer <solar at openwall.com>");

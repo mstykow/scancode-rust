@@ -9,9 +9,9 @@ use std::sync::LazyLock;
 
 use crate::models::LineNumber;
 
-use super::DetectionConfig;
 use super::host::is_good_email_domain;
 use super::junk_data::classify_email;
+use super::{DetectionConfig, decode_pod_angle_escapes};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmailDetection {
@@ -31,6 +31,8 @@ pub fn find_emails(text: &str, config: &DetectionConfig) -> Vec<EmailDetection> 
         let line_number = LineNumber::from_0_indexed(line_index);
         let normalized_line = line.replace("\\r\\n", "\\n").replace("\\r", "\\n");
         for segment in normalized_line.split("\\n") {
+            let segment = decode_pod_angle_escapes(segment);
+            let segment = segment.as_ref();
             for matched in EMAILS_REGEX.find_iter(segment) {
                 // Skip SSH remotes such as `git@github.com:org/repo.git` and
                 // `user@host:port` URL authorities. Only a `:` followed by a
@@ -163,6 +165,14 @@ mod tests {
         assert_eq!(
             emails("mail jane@realcorp.io today"),
             vec!["jane@realcorp.io"]
+        );
+    }
+
+    #[test]
+    fn test_find_emails_decodes_perl_pod_angle_escapes() {
+        assert_eq!(
+            emails("Peter John Acklam E<lt>pjacklam@gmail.comE<gt>"),
+            vec!["pjacklam@gmail.com"]
         );
     }
 }
