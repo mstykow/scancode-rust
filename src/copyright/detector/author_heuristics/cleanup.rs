@@ -563,6 +563,251 @@ pub(in super::super) fn drop_weak_single_word_prose_authors(
     });
 }
 
+/// Prefer a complete `by NAME` credit that ends on its source line over a
+/// parser span that absorbed the following comment sentence.
+pub(in super::super) fn repair_complete_by_line_author_boundaries(
+    raw_lines: &[&str],
+    authors: &mut [AuthorDetection],
+) {
+    static TRAILING_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\bby\s+(?P<who>[^,;:]+?)\s*$").expect("valid trailing by-author regex")
+    });
+
+    for author in authors {
+        if author.end_line <= author.start_line {
+            continue;
+        }
+        let Some(raw_line) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
+            continue;
+        };
+        let following = raw_lines
+            .get(author.start_line.get())
+            .map(|line| prepare_text_line(line))
+            .unwrap_or_default();
+        let following_lower = following.to_ascii_lowercase();
+        let following_has_obfuscated_contact =
+            following_lower.contains(" at ") && following_lower.contains(" dot ");
+        if following_lower.starts_with("(http://")
+            || following_lower.starts_with("(https://")
+            || following.contains('@')
+            || following_has_obfuscated_contact
+            || following_lower.starts_with("by ")
+            || following_lower.contains(" by ")
+        {
+            continue;
+        }
+        let prepared = prepare_text_line(raw_line);
+        let Some(captures) = TRAILING_BY_RE.captures(&prepared) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        let who_lower = who.to_ascii_lowercase();
+        let trailing_conjunction_words = who_lower
+            .rsplit_once(" and ")
+            .or_else(|| who_lower.rsplit_once(" or "))
+            .map(|(_, tail)| tail.split_whitespace().count());
+        if who_lower.ends_with(" and")
+            || who_lower.ends_with(" or")
+            || trailing_conjunction_words == Some(1)
+        {
+            continue;
+        }
+        let uppercase_words = who
+            .split_whitespace()
+            .filter(|word| {
+                word.chars()
+                    .find(|ch| ch.is_alphabetic())
+                    .is_some_and(|ch| ch.is_uppercase())
+            })
+            .count();
+        if uppercase_words < 2 {
+            continue;
+        }
+        let Some(refined) = refine_author(who) else {
+            continue;
+        };
+        if author.author != refined && author.author.starts_with(&refined) {
+            author.author = refined;
+            author.end_line = author.start_line;
+        }
+    }
+}
+
+/// Repair an author name followed by the first half of a hyphenated prose word
+/// split across two source lines, such as `Name, poss-` / `ibly modified`.
+pub(in super::super) fn repair_hyphenated_prose_tail_authors(
+    raw_lines: &[&str],
+    authors: &mut [AuthorDetection],
+) {
+    for author in authors {
+        if author.end_line <= author.start_line {
+            continue;
+        }
+        let Some((name, fragment)) = author.author.rsplit_once(',') else {
+            continue;
+        };
+        let fragment = fragment.trim();
+        if fragment.len() < 2 || !fragment.chars().all(|ch| ch.is_lowercase()) {
+            continue;
+        }
+        let Some(first_raw) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
+            continue;
+        };
+        let Some(next_raw) = raw_lines.get(author.start_line.get()) else {
+            continue;
+        };
+        let first = prepare_text_line(first_raw);
+        let next = prepare_text_line(next_raw);
+        if !first.contains(&format!("{fragment}-"))
+            || !next
+                .chars()
+                .find(|ch| ch.is_alphabetic())
+                .is_some_and(|ch| ch.is_lowercase())
+        {
+            continue;
+        }
+        let Some(refined) = refine_author(name.trim()) else {
+            continue;
+        };
+        author.author = refined;
+        author.end_line = author.start_line;
+    }
+}
+
+/// Drop a candidate introduced by `Authors` when that word is embedded in a
+/// larger title-cased product or service name instead of acting as a label.
+pub(in super::super) fn drop_embedded_authors_title_phrases(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    authors.retain(|author| {
+        let candidate_lower = author.author.to_lowercase();
+        !(author.start_line.get()..=author.end_line.get()).any(|line_number| {
+            let Some(raw_line) = raw_lines.get(line_number.saturating_sub(1)) else {
+                return false;
+            };
+            let prepared = prepare_text_line(raw_line);
+            let words: Vec<&str> = prepared.split_whitespace().collect();
+            words.windows(2).enumerate().any(|(index, pair)| {
+                let label = pair[0];
+                if label.contains(':')
+                    || !label
+                        .trim_matches(|ch: char| !ch.is_alphabetic())
+                        .eq_ignore_ascii_case("authors")
+                    || index == 0
+                {
+                    return false;
+                }
+                let previous = words[index - 1];
+                let previous_is_title_cased = previous
+                    .chars()
+                    .find(|ch| ch.is_alphabetic())
+                    .is_some_and(|ch| ch.is_uppercase());
+                let tail_lower = words[index + 1..].join(" ").to_lowercase();
+                previous_is_title_cased && tail_lower.contains(&candidate_lower)
+            })
+        })
+    });
+}
+
+/// Drop a multi-line candidate when a complete candidate already ends on the
+/// first line and the next line opens a distinct `... by ...` attribution.
+pub(in super::super) fn drop_shadowed_multiline_author_overruns(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.len() < 2 {
+        return;
+    }
+    let originals = authors.clone();
+
+    authors.retain(|author| {
+        !originals.iter().any(|complete| {
+            if complete.start_line != author.start_line
+                || complete.end_line >= author.end_line
+                || complete.author.len() >= author.author.len()
+                || !author.author.starts_with(&complete.author)
+            {
+                return false;
+            }
+            let boundary = author
+                .author
+                .as_bytes()
+                .get(complete.author.len())
+                .is_some_and(|ch| ch.is_ascii_whitespace() || matches!(ch, b',' | b'.'));
+            if !boundary {
+                return false;
+            }
+            let tail = author.author[complete.author.len()..]
+                .trim_start_matches(|ch: char| ch.is_whitespace() || matches!(ch, ',' | '.'));
+            let tail_lower = tail.to_ascii_lowercase();
+            if tail_lower.starts_with("and ") || tail_lower.starts_with("or ") {
+                return false;
+            }
+
+            raw_lines
+                .get(complete.end_line.get())
+                .map(|line| prepare_text_line(line).to_ascii_lowercase())
+                .is_some_and(|line| line.contains(" by "))
+        })
+    });
+}
+
+/// Stop a contact-backed attribution before the next source line opens a
+/// distinct attribution. This handles wrapped parsers that absorb the first
+/// word of the next sentence into the preceding author.
+pub(in super::super) fn repair_contact_author_before_new_attribution(
+    raw_lines: &[&str],
+    authors: &mut [AuthorDetection],
+) {
+    static TRAILING_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\bby\s+(?P<who>.+?)\s*$").expect("valid contact by-author regex")
+    });
+
+    for author in authors {
+        if author.end_line <= author.start_line {
+            continue;
+        }
+        let Some(first_raw) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
+            continue;
+        };
+        let Some(next_raw) = raw_lines.get(author.start_line.get()) else {
+            continue;
+        };
+        let first = prepare_text_line(first_raw);
+        let first_lower = first.to_ascii_lowercase();
+        let next = prepare_text_line(next_raw).to_ascii_lowercase();
+        let has_contact =
+            first.contains('@') || (first_lower.contains(" at ") && first_lower.contains(" dot "));
+        if !has_contact
+            || !next.contains(" by ")
+            || next.starts_with("and ")
+            || next.starts_with("or ")
+        {
+            continue;
+        }
+        let Some(captures) = TRAILING_BY_RE.captures(&first) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        let Some(refined) = refine_author(who) else {
+            continue;
+        };
+        if author.author.starts_with(&refined) {
+            author.author = refined;
+            author.end_line = author.start_line;
+        }
+    }
+}
+
 fn window_contains_markup_element_author_value(window: &str, author: &str) -> bool {
     let normalized = normalize_whitespace(window);
     if !(normalized.contains('<') && normalized.contains('>')) {

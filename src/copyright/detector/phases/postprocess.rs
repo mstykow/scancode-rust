@@ -324,6 +324,9 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
     super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
     super::author_heuristics::drop_weak_single_word_prose_authors(raw_lines, authors);
+    super::author_heuristics::repair_complete_by_line_author_boundaries(raw_lines, authors);
+    super::author_heuristics::repair_hyphenated_prose_tail_authors(raw_lines, authors);
+    super::author_heuristics::drop_embedded_authors_title_phrases(raw_lines, authors);
     seen.rebuild_authors_from(authors);
 }
 

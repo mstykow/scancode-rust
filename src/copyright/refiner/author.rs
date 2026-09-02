@@ -16,6 +16,9 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = strip_trailing_parenthesized_email_contact(&a);
     a = strip_trailing_at_handle(&a);
     a = truncate_trailing_collective_contributors_prose(&a);
+    a = truncate_trailing_revision_metadata(&a);
+    a = truncate_trailing_contact_metadata(&a);
+    a = truncate_trailing_email_prose(&a);
     a = truncate_prose_sentence_after_name(&a);
     a = strip_leading_maintainers_label(&a);
     a = strip_trailing_javadoc_tags(&a);
@@ -34,6 +37,7 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = strip_trailing_comma_year(&a);
     a = strip_trailing_comma_month_year(&a);
     a = strip_trailing_on_date(&a);
+    a = truncate_trailing_revision_metadata(&a);
     a = strip_trailing_version(&a);
     a = strip_trailing_comma_email_matching_name(&a);
     a = truncate_trailing_from_clause_after_angle_contact(&a);
@@ -54,6 +58,7 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = strip_trailing_gnu_project_file_suffix(&a);
     a = normalize_comma_spacing(&a);
     a = normalize_angle_bracket_comma_spacing(&a);
+    a = strip_dangling_quote_before_contact(&a);
     a = strip_trailing_comma_and(&a);
     a = refine_names(&a, &AUTHORS_PREFIXES);
     a = a.trim().to_string();
@@ -195,6 +200,10 @@ fn looks_like_prose_fragment_author(s: &str) -> bool {
         return true;
     }
 
+    if looks_like_contact_instruction_author(trimmed) {
+        return true;
+    }
+
     let contains_email = contains_email_address(trimmed);
     if contains_email && trimmed.split_whitespace().count() <= 6 {
         return false;
@@ -309,6 +318,145 @@ fn looks_like_prose_fragment_author(s: &str) -> bool {
     }
 
     starts_lowercase || capitalized_word_count < 2
+}
+
+fn looks_like_contact_instruction_author(s: &str) -> bool {
+    let lower = s.trim().to_ascii_lowercase();
+    (lower.starts_with("at ") || lower.starts_with("via ")) && contains_email_address(s)
+}
+
+/// Stop an author at revision metadata. A delimited numeric date, a written
+/// date, or a year before a new attribution describes file history, not a name.
+fn truncate_trailing_revision_metadata(s: &str) -> String {
+    static REVISION_METADATA_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?ix)
+            ^(?P<name>.+?)
+            (?:
+                ,\s*(?:original(?:ly)?\s+)?
+                (?:
+                    \d{1,2}/(?:\d{1,2}/)?\d{2,4}
+                    |
+                    \d{1,2}\s+\p{L}{3,9}\s+\d{2,4}
+                )
+                |
+                \s+
+                (?:
+                    jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|
+                    jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?
+                )
+                \s+\d{1,2}(?:,\s+\d{4})?
+                |
+                \s+\d{4}\.\s+(?:maintained|modified|revised|updated)\s+by\b
+            )
+            \b.*$
+            ",
+        )
+        .expect("valid author revision metadata regex")
+    });
+
+    let trimmed = s.trim();
+    let Some(captures) = REVISION_METADATA_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let name = captures
+        .name("name")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+    if name.split_whitespace().count() < 2 {
+        return s.to_string();
+    }
+
+    name.to_string()
+}
+
+/// Stop after a complete email contact when the remaining text is a prose
+/// clause. Conjoined contacts remain intact as an author list.
+fn truncate_trailing_email_prose(s: &str) -> String {
+    static EMAIL_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?ix)
+            ^(?P<head>.*\b[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+\b\s*>?)
+            (?P<separator>\s*,\s+|\s*\.\s+|\s+)
+            (?P<tail>.+)$
+            ",
+        )
+        .expect("valid author email prose-tail regex")
+    });
+
+    let trimmed = s.trim();
+    let Some(captures) = EMAIL_TAIL_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let head = captures
+        .name("head")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+    let separator = captures
+        .name("separator")
+        .map(|matched| matched.as_str().trim())
+        .unwrap_or("");
+    let tail = captures
+        .name("tail")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+    let tail_lower = tail.to_ascii_lowercase();
+
+    if tail_lower.starts_with("and ")
+        || tail_lower.starts_with("or ")
+        || tail_lower == "et al"
+        || tail_lower.starts_with("et al.")
+    {
+        return s.to_string();
+    }
+    let tail_starts_lowercase = tail.chars().next().is_some_and(|ch| ch.is_lowercase());
+    let tail_word_count = tail.split_whitespace().count();
+    let tail_is_following_attribution = separator == "." && tail_lower.contains(" by ");
+    if tail_is_following_attribution
+        || (tail_starts_lowercase && tail_word_count >= 2 && looks_like_prose_fragment_author(tail))
+    {
+        return head.to_string();
+    }
+
+    s.to_string()
+}
+
+/// Stop a collected author at a following contact-field label. Email and URL
+/// detections retain the contact separately.
+fn truncate_trailing_contact_metadata(s: &str) -> String {
+    static CONTACT_METADATA_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<name>.+?)\.\s+(?:e-?mail|contact)\s*:?\s+.+$")
+            .expect("valid author contact metadata regex")
+    });
+
+    let trimmed = s.trim();
+    let Some(captures) = CONTACT_METADATA_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let name = captures
+        .name("name")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+    if name.split_whitespace().count() < 2 || looks_like_prose_fragment_author(name) {
+        return s.to_string();
+    }
+
+    name.to_string()
+}
+
+fn strip_dangling_quote_before_contact(s: &str) -> String {
+    static DANGLING_QUOTE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?P<name>\p{L})['`’]\s+(?P<contact><[^>]*@[^>]*>)")
+            .expect("valid dangling author quote regex")
+    });
+
+    DANGLING_QUOTE_RE
+        .replace_all(s, "${name} ${contact}")
+        .into_owned()
 }
 
 fn contains_windows_versioninfo_fragment(s: &str) -> bool {

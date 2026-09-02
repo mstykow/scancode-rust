@@ -2469,6 +2469,64 @@ fn test_refine_author_does_not_let_email_bypass_prose_evidence() {
 }
 
 #[test]
+fn test_refine_author_respects_revision_and_contact_metadata_boundaries() {
+    assert_eq!(
+        refine_author(
+            "Bill Davidsen, original 10/13/91, revised 23 Oct 1991. This program is public domain"
+        ),
+        Some("Bill Davidsen".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "George Petrov, 11 Apr 1995 (VMCOMPIL EXEC) Modified for IBM C V3R1 by Ian E. Gorman"
+        ),
+        Some("George Petrov".to_string())
+    );
+    assert_eq!(
+        refine_author("John Doe, 7/2000"),
+        Some("John Doe".to_string())
+    );
+    assert_eq!(
+        refine_author("Greg Hartwig. e-mail ghartwig@example.com"),
+        Some("Greg Hartwig".to_string())
+    );
+    assert_eq!(
+        refine_author("Andy Dougherty July 14, 1998"),
+        Some("Andy Dougherty".to_string())
+    );
+    assert_eq!(
+        refine_author("Yves Orton (demerphq) 2007. Maintained by Perl5 Porters"),
+        Some("Yves Orton (demerphq)".to_string())
+    );
+    assert_eq!(
+        refine_author("Andy Dougherty doughera@example.com, borrowing very"),
+        Some("Andy Dougherty doughera@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author("Michael G Schwern schwern@example.com within the"),
+        Some("Michael G Schwern schwern@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author("Russ Allbery <rra@example.com> . Subsequently updated by Russ Allbery"),
+        Some("Russ Allbery <rra@example.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("Jane Doe <jane@example.com> and John Roe <john@example.com>"),
+        Some("Jane Doe <jane@example.com> and John Roe <john@example.com>".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_normalizes_contact_evidence_without_contact_instructions() {
+    assert_eq!(
+        refine_author("Francesco Potorti` <pot@example.com>"),
+        Some("Francesco Potorti <pot@example.com>".to_string())
+    );
+    assert_eq!(refine_author("at bugs@example.com or"), None);
+    assert_eq!(refine_author("via maintainers@example.com"), None);
+}
+
+#[test]
 fn test_refine_author_strips_author_prefix() {
     let result = refine_author("author John Doe");
     assert_eq!(result, Some("John Doe".to_string()));
