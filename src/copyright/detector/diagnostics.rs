@@ -105,8 +105,12 @@ fn trace_candidate_groups(content: &str) -> Vec<CandidateGroupTrace> {
 }
 
 #[test]
-fn test_nameslist_rows_are_attributed_to_span_fallback() {
+fn test_nameslist_rows_are_rejected_by_span_fallback() {
     let input = concat!(
+        "00A8\tDIAERESIS\n",
+        "\t* this is a spacing character\n",
+        "\tx (combining diaeresis - 0308)\n",
+        "\t# 0020 0308\n",
         "00A9\tCOPYRIGHT SIGN\n",
         "\tx (sound recording copyright - 2117)\n",
         "\tx (circled latin capital letter c - 24B8)\n",
@@ -118,7 +122,7 @@ fn test_nameslist_rows_are_attributed_to_span_fallback() {
     let traces = trace_candidate_groups(input);
     let trace = traces
         .iter()
-        .find(|trace| trace.lines.contains(&2))
+        .find(|trace| trace.lines.contains(&6))
         .expect("candidate group containing the copyright cross-reference");
 
     assert!(!trace.has_top_level_nodes, "trace: {trace:#?}");
@@ -134,8 +138,8 @@ fn test_nameslist_rows_are_attributed_to_span_fallback() {
         .iter()
         .find(|detections| detections.origin == DetectionOrigin::SpanFallback)
         .expect("span-fallback origin");
-    assert!(!span.copyrights.is_empty(), "trace: {trace:#?}");
-    assert!(!span.holders.is_empty(), "trace: {trace:#?}");
+    assert!(span.copyrights.is_empty(), "trace: {trace:#?}");
+    assert!(span.holders.is_empty(), "trace: {trace:#?}");
     assert!(span.authors.is_empty(), "trace: {trace:#?}");
 }
 
