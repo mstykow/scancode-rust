@@ -309,6 +309,49 @@ fn test_conjoined_contact_attribution_continuation_is_preserved() {
 }
 
 #[test]
+fn test_passive_product_creation_is_not_human_authorship() {
+    let input = "Archive entry names behave like those created by ZipTool's MSDOS port.\n\
+                 Therefore archives created by MacTool 1.0 (March 1999) need conversion.";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_passive_creation_keeps_person_and_contact_backed_authors() {
+    let raw_lines = vec![
+        "Files were created by Jane Doe.",
+        "Archives were created by Release Tool 2.0.",
+        "Files were created by maintainer@example.com.",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "Jane Doe".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::ONE,
+        },
+        AuthorDetection {
+            author: "Release Tool 2.0".to_string(),
+            start_line: LineNumber::new(2).expect("valid line"),
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "maintainer@example.com".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(3).expect("valid line"),
+        },
+    ];
+
+    drop_passive_product_creation_authors(&raw_lines, &mut authors);
+
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    assert_eq!(values, vec!["Jane Doe", "maintainer@example.com"]);
+}
+
+#[test]
 fn test_extract_comment_author_label_authors_detects_doxygen_author_tags() {
     let raw_lines = vec![
         "*> \\author Univ. of California Berkeley",

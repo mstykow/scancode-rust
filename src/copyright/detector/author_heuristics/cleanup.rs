@@ -808,6 +808,75 @@ pub(in super::super) fn repair_contact_author_before_new_attribution(
     }
 }
 
+/// Drop product provenance mistaken for human authorship in passive creation
+/// sentences, such as plural artifacts created by a versioned application.
+pub(in super::super) fn drop_passive_product_creation_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    authors.retain(|author| {
+        if author.author.contains('@') {
+            return true;
+        }
+        let author_lower = author.author.to_ascii_lowercase();
+        if author_lower.contains(" at ") && author_lower.contains(" dot ") {
+            return true;
+        }
+
+        let window = (author.start_line.get()..=author.end_line.get())
+            .filter_map(|line_number| raw_lines.get(line_number.saturating_sub(1)))
+            .map(|line| prepare_text_line(line))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let window_lower = window.to_ascii_lowercase();
+        let Some(created_index) = window_lower.find("created by") else {
+            return true;
+        };
+        let subject = window_lower[..created_index]
+            .split_whitespace()
+            .rev()
+            .map(|word| word.trim_matches(|ch: char| !ch.is_alphanumeric()))
+            .find(|word| {
+                !word.is_empty()
+                    && !matches!(
+                        *word,
+                        "be" | "been" | "being" | "is" | "are" | "was" | "were"
+                    )
+            })
+            .unwrap_or("");
+        let plural_artifact = matches!(subject, "those" | "these" | "them")
+            || (subject.len() > 2 && subject.ends_with('s') && subject != "this");
+        if !plural_artifact {
+            return true;
+        }
+
+        let tokens: Vec<&str> = author
+            .author
+            .split_whitespace()
+            .map(|word| {
+                word.trim_matches(|ch: char| !ch.is_alphanumeric() && ch != '\'' && ch != '’')
+            })
+            .filter(|word| !word.is_empty())
+            .collect();
+        let has_version_token = tokens.iter().any(|word| {
+            let lower = word.to_ascii_lowercase();
+            (word.contains('.') && word.chars().any(|ch| ch.is_ascii_digit()))
+                || lower
+                    .strip_prefix('v')
+                    .is_some_and(|rest| rest.chars().next().is_some_and(|ch| ch.is_ascii_digit()))
+        });
+        let has_possessive = tokens
+            .iter()
+            .any(|word| word.ends_with("'s") || word.ends_with("’s"));
+        let has_acronym = tokens.iter().any(|word| {
+            let letters: Vec<char> = word.chars().filter(|ch| ch.is_alphabetic()).collect();
+            letters.len() >= 3 && letters.iter().all(|ch| ch.is_uppercase())
+        });
+
+        !(has_version_token || (has_possessive && has_acronym))
+    });
+}
+
 fn window_contains_markup_element_author_value(window: &str, author: &str) -> bool {
     let normalized = normalize_whitespace(window);
     if !(normalized.contains('<') && normalized.contains('>')) {
