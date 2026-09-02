@@ -1082,6 +1082,41 @@ fn test_name_contributed_line_is_detected_as_author() {
 }
 
 #[test]
+fn test_changes_by_attribution_is_detected_inline_and_across_lines() {
+    let input = concat!(
+        "This platform file is based on unix.c; changes by Ruslan Nickolaev (nruslan@hotbox.ru)\n",
+        "This other port is based on unix.c; changes\n",
+        " by Chris Herborth (chrish@pobox.com).\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(&"Ruslan Nickolaev (nruslan@hotbox.ru)"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.contains(&"Chris Herborth (chrish@pobox.com)"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_changes_by_prose_does_not_create_an_author() {
+    let input = concat!(
+        "The value changes by adding one to the previous result.\n",
+        "The rate changes by 2 percent.\n",
+        "MAJOR CHANGES BY BETA VERSION\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
 fn test_name_contributed_line_ignores_portions_holder_phrase() {
     let input = "Copyright (c) 2006, Industrial Light & Magic, a division of Lucasfilm\nEntertainment Company Ltd. Portions contributed and copyright held by\nothers as indicated. All rights reserved.";
     let (_c, _h, authors) = super::super::detect_copyrights_from_text(input);

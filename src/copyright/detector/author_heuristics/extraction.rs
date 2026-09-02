@@ -621,6 +621,78 @@ pub(in super::super) fn extract_name_contributed_authors(
         .collect()
 }
 
+/// Extract explicit `changes by NAME` credits, including the common wrapped
+/// form where `changes` closes one comment line and `by NAME` opens the next.
+pub(in super::super) fn extract_changes_by_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    static CHANGES_BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\bchanges\s+by\s+(?P<who>.+)$").unwrap());
+    static BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^by\s+(?P<who>.+)$").unwrap());
+
+    let mut authors = Vec::new();
+    for line in prepared_cache.iter_non_empty() {
+        let Some(captures) = CHANGES_BY_RE.captures(line.prepared) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        if who
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+        {
+            continue;
+        }
+        if let Some(author) = refine_author(who) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            });
+        }
+    }
+
+    for (line, next_line) in prepared_cache.adjacent_pairs() {
+        if !line
+            .prepared
+            .trim_end()
+            .to_ascii_lowercase()
+            .ends_with("changes")
+        {
+            continue;
+        }
+        let Some(captures) = BY_RE.captures(next_line.prepared.trim()) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        if who
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+        {
+            continue;
+        }
+        if let Some(author) = refine_author(who) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: next_line.line_number,
+            });
+        }
+    }
+
+    authors
+}
+
 fn looks_like_contributed_person_name_token(word: &str) -> bool {
     let trimmed_word = word.trim_matches(|ch: char| {
         !ch.is_alphabetic() && ch != '\'' && ch != '’' && ch != '.' && ch != '-'
