@@ -616,6 +616,35 @@ pub(in super::super) fn drop_authors_after_sentence_final_label(
     });
 }
 
+/// Drop an object phrase misread as a name after a subject-role construction,
+/// such as `Kent was the author or maintainer of 178 CPAN distributions`.
+/// Here `author` is a predicate describing the named subject, not a label that
+/// introduces the words following `of`.
+pub(in super::super) fn drop_subject_role_object_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    static SUBJECT_ROLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?ix)
+            \b\p{Lu}[\p{L}\p{M}'’.-]*
+            (?:\s+\p{Lu}[\p{L}\p{M}'’.-]*){0,5}
+            \s+(?:is|was)\s+(?:the\s+)?
+            (?:author|maintainer)
+            (?:\s+or\s+(?:author|maintainer))?
+            \s+of\b
+            ",
+        )
+        .expect("valid subject-role author regex")
+    });
+
+    authors.retain(|author| {
+        let start = author.start_line.get().saturating_sub(1);
+        let end = author.end_line.get().min(raw_lines.len());
+        start >= end || !SUBJECT_ROLE_RE.is_match(&raw_lines[start..end].join(" "))
+    });
+}
+
 /// Drop a weak compact author phrase when it was harvested without a bounded
 /// label or attribution. Lowercase names remain valid with explicit evidence.
 pub(in super::super) fn drop_weak_prose_authors(

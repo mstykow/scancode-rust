@@ -251,6 +251,62 @@ fn test_json_author_array_keeps_explicit_email_identity() {
 }
 
 #[test]
+fn test_json_author_array_keeps_punctuated_obfuscated_contact() {
+    let input = r#"{
+  "name": "example-package",
+  "author": ["Masaaki Goshima (goccy) <goccy(at)cpan.org>"]
+}"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Masaaki Goshima (goccy) goccy at cpan.org"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_author_cleanup_uses_grammatical_boundaries_and_deduplicates_quotes() {
+    let inputs = [
+        (
+            "C<Devel::PPPort>, maintained by Paul Marquess, has been added. It is primarily used\n",
+            vec!["Paul Marquess"],
+        ),
+        (
+            "December, 2001; by Nicholas Clark: make timestr recognise the style 'none'\n",
+            vec!["Nicholas Clark"],
+        ),
+        (
+            "# Updated for threads by \"Timur I. Bakeyev\" <bsdi@example.com>\n",
+            vec!["Timur I. Bakeyev <bsdi@example.com>"],
+        ),
+        (
+            "module-starter --module=Foo::Bar --author=\"Your Name\" --email=yourname@cpan.org\n",
+            vec![],
+        ),
+        (
+            "A self-described geek, Kent was the author or maintainer of 178 CPAN distributions, the Perl maintainer for Gentoo. He is mourned by his friends.\n",
+            vec![],
+        ),
+    ];
+
+    for (input, expected) in inputs {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+        assert_eq!(
+            authors
+                .iter()
+                .map(|author| author.author.as_str())
+                .collect::<Vec<_>>(),
+            expected,
+            "input: {input:?}; authors: {authors:?}"
+        );
+    }
+}
+
+#[test]
 fn test_json_author_array_in_query_or_schema_is_not_file_authorship() {
     let input = r#"{
   "name": "query-fixtures",

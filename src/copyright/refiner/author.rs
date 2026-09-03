@@ -8,10 +8,10 @@ use super::*;
 
 /// Refine a detected author name. Returns `None` if junk or empty.
 pub fn refine_author(s: &str) -> Option<String> {
-    if s.is_empty() {
+    if s.is_empty() || looks_like_template_placeholder_author(s) {
         return None;
     }
-    let had_obfuscated_angle_contact = contains_obfuscated_angle_contact(s);
+    let had_obfuscated_contact = contains_obfuscated_contact(s);
     let mut a = remove_some_extra_words_and_punct(s);
     a = strip_trailing_parenthesized_email_contact(&a);
     a = strip_trailing_at_handle(&a);
@@ -19,6 +19,8 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = truncate_trailing_revision_metadata(&a);
     a = truncate_trailing_contact_metadata(&a);
     a = truncate_trailing_email_prose(&a);
+    a = truncate_trailing_lowercase_clause_after_name(&a);
+    a = truncate_trailing_change_action_after_name(&a);
     a = truncate_prose_sentence_after_name(&a);
     a = strip_leading_maintainers_label(&a);
     a = strip_trailing_javadoc_tags(&a);
@@ -102,7 +104,7 @@ pub fn refine_author(s: &str) -> Option<String> {
         return None;
     }
 
-    if looks_like_prose_fragment_author(&a) && !had_obfuscated_angle_contact {
+    if looks_like_prose_fragment_author(&a) && !had_obfuscated_contact {
         return None;
     }
 
@@ -117,11 +119,15 @@ pub fn refine_author(s: &str) -> Option<String> {
     }
 }
 
-fn contains_obfuscated_angle_contact(s: &str) -> bool {
+fn contains_obfuscated_contact(s: &str) -> bool {
     static OBFUSCATED_ANGLE_CONTACT_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)<\s*(?P<inner>[^<>]*\bat\b[^<>]*)\s*>").unwrap());
+    static NORMALIZED_OBFUSCATED_CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\b[a-z0-9._%+-]+\s+at\s+[a-z0-9.-]+\.[a-z]{2,}\b")
+            .expect("valid normalized obfuscated contact regex")
+    });
 
-    OBFUSCATED_ANGLE_CONTACT_RE.is_match(s)
+    OBFUSCATED_ANGLE_CONTACT_RE.is_match(s) || NORMALIZED_OBFUSCATED_CONTACT_RE.is_match(s)
 }
 
 fn collapse_repeated_angle_contact(s: &str) -> String {
@@ -395,6 +401,81 @@ fn truncate_trailing_revision_metadata(s: &str) -> String {
     name.to_string()
 }
 
+/// Stop a parser overrun when a complete personal name is followed by a
+/// lowercase explanatory clause. Comma-inverted names remain untouched because
+/// their post-comma token starts with an uppercase letter.
+fn truncate_trailing_lowercase_clause_after_name(s: &str) -> String {
+    static LOWERCASE_CLAUSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?x)
+            ^(?P<name>
+                \p{Lu}[\p{L}\p{M}'’.-]*
+                (?:\s+(?:\p{Lu}[\p{L}\p{M}'’.-]*|\p{Lu}\.)){1,5}
+            )
+            \s*,\s+
+            (?P<tail>\p{Ll}.*)
+            $",
+        )
+        .expect("valid lowercase author clause regex")
+    });
+
+    let trimmed = s.trim();
+    let Some(captures) = LOWERCASE_CLAUSE_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let name = captures
+        .name("name")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+    let tail = captures
+        .name("tail")
+        .map(|matched| matched.as_str())
+        .unwrap_or("")
+        .trim();
+
+    if !name.is_empty()
+        && !looks_like_conjoined_author_tail(tail)
+        && !looks_like_comma_separated_author_tail(tail)
+        && looks_like_prose_fragment_author(tail)
+    {
+        name.to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// Stop at an unpunctuated change-description verb after a complete name.
+/// Some token streams discard the source colon in `by Name: changed ...`, so
+/// the remaining lowercase action is the reliable grammatical boundary.
+fn truncate_trailing_change_action_after_name(s: &str) -> String {
+    static CHANGE_ACTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?x)
+            ^(?P<name>
+                \p{Lu}[\p{L}\p{M}'’.-]*
+                (?:\s+(?:\p{Lu}[\p{L}\p{M}'’.-]*|\p{Lu}\.)){1,5}
+            )
+            \s+
+            (?:
+                add(?:ed|ing|s)?|chang(?:e|ed|ing|es)|fix(?:ed|ing|es)?|
+                implement(?:ed|ing|s)?|ma(?:ke|de|king|kes)|port(?:ed|ing|s)?|
+                recogni[sz](?:e|ed|ing|es)|return(?:ed|ing|s)?|
+                support(?:ed|ing|s)?|updat(?:e|ed|ing|es)|us(?:e|ed|ing|es)
+            )
+            (?:\s+.*)?
+            $",
+        )
+        .expect("valid author change-action regex")
+    });
+
+    let trimmed = s.trim();
+    CHANGE_ACTION_RE
+        .captures(trimmed)
+        .and_then(|captures| captures.name("name"))
+        .map_or_else(|| s.to_string(), |matched| matched.as_str().to_string())
+}
+
 /// Stop after a complete email contact when the remaining text is a prose
 /// clause. Conjoined contacts remain intact as an author list.
 fn truncate_trailing_email_prose(s: &str) -> String {
@@ -474,7 +555,7 @@ fn truncate_trailing_contact_metadata(s: &str) -> String {
 
 fn strip_dangling_quote_before_contact(s: &str) -> String {
     static DANGLING_QUOTE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?P<name>\p{L})['`’]\s+(?P<contact><[^>]*@[^>]*>)")
+        Regex::new(r#"(?P<name>\p{L})["'`’]\s+(?P<contact><[^>]*@[^>]*>)"#)
             .expect("valid dangling author quote regex")
     });
 
@@ -579,6 +660,15 @@ fn looks_like_translation_placeholder_author(s: &str) -> bool {
 
     let trimmed = s.trim();
     trimmed.eq_ignore_ascii_case("Requires translation") || AUTHOR_PLACEHOLDER_RE.is_match(trimmed)
+}
+
+fn looks_like_template_placeholder_author(s: &str) -> bool {
+    let lower = normalize_whitespace(s).to_ascii_lowercase();
+    lower == "your name"
+        || lower.starts_with("your name ")
+        || lower == "author name"
+        || lower.starts_with("author name ")
+        || lower.contains("yourname@")
 }
 
 fn contains_no_copyright_clause(s: &str) -> bool {
@@ -868,11 +958,19 @@ fn looks_like_leading_the_institution_author(s: &str) -> bool {
 fn normalize_obfuscated_angle_contact(s: &str) -> String {
     static OBFUSCATED_ANGLE_CONTACT_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)<\s*(?P<inner>[^<>]*\bat\b[^<>]*)\s*>").unwrap());
+    static PUNCTUATED_SEPARATOR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)[\(\[\{]\s*(?P<separator>at|dot)\s*[\)\]\}]")
+            .expect("valid punctuated obfuscated contact separator regex")
+    });
 
     let replaced = OBFUSCATED_ANGLE_CONTACT_RE
         .replace_all(s, |caps: &regex::Captures| {
             caps.name("inner")
-                .map(|m| format!(" {} ", m.as_str().trim()))
+                .map(|matched| {
+                    let normalized =
+                        PUNCTUATED_SEPARATOR_RE.replace_all(matched.as_str(), " ${separator} ");
+                    format!(" {} ", normalize_whitespace(&normalized))
+                })
                 .unwrap_or_default()
         })
         .into_owned();
@@ -1497,6 +1595,21 @@ fn looks_like_conjoined_author_tail(tail: &str) -> bool {
         .expect("valid conjoined author regex")
     });
     CONJOINED_NAME_RE.is_match(tail.trim().trim_end_matches('.'))
+}
+
+fn looks_like_comma_separated_author_tail(tail: &str) -> bool {
+    static COMMA_NAME_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?x)
+            ^[\p{L}\p{M}0-9._'’-]{1,32}\s*,\s*(?:and\s+)?
+            \p{Lu}[\p{L}\p{M}'’.-]*
+            (?:\s+(?:\p{Lu}[\p{L}\p{M}'’.-]*|\p{Lu}\.)){1,5}
+            $",
+        )
+        .expect("valid comma-separated author tail regex")
+    });
+
+    COMMA_NAME_TAIL_RE.is_match(tail.trim().trim_end_matches('.'))
 }
 
 /// Truncate a trailing website/homepage label followed by a URL.
