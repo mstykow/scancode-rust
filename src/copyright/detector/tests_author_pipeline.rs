@@ -269,6 +269,46 @@ fn test_json_author_array_in_query_or_schema_is_not_file_authorship() {
 }
 
 #[test]
+fn test_yaml_author_list_emits_independent_authors() {
+    let input = r#"---
+name: example-package
+author:
+  - 'Ada Lovelace <ada@example.com>'
+  - Example Toolchain Team
+version: 1.0.0
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Ada Lovelace <ada@example.com>", "Example Toolchain Team"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_yaml_author_values_in_examples_are_not_file_authorship() {
+    let input = r#"---
+name: query-fixtures
+examples:
+  - name: novels
+    author:
+      - Agatha Christie
+schema:
+  properties:
+    author:
+      examples:
+        - Example Person
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
 fn test_plain_json_author_string_machine_token_dropped_without_metadata_context() {
     let input = r#""author": "makeappicon", "images": []"#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);

@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 use serde_json::{Map as JsonMap, Value as JsonValue};
+use yaml_serde::Value as YamlValue;
 
 use super::super::token_utils::normalize_whitespace;
 use super::{
@@ -3139,7 +3140,7 @@ pub(in super::super) fn extract_json_author_object_authors(
     authors
 }
 
-fn json_key_opens_code_or_schema_context(key: &str) -> bool {
+fn structured_key_opens_code_or_schema_context(key: &str) -> bool {
     key.starts_with('$')
         || matches!(
             key.to_ascii_lowercase().as_str(),
@@ -3155,34 +3156,47 @@ fn json_key_opens_code_or_schema_context(key: &str) -> bool {
         )
 }
 
-fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool {
-    object.keys().any(|key| {
-        matches!(
-            key.to_ascii_lowercase().as_str(),
-            "abstract"
-                | "bomformat"
-                | "components"
-                | "description"
-                | "distribution_type"
-                | "homepage"
-                | "license"
-                | "licenses"
-                | "name"
-                | "package"
-                | "publisher"
-                | "purl"
-                | "release_status"
-                | "supplier"
-                | "url"
-                | "version"
-        )
-    })
+fn structured_key_is_package_metadata(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "abstract"
+            | "bomformat"
+            | "components"
+            | "description"
+            | "distribution_type"
+            | "homepage"
+            | "license"
+            | "licenses"
+            | "name"
+            | "package"
+            | "publisher"
+            | "purl"
+            | "release_status"
+            | "supplier"
+            | "url"
+            | "version"
+    )
 }
 
-fn collect_json_author_array_values(
+fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool {
+    object
+        .keys()
+        .any(|key| structured_key_is_package_metadata(key))
+}
+
+fn refine_structured_metadata_author(candidate: &str) -> Option<String> {
+    let context = format!(
+        r#"{{"name":"metadata","author":{}}}"#,
+        serde_json::to_string(candidate).ok()?
+    );
+    refine_json_author_candidate(candidate, &context)
+}
+
+fn collect_structured_author_values(
     value: &JsonValue,
     is_root: bool,
     in_code_or_schema_context: bool,
+    allow_scalar_value: bool,
     values: &mut Vec<String>,
 ) {
     match value {
@@ -3190,35 +3204,57 @@ fn collect_json_author_array_values(
             let object_is_metadata = is_root || json_object_has_package_metadata(object);
             for (key, child) in object {
                 let child_is_code_or_schema =
-                    in_code_or_schema_context || json_key_opens_code_or_schema_context(key);
+                    in_code_or_schema_context || structured_key_opens_code_or_schema_context(key);
                 let is_author_key =
                     key.eq_ignore_ascii_case("author") || key.eq_ignore_ascii_case("authors");
 
-                if is_author_key
-                    && object_is_metadata
-                    && !child_is_code_or_schema
-                    && let JsonValue::Array(entries) = child
-                {
-                    for entry in entries {
-                        let candidate = match entry {
-                            JsonValue::String(candidate) => Some(candidate.as_str()),
-                            JsonValue::Object(author) => {
-                                author.get("name").and_then(JsonValue::as_str)
+                if is_author_key && object_is_metadata && !child_is_code_or_schema {
+                    match child {
+                        JsonValue::Array(entries) => {
+                            for entry in entries {
+                                let candidate = match entry {
+                                    JsonValue::String(candidate) => Some(candidate.as_str()),
+                                    JsonValue::Object(author) => {
+                                        author.get("name").and_then(JsonValue::as_str)
+                                    }
+                                    _ => None,
+                                };
+                                if let Some(candidate) = candidate {
+                                    values.push(candidate.to_string());
+                                }
                             }
-                            _ => None,
-                        };
-                        if let Some(candidate) = candidate {
+                        }
+                        JsonValue::String(candidate) if allow_scalar_value => {
                             values.push(candidate.to_string());
                         }
+                        JsonValue::Object(author) if allow_scalar_value => {
+                            if let Some(candidate) = author.get("name").and_then(JsonValue::as_str)
+                            {
+                                values.push(candidate.to_string());
+                            }
+                        }
+                        _ => {}
                     }
                 }
 
-                collect_json_author_array_values(child, false, child_is_code_or_schema, values);
+                collect_structured_author_values(
+                    child,
+                    false,
+                    child_is_code_or_schema,
+                    allow_scalar_value,
+                    values,
+                );
             }
         }
         JsonValue::Array(entries) => {
             for entry in entries {
-                collect_json_author_array_values(entry, false, in_code_or_schema_context, values);
+                collect_structured_author_values(
+                    entry,
+                    false,
+                    in_code_or_schema_context,
+                    allow_scalar_value,
+                    values,
+                );
             }
         }
         _ => {}
@@ -3247,7 +3283,7 @@ pub(in super::super) fn extract_json_author_array_authors(
     };
 
     let mut candidates = Vec::new();
-    collect_json_author_array_values(&json, true, false, &mut candidates);
+    collect_structured_author_values(&json, true, false, false, &mut candidates);
 
     let mut used_source_lines = HashSet::new();
     let fallback_source_index = raw_lines
@@ -3257,16 +3293,63 @@ pub(in super::super) fn extract_json_author_array_authors(
     candidates
         .into_iter()
         .filter_map(|candidate| {
-            let context = format!(
-                r#"{{"name":"metadata","author":{}}}"#,
-                serde_json::to_string(&candidate).ok()?
-            );
-            let author = refine_json_author_candidate(&candidate, &context)?;
+            let author = refine_structured_metadata_author(&candidate)?;
             let encoded = serde_json::to_string(&candidate).ok()?;
             let source_index = raw_lines
                 .iter()
                 .enumerate()
                 .find(|(idx, line)| !used_source_lines.contains(idx) && line.contains(&encoded))
+                .map(|(idx, _)| idx)
+                .unwrap_or(fallback_source_index);
+            used_source_lines.insert(source_index);
+            let line = LineNumber::from_0_indexed(source_index);
+            Some(AuthorDetection {
+                author,
+                start_line: line,
+                end_line: line,
+            })
+        })
+        .collect()
+}
+
+fn line_has_yaml_author_key(line: &str) -> bool {
+    let Some((key, _value)) = line.trim_start().split_once(':') else {
+        return false;
+    };
+    key.trim().eq_ignore_ascii_case("author") || key.trim().eq_ignore_ascii_case("authors")
+}
+
+/// Extract independently declared authors from validated YAML author arrays.
+pub(in super::super) fn extract_yaml_metadata_authors(raw_lines: &[&str]) -> Vec<AuthorDetection> {
+    let Some(fallback_source_index) = raw_lines
+        .iter()
+        .position(|line| line_has_yaml_author_key(line))
+    else {
+        return Vec::new();
+    };
+
+    let content = raw_lines.join("\n");
+    let Ok(yaml) = yaml_serde::from_str::<YamlValue>(&content) else {
+        return Vec::new();
+    };
+    let Ok(yaml_as_json) = serde_json::to_value(yaml) else {
+        return Vec::new();
+    };
+
+    let mut candidates = Vec::new();
+    collect_structured_author_values(&yaml_as_json, true, false, false, &mut candidates);
+
+    let mut used_source_lines = HashSet::new();
+    candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let author = refine_structured_metadata_author(&candidate)?;
+            let source_index = raw_lines
+                .iter()
+                .enumerate()
+                .find(|(idx, line)| {
+                    !used_source_lines.contains(idx) && line.contains(candidate.as_str())
+                })
                 .map(|(idx, _)| idx)
                 .unwrap_or(fallback_source_index);
             used_source_lines.insert(source_index);
