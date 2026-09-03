@@ -3178,6 +3178,26 @@ fn structured_key_is_package_metadata(key: &str) -> bool {
     )
 }
 
+fn structured_key_declares_authorship(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "author" | "authors" | "contributor" | "contributors" | "x_contributors"
+    )
+}
+
+fn structured_key_opens_package_inventory_context(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "bundledependencies"
+            | "bundleddependencies"
+            | "dependencies"
+            | "devdependencies"
+            | "optionaldependencies"
+            | "packages"
+            | "peerdependencies"
+    )
+}
+
 fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool {
     object
         .keys()
@@ -3196,7 +3216,9 @@ fn collect_structured_author_values(
     value: &JsonValue,
     is_root: bool,
     in_code_or_schema_context: bool,
+    in_package_inventory_context: bool,
     allow_scalar_value: bool,
+    collect_excluded_values: bool,
     values: &mut Vec<String>,
 ) {
     match value {
@@ -3205,10 +3227,16 @@ fn collect_structured_author_values(
             for (key, child) in object {
                 let child_is_code_or_schema =
                     in_code_or_schema_context || structured_key_opens_code_or_schema_context(key);
-                let is_author_key =
-                    key.eq_ignore_ascii_case("author") || key.eq_ignore_ascii_case("authors");
+                let child_is_package_inventory = in_package_inventory_context
+                    || structured_key_opens_package_inventory_context(key);
+                let is_credit_key = structured_key_declares_authorship(key);
 
-                if is_author_key && object_is_metadata && !child_is_code_or_schema {
+                let should_collect = if collect_excluded_values {
+                    child_is_code_or_schema || in_package_inventory_context
+                } else {
+                    object_is_metadata && !child_is_code_or_schema && !in_package_inventory_context
+                };
+                if is_credit_key && should_collect {
                     match child {
                         JsonValue::Array(entries) => {
                             for entry in entries {
@@ -3241,7 +3269,9 @@ fn collect_structured_author_values(
                     child,
                     false,
                     child_is_code_or_schema,
+                    child_is_package_inventory,
                     allow_scalar_value,
+                    collect_excluded_values,
                     values,
                 );
             }
@@ -3252,7 +3282,9 @@ fn collect_structured_author_values(
                     entry,
                     false,
                     in_code_or_schema_context,
+                    in_package_inventory_context,
                     allow_scalar_value,
+                    collect_excluded_values,
                     values,
                 );
             }
@@ -3261,18 +3293,22 @@ fn collect_structured_author_values(
     }
 }
 
-/// Extract independently declared authors from validated JSON author arrays.
+/// Extract independent author and contributor credits from validated JSON arrays.
 ///
 /// Array entries are kept separate because each item is an independent
 /// declaration. Nested query, example, and schema structures are excluded by
 /// their structural path rather than by candidate text.
-pub(in super::super) fn extract_json_author_array_authors(
+pub(in super::super) fn extract_json_credit_array_authors(
     raw_lines: &[&str],
 ) -> Vec<AuthorDetection> {
     if raw_lines.is_empty()
-        || !raw_lines
-            .iter()
-            .any(|line| line.contains("\"author\"") || line.contains("\"authors\""))
+        || !raw_lines.iter().any(|line| {
+            line.contains("\"author\"")
+                || line.contains("\"authors\"")
+                || line.contains("\"contributor\"")
+                || line.contains("\"contributors\"")
+                || line.contains("\"x_contributors\"")
+        })
     {
         return Vec::new();
     }
@@ -3283,12 +3319,18 @@ pub(in super::super) fn extract_json_author_array_authors(
     };
 
     let mut candidates = Vec::new();
-    collect_structured_author_values(&json, true, false, false, &mut candidates);
+    collect_structured_author_values(&json, true, false, false, false, false, &mut candidates);
 
     let mut used_source_lines = HashSet::new();
     let fallback_source_index = raw_lines
         .iter()
-        .position(|line| line.contains("\"author\"") || line.contains("\"authors\""))
+        .position(|line| {
+            line.contains("\"author\"")
+                || line.contains("\"authors\"")
+                || line.contains("\"contributor\"")
+                || line.contains("\"contributors\"")
+                || line.contains("\"x_contributors\"")
+        })
         .unwrap_or(0);
     candidates
         .into_iter()
@@ -3312,18 +3354,20 @@ pub(in super::super) fn extract_json_author_array_authors(
         .collect()
 }
 
-fn line_has_yaml_author_key(line: &str) -> bool {
+fn line_has_structured_credit_key(line: &str) -> bool {
     let Some((key, _value)) = line.trim_start().split_once(':') else {
         return false;
     };
-    key.trim().eq_ignore_ascii_case("author") || key.trim().eq_ignore_ascii_case("authors")
+    structured_key_declares_authorship(key.trim().trim_matches(&['\'', '"'][..]))
 }
 
-/// Extract independently declared authors from validated YAML author arrays.
-pub(in super::super) fn extract_yaml_metadata_authors(raw_lines: &[&str]) -> Vec<AuthorDetection> {
+/// Extract independent author and contributor credits from validated YAML arrays.
+pub(in super::super) fn extract_yaml_credit_array_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
     let Some(fallback_source_index) = raw_lines
         .iter()
-        .position(|line| line_has_yaml_author_key(line))
+        .position(|line| line_has_structured_credit_key(line))
     else {
         return Vec::new();
     };
@@ -3337,7 +3381,15 @@ pub(in super::super) fn extract_yaml_metadata_authors(raw_lines: &[&str]) -> Vec
     };
 
     let mut candidates = Vec::new();
-    collect_structured_author_values(&yaml_as_json, true, false, false, &mut candidates);
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        false,
+        false,
+        &mut candidates,
+    );
 
     let mut used_source_lines = HashSet::new();
     candidates
@@ -3361,6 +3413,74 @@ pub(in super::super) fn extract_yaml_metadata_authors(raw_lines: &[&str]) -> Vec
             })
         })
         .collect()
+}
+
+/// Drop line-based detections that parsed JSON or YAML places in code/schema
+/// contexts or nested package inventories rather than document-level credits.
+pub(in super::super) fn drop_out_of_scope_structured_credit_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.is_empty()
+        || !raw_lines
+            .iter()
+            .any(|line| line_has_structured_credit_key(line))
+    {
+        return;
+    }
+
+    let content = raw_lines.join("\n");
+    let Ok(yaml) = yaml_serde::from_str::<YamlValue>(&content) else {
+        return;
+    };
+    let Ok(yaml_as_json) = serde_json::to_value(yaml) else {
+        return;
+    };
+
+    let mut excluded_candidates = Vec::new();
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        true,
+        true,
+        &mut excluded_candidates,
+    );
+    let mut included_candidates = Vec::new();
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        true,
+        false,
+        &mut included_candidates,
+    );
+    let included: HashSet<String> = included_candidates
+        .into_iter()
+        .filter_map(|candidate| refine_structured_metadata_author(&candidate))
+        .collect();
+    let excluded: Vec<(String, LineNumber)> = excluded_candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let author = refine_structured_metadata_author(&candidate)?;
+            if included.contains(&author) {
+                return None;
+            }
+            let source_index = raw_lines
+                .iter()
+                .position(|line| line.contains(candidate.as_str()))?;
+            Some((author, LineNumber::from_0_indexed(source_index)))
+        })
+        .collect();
+
+    authors.retain(|author| {
+        !excluded.iter().any(|(excluded_author, source_line)| {
+            author.author == *excluded_author
+                && author.start_line.get().abs_diff(source_line.get()) <= 1
+        })
+    });
 }
 
 pub(in super::super) fn extract_maintained_by_authors(

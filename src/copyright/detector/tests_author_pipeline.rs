@@ -309,6 +309,122 @@ schema:
 }
 
 #[test]
+fn test_json_contributor_array_emits_independent_authors() {
+    let input = r#"{
+  "name": "example-package",
+  "contributors": [
+    "Ada Lovelace <ada@example.com>",
+    {"name": "Grace Hopper"}
+  ],
+  "version": "1.0.0"
+}"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Ada Lovelace <ada@example.com>", "Grace Hopper"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_yaml_extension_contributor_array_emits_independent_authors() {
+    let input = r#"---
+name: example-package
+version: 1.0.0
+x_contributors:
+  - 'Olivier Mengue <olivier@example.com>'
+  - 'Shlomi Fish <shlomi@example.com>'
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "Olivier Mengue <olivier@example.com>",
+            "Shlomi Fish <shlomi@example.com>",
+        ],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_structured_contributor_arrays_in_examples_are_not_file_authorship() {
+    let json = r#"{
+  "name": "fixture-package",
+  "examples": [{"name": "sample", "contributors": ["Example Person"]}]
+}"#;
+    let yaml = r#"---
+name: fixture-package
+examples:
+  - name: sample
+    contributors:
+      - Example Person
+"#;
+
+    for input in [json, yaml] {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+        assert!(authors.is_empty(), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_nested_package_contributors_are_not_document_authors() {
+    let json = r#"{
+  "name": "lockfile",
+  "packages": {
+    "node_modules/dependency": {
+      "name": "dependency",
+      "version": "1.0.0",
+      "author": "Dependency Author",
+      "contributors": ["Dependency Contributor"]
+    }
+  }
+}"#;
+    let yaml = r#"---
+name: package-inventory
+packages:
+  dependency:
+    name: dependency
+    version: 1.0.0
+    author: Dependency Author
+    contributors:
+      - Dependency Contributor
+"#;
+
+    for input in [json, yaml] {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+        assert!(authors.is_empty(), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_nested_document_metadata_contributors_are_authors() {
+    let input = r#"{
+  "metadata": {
+    "name": "document-metadata",
+    "contributors": ["Document Contributor"]
+  }
+}"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Document Contributor"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
 fn test_plain_json_author_string_machine_token_dropped_without_metadata_context() {
     let input = r#""author": "makeappicon", "images": []"#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
