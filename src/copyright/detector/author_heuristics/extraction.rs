@@ -490,6 +490,12 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         )
         .unwrap()
     });
+    static CHAINED_SUBJECT_CREDIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:this\s+)?[^,\r\n]{1,100}?\s+is\s+by\s+(?P<who>[^,;\r\n]{2,80}),\s*(?:adapted|authored|implemented|merged|modified|ported|revised|updated|written)\s+by\b",
+        )
+        .unwrap()
+    });
     let mut authors: Vec<AuthorDetection> = prepared_cache
         .iter_non_empty()
         .filter_map(|line| {
@@ -525,13 +531,31 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         .collect();
 
     for line in prepared_cache.iter_non_empty() {
+        if let Some(author) = CHAINED_SUBJECT_CREDIT_RE
+            .captures(line.prepared)
+            .and_then(|captures| captures.name("who"))
+            .and_then(|matched| refine_author(matched.as_str()))
+            .filter(|author| looks_like_contactless_person_name(author))
+        {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            });
+        }
+
         let Some(clause) = CHAINED_ATTRIBUTION_CLAUSE_RE
             .captures(line.prepared)
             .and_then(|captures| captures.name("clause"))
         else {
             continue;
         };
-        let Some(author) = extract_line_local_attribution_author(clause.as_str(), false) else {
+        let Some(author) =
+            extract_line_local_attribution_author(clause.as_str(), false).or_else(|| {
+                let author = extract_line_local_attribution_author(clause.as_str(), true)?;
+                looks_like_contactless_person_name(&author).then_some(author)
+            })
+        else {
             continue;
         };
         authors.push(AuthorDetection {

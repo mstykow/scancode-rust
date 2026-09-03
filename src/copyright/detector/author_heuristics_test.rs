@@ -1770,6 +1770,32 @@ fn test_chained_active_attributions_are_distinct_authors() {
 }
 
 #[test]
+fn test_chained_action_attribution_keeps_contactless_people() {
+    let input = concat!(
+        "Created by Rodney Brown from an earlier version, modified by Chr. Spieler.\n",
+        "This stat() is by Paul Wells, modified by Paul Kienitz.\n",
+        "Output created by Release Tool, modified by Build Generator.\n",
+        "The output is by default, modified by Build Generator.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Rodney Brown"), "authors: {values:?}");
+    assert!(values.contains(&"Chr. Spieler"), "authors: {values:?}");
+    assert!(values.contains(&"Paul Wells"), "authors: {values:?}");
+    assert!(values.contains(&"Paul Kienitz"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
 fn test_wrapped_contribution_role_supports_leading_by_author() {
     let input = concat!(
         "AUTHORS\n",
