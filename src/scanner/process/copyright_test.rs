@@ -1206,6 +1206,7 @@ fn test_extract_copyright_information_keeps_explicit_contactless_code_attributio
     let text = concat!(
         "Fcntl, Socket, and Sys::Syslog have been rewritten by Nicholas Clark to use the new API.\n",
         "Most of the documentation is taken from JSON::XS by Marc Lehmann\n",
+        "sub helper { # Compatibility code. Written by Alexandr Ciornii, version 0.23.\n",
     );
     let mut builder = FileInfoBuilder::default();
     extract_copyright_information(&mut builder, Path::new("Credits.pm"), text, 120.0, false);
@@ -1218,6 +1219,7 @@ fn test_extract_copyright_information_keeps_explicit_contactless_code_attributio
         .collect();
     assert!(values.contains(&"Nicholas Clark"), "authors: {values:?}");
     assert!(values.contains(&"Marc Lehmann"), "authors: {values:?}");
+    assert!(values.contains(&"Alexandr Ciornii"), "authors: {values:?}");
 }
 
 #[test]

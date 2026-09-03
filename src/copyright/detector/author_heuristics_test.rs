@@ -571,6 +571,9 @@ fn test_source_header_credit_variants_are_authors() {
         "# Improved by Jake Hamby <jake@example.net> to support both compilers\n",
         "# Originally contributed by: Mark Kettenis <mark@example.net> Dec 1998\n",
         "# DCL-ified by Peter Prymmer <peter@example.net> 22-DEC-1995\n",
+        "$! DCL-ified by VMS Author <vms@example.net> 22-DEC-1995\n",
+        "& Written 02-05-05 by Macro Author (macro@example.net)\n",
+        "sub helper { # Compatibility code. Written by Alexandr Ciornii, version 0.23.\n",
         "(contributed by Peter J. Holzer, peter@example.net)\n",
         "DataBase Editor by Janick Bergeron [janick@example.net] for testing\n",
     );
@@ -592,6 +595,9 @@ fn test_source_header_credit_variants_are_authors() {
         "Jake Hamby <jake@example.net>",
         "Mark Kettenis <mark@example.net>",
         "Peter Prymmer <peter@example.net>",
+        "VMS Author <vms@example.net>",
+        "Macro Author (macro@example.net)",
+        "Alexandr Ciornii",
         "Peter J. Holzer, peter@example.net",
         "Janick Bergeron janick@example.net",
     ] {
@@ -609,6 +615,8 @@ fn test_source_header_credit_words_without_people_are_not_authors() {
         "Jean Example. Send mail to support@example.net for a copy.\n",
         "Configured by root@localhost\n",
         "* Configured by     : root@localhost\n",
+        "$! Written 02-05-05 by the build system\n",
+        "value & Written by Build Generator, then cached.\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
 

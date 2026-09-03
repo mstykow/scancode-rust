@@ -423,7 +423,7 @@ fn raw_span_has_author_attribution(raw_span: &str) -> bool {
 fn raw_span_has_explicit_contactless_author_attribution(raw_span: &str) -> bool {
     static EXPLICIT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:rewritten\s+by|as\s+authored\s+by\s+me,|(?:documentation|code|implementation|work|text|material)\b[^\r\n]{0,80}?\b(?:taken|copied|derived|adapted|borrowed)\s+from\b[^\r\n]{1,120}?\s+by)\b",
+            r"(?i)(?:\b(?:rewritten\s+by|as\s+authored\s+by\s+me,|(?:documentation|code|implementation|work|text|material)\b[^\r\n]{0,80}?\b(?:taken|copied|derived|adapted|borrowed)\s+from\b[^\r\n]{1,120}?\s+by)\b|[.;]\s*(?:adapted|authored|configured|contributed|created|developed|edited|implemented|improved|modified|ported|revised|updated|written)\s+by\b)",
         )
         .expect("valid explicit contactless author attribution regex")
     });

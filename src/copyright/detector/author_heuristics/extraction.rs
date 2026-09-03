@@ -224,6 +224,15 @@ fn strip_leading_dash_bullet(line: &str) -> &str {
         .unwrap_or_else(|| line.trim())
 }
 
+fn strip_leading_source_credit_marker(line: &str) -> &str {
+    let trimmed = strip_leading_dash_bullet(line);
+    ["$!", "&"]
+        .iter()
+        .find_map(|marker| trimmed.strip_prefix(marker))
+        .map(str::trim_start)
+        .unwrap_or(trimmed)
+}
+
 fn trim_attribution_tail(who: &str) -> String {
     static WITH_HELP_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\s+with\s+the\s+help\s+of\b.*$").unwrap());
@@ -402,7 +411,7 @@ fn extract_line_local_attribution_author(
 ) -> Option<String> {
     static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:authored|configured|contributed|created|improved|implemented|overhauled|revised|written|[\p{L}\d][\p{L}\d-]{0,30}-ified)\s+by|original\s+by|(?:adapted|edited|modified|ported|updated)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by)[ \t]*:?[ \t]+(?P<who>.+)$",
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:authored|configured|contributed|created|improved|implemented|overhauled|revised|[\p{L}\d][\p{L}\d-]{0,30}-ified)\s+by|written(?:\s+\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})?\s+by|original\s+by|(?:adapted|edited|modified|ported|updated)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by)[ \t]*:?[ \t]+(?P<who>.+)$",
         )
         .unwrap()
     });
@@ -430,7 +439,7 @@ fn extract_line_local_attribution_author(
         Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+)[A-Z].*$").unwrap()
     });
 
-    let normalized = strip_leading_dash_bullet(line);
+    let normalized = strip_leading_source_credit_marker(line);
     let normalized_lower = normalized.to_ascii_lowercase();
     if normalized_lower.find(" by ").is_some_and(|by_index| {
         let prefix = &normalized_lower[..by_index];
@@ -496,6 +505,12 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         )
         .unwrap()
     });
+    static INLINE_SENTENCE_ACTION_CREDIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)[.;]\s*(?:adapted|authored|configured|contributed|created|developed|edited|implemented|improved|modified|ported|revised|updated|written)\s+by\s+(?P<who>[^,;\r\n]{2,80}),",
+        )
+        .unwrap()
+    });
     let mut authors: Vec<AuthorDetection> = prepared_cache
         .iter_non_empty()
         .filter_map(|line| {
@@ -531,6 +546,19 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         .collect();
 
     for line in prepared_cache.iter_non_empty() {
+        if let Some(author) = INLINE_SENTENCE_ACTION_CREDIT_RE
+            .captures(line.prepared)
+            .and_then(|captures| captures.name("who"))
+            .and_then(|matched| refine_author(matched.as_str()))
+            .filter(|author| looks_like_contactless_person_name(author))
+        {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            });
+        }
+
         if let Some(author) = CHAINED_SUBJECT_CREDIT_RE
             .captures(line.prepared)
             .and_then(|captures| captures.name("who"))
