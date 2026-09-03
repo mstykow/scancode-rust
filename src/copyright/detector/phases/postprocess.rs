@@ -315,6 +315,10 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_out_of_scope_structured_credit_authors(raw_lines, authors);
     seen.rebuild_authors_from(authors);
 
+    let mut new_a = super::author_heuristics::extract_embedded_yaml_credit_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let mut new_a =
         super::postprocess_transforms::extract_following_authors_holders(raw_lines, prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);

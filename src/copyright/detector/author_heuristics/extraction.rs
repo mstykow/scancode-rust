@@ -3205,11 +3205,41 @@ fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool
 }
 
 fn refine_structured_metadata_author(candidate: &str) -> Option<String> {
+    let candidate = strip_redundant_structured_handle_prefix(candidate);
     let context = format!(
         r#"{{"name":"metadata","author":{}}}"#,
         serde_json::to_string(candidate).ok()?
     );
     refine_json_author_candidate(candidate, &context)
+}
+
+fn strip_redundant_structured_handle_prefix(candidate: &str) -> &str {
+    let Some((handle, identity)) = candidate.split_once(':') else {
+        return candidate;
+    };
+    let handle = handle.trim();
+    let identity = identity.trim();
+    if handle.is_empty()
+        || handle.chars().any(char::is_whitespace)
+        || !handle
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        return candidate;
+    }
+
+    let Some(contact_start) = identity.rfind('<') else {
+        return candidate;
+    };
+    let Some(at_offset) = identity[contact_start + 1..].find('@') else {
+        return candidate;
+    };
+    let contact_user = identity[contact_start + 1..contact_start + 1 + at_offset].trim();
+    if handle.eq_ignore_ascii_case(contact_user) {
+        identity
+    } else {
+        candidate
+    }
 }
 
 fn collect_structured_author_values(
@@ -3361,9 +3391,9 @@ fn line_has_structured_credit_key(line: &str) -> bool {
     structured_key_declares_authorship(key.trim().trim_matches(&['\'', '"'][..]))
 }
 
-/// Extract independent author and contributor credits from validated YAML arrays.
-pub(in super::super) fn extract_yaml_credit_array_authors(
+fn extract_yaml_credit_array_authors_from_slice(
     raw_lines: &[&str],
+    line_offset: usize,
 ) -> Vec<AuthorDetection> {
     let Some(fallback_source_index) = raw_lines
         .iter()
@@ -3405,7 +3435,7 @@ pub(in super::super) fn extract_yaml_credit_array_authors(
                 .map(|(idx, _)| idx)
                 .unwrap_or(fallback_source_index);
             used_source_lines.insert(source_index);
-            let line = LineNumber::from_0_indexed(source_index);
+            let line = LineNumber::from_0_indexed(source_index + line_offset);
             Some(AuthorDetection {
                 author,
                 start_line: line,
@@ -3413,6 +3443,60 @@ pub(in super::super) fn extract_yaml_credit_array_authors(
             })
         })
         .collect()
+}
+
+/// Extract independent author and contributor credits from validated YAML arrays.
+pub(in super::super) fn extract_yaml_credit_array_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    extract_yaml_credit_array_authors_from_slice(raw_lines, 0)
+}
+
+/// Extract credit arrays from explicitly bounded YAML front matter and tagged
+/// YAML sections embedded in a larger text document.
+pub(in super::super) fn extract_embedded_yaml_credit_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    let mut authors = Vec::new();
+
+    let first_non_empty = raw_lines.iter().position(|line| !line.trim().is_empty());
+    if let Some(start) = first_non_empty
+        && raw_lines[start]
+            .trim_start_matches('\u{feff}')
+            .trim()
+            .eq("---")
+        && let Some(end) = raw_lines[start + 1..]
+            .iter()
+            .position(|line| line.trim() == "---")
+            .map(|relative| start + 1 + relative)
+    {
+        authors.extend(extract_yaml_credit_array_authors_from_slice(
+            &raw_lines[start..end],
+            start,
+        ));
+    }
+
+    for (marker_index, marker) in raw_lines.iter().enumerate() {
+        if !marker.trim().eq_ignore_ascii_case("--- yaml") {
+            continue;
+        }
+        let start = marker_index + 1;
+        let end = raw_lines[start..]
+            .iter()
+            .position(|line| {
+                let trimmed = line.trim();
+                trimmed
+                    .get(..4)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("--- "))
+            })
+            .map_or(raw_lines.len(), |relative| start + relative);
+        authors.extend(extract_yaml_credit_array_authors_from_slice(
+            &raw_lines[start..end],
+            start,
+        ));
+    }
+
+    authors
 }
 
 /// Drop line-based detections that parsed JSON or YAML places in code/schema

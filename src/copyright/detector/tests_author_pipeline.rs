@@ -425,6 +425,51 @@ fn test_nested_document_metadata_contributors_are_authors() {
 }
 
 #[test]
+fn test_yaml_front_matter_credit_array_is_bounded_before_document_body() {
+    let input = r#"---
+title: Example package
+authors:
+  - 'Ada Lovelace <ada@example.com>'
+---
+# Guide
+
+The author field in prose is not another declaration.
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Ada Lovelace <ada@example.com>"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_tagged_embedded_yaml_credit_array_strips_redundant_handle() {
+    let input = r#"=== metadata round trip
+--- yaml
+---
+author:
+  - 'mst: Matt S. Trout <mst@shadowcatsystems.co.uk>'
+--- output
+[{ author => ['mst: Matt S. Trout <mst@shadowcatsystems.co.uk>'] }]
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Matt S. Trout <mst@shadowcatsystems.co.uk>"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
 fn test_plain_json_author_string_machine_token_dropped_without_metadata_context() {
     let input = r#""author": "makeappicon", "images": []"#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
