@@ -8,4 +8,6 @@ copyrights:
 holders:
   - Paul Mundt
   - Vladimir Oleynik
-authors: []
+authors:
+  - Paul Mundt <lethal@linux-sh.org>
+  - Vladimir Oleynik <dzo@simtreas.ru>

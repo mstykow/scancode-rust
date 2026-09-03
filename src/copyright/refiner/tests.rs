@@ -246,6 +246,10 @@ fn test_refine_author_truncates_trailing_prose_after_contact() {
         refine_author("Jean-Loup Gailly <gzip@prep.ai.mit.edu> . Since this"),
         Some("Jean-Loup Gailly <gzip@prep.ai.mit.edu>".to_string())
     );
+    assert_eq!(
+        refine_author("Charles Bailey <bailey@example.net> in 1996"),
+        Some("Charles Bailey <bailey@example.net>".to_string())
+    );
 }
 
 #[test]
@@ -257,6 +261,14 @@ fn test_refine_author_keeps_conjoined_name_after_contact() {
     assert_eq!(
         refine_author("John Smith <js@example.com> and this module is maintained"),
         Some("John Smith <js@example.com>".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_collapses_repeated_angle_contact() {
+    assert_eq!(
+        refine_author("David Sundstrom <sunds@example.com sunds@example.com>"),
+        Some("David Sundstrom <sunds@example.com>".to_string())
     );
 }
 

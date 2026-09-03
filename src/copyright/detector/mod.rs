@@ -400,6 +400,7 @@ pub fn detect_copyrights_from_text_with_deadline(
         author_heuristics::repair_contact_author_before_new_attribution(&raw_lines, &mut authors);
         author_heuristics::drop_shadowed_multiline_author_overruns(&raw_lines, &mut authors);
         author_heuristics::drop_passive_product_creation_authors(&raw_lines, &mut authors);
+        author_heuristics::drop_weak_prose_authors(&raw_lines, &mut authors);
         dedupe_exact_span_copyrights(&mut copyrights);
         dedupe_exact_span_holders(&mut holders);
         dedupe_exact_span_authors(&mut authors);
@@ -435,6 +436,7 @@ pub fn detect_copyrights_from_text_with_deadline(
     author_heuristics::repair_contact_author_before_new_attribution(&raw_lines, &mut authors);
     author_heuristics::drop_shadowed_multiline_author_overruns(&raw_lines, &mut authors);
     author_heuristics::drop_passive_product_creation_authors(&raw_lines, &mut authors);
+    author_heuristics::drop_weak_prose_authors(&raw_lines, &mut authors);
     postprocess_transforms::drop_trademark_boilerplate_multiline_extensions(
         &raw_lines,
         &mut copyrights,
@@ -472,6 +474,18 @@ pub fn detect_copyrights_from_text_with_deadline(
     ));
     holders
         .extend(postprocess_transforms::add_missing_holders_for_iso_date_copyrights(&copyrights));
+
+    let mut final_line_local_authors =
+        author_heuristics::extract_line_local_attribution_authors(&prepared_lines);
+    final_line_local_authors.retain(|candidate| {
+        !authors
+            .iter()
+            .any(|author| author.author == candidate.author)
+    });
+    authors.extend(final_line_local_authors);
+    author_heuristics::repair_chained_attribution_authors(&prepared_lines, &mut authors);
+    author_heuristics::drop_same_span_contact_sentence_overruns(&mut authors);
+    author_heuristics::drop_shadowed_author_prefixes(&mut authors);
 
     dedupe_exact_span_holders(&mut holders);
 

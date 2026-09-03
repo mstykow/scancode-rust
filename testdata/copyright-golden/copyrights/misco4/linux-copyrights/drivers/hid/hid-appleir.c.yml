@@ -17,4 +17,7 @@ holders:
   - Novell Inc.
   - Red Hat Inc.
 authors:
-  - James McKenzie Ported to recent 2.6 kernel versions by Greg Kroah-Hartman <gregkh@suse.de> Updated to support newer remotes by Bastien Nocera <hadess@hadess.net> Ported to HID subsystem by Benjamin Tissoires <benjamin.tissoires@gmail.com>
+  - Bastien Nocera <hadess@hadess.net>
+  - Benjamin Tissoires <benjamin.tissoires@gmail.com>
+  - Greg Kroah-Hartman <gregkh@suse.de>
+  - James McKenzie

@@ -33,6 +33,7 @@ pub fn refine_author(s: &str) -> Option<String> {
     a = truncate_omap_dual_mode_clause(&a);
     a = strip_initials_before_angle_email(&a);
     a = normalize_obfuscated_angle_contact(&a);
+    a = collapse_repeated_angle_contact(&a);
     a = strip_trailing_year_after_angle_email(&a);
     a = strip_trailing_comma_year(&a);
     a = strip_trailing_comma_month_year(&a);
@@ -121,6 +122,29 @@ fn contains_obfuscated_angle_contact(s: &str) -> bool {
         LazyLock::new(|| Regex::new(r"(?i)<\s*(?P<inner>[^<>]*\bat\b[^<>]*)\s*>").unwrap());
 
     OBFUSCATED_ANGLE_CONTACT_RE.is_match(s)
+}
+
+fn collapse_repeated_angle_contact(s: &str) -> String {
+    static ANGLE_CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<([^<>]+)>").unwrap());
+
+    ANGLE_CONTACT_RE
+        .replace_all(s, |captures: &regex::Captures<'_>| {
+            let body = captures.get(1).map_or("", |matched| matched.as_str());
+            let contacts: Vec<&str> = body.split_whitespace().collect();
+            if contacts.len() > 1
+                && contacts.iter().all(|contact| contact.contains('@'))
+                && contacts
+                    .windows(2)
+                    .all(|pair| pair[0].eq_ignore_ascii_case(pair[1]))
+            {
+                format!("<{}>", contacts[0])
+            } else {
+                captures
+                    .get(0)
+                    .map_or_else(String::new, |matched| matched.as_str().to_string())
+            }
+        })
+        .into_owned()
 }
 
 /// Strip a trailing parenthesized angle-bracketed email contact from an author
@@ -1447,7 +1471,7 @@ fn truncate_trailing_clause_after_contact(s: &str) -> String {
     let tail_lower = prose_tail.to_ascii_lowercase();
     let prose_like_tail = [
         "the ", "a ", "an ", "i ", "since ", "this ", "these ", "those ", "is ", "was ", "visit ",
-        "for ", "from ",
+        "for ", "from ", "in ", "on ",
     ]
     .iter()
     .any(|prefix_text| tail_lower.starts_with(prefix_text));

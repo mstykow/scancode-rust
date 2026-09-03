@@ -148,6 +148,15 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(authors, a_before);
     seen.rebuild_authors_from(authors);
 
+    let mut new_a =
+        super::author_heuristics::extract_line_local_attribution_authors(prepared_cache);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
+    let mut new_a = super::author_heuristics::extract_subject_attribution_authors(prepared_cache);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let a_before = authors.len();
     super::author_heuristics::extract_multiline_written_by_author_blocks(prepared_cache, authors);
     seen.dedup_new_authors(authors, a_before);
@@ -267,6 +276,7 @@ fn run_author_extraction_and_repairs(
     );
     super::author_heuristics::drop_shadowed_compound_email_authors(authors);
     super::author_heuristics::drop_shadowed_prefix_authors(authors);
+    super::author_heuristics::drop_same_span_contact_sentence_overruns(authors);
     seen.rebuild_authors_from(authors);
 
     super::postprocess_transforms::merge_implemented_by_lines(
@@ -295,6 +305,16 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::normalize_json_blob_authors(raw_lines, authors);
     seen.authors = authors.iter().map(|a| a.author.clone()).collect();
 
+    let mut new_a = super::author_heuristics::extract_json_credit_array_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
+    let mut new_a = super::author_heuristics::extract_yaml_credit_array_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+    super::author_heuristics::drop_out_of_scope_structured_credit_authors(raw_lines, authors);
+    seen.rebuild_authors_from(authors);
+
     let mut new_a =
         super::postprocess_transforms::extract_following_authors_holders(raw_lines, prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -312,6 +332,9 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
 
+    super::author_heuristics::repair_chained_attribution_authors(prepared_cache, authors);
+    seen.rebuild_authors_from(authors);
+
     let mut new_a = super::author_heuristics::extract_comment_author_label_authors(raw_lines);
     new_a.retain(|candidate| {
         !authors
@@ -323,7 +346,7 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
     super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
     super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
-    super::author_heuristics::drop_weak_single_word_prose_authors(raw_lines, authors);
+    super::author_heuristics::drop_weak_prose_authors(raw_lines, authors);
     super::author_heuristics::repair_complete_by_line_author_boundaries(raw_lines, authors);
     super::author_heuristics::repair_hyphenated_prose_tail_authors(raw_lines, authors);
     super::author_heuristics::drop_embedded_authors_title_phrases(raw_lines, authors);
@@ -976,6 +999,9 @@ fn run_final_variant_and_cleanup_repairs(
     );
     super::postprocess_transforms::drop_markup_declaration_and_versioninfo_copyrights_and_holders(
         raw_lines, copyrights, holders,
+    );
+    super::postprocess_transforms::drop_section_heading_multiline_copyrights_shadowed_by_final_line(
+        raw_lines, copyrights,
     );
     super::postprocess_transforms::drop_copyright_like_holders(holders);
     drop_placeholder_and_code_junk_by_raw_line(raw_lines, copyrights, holders);

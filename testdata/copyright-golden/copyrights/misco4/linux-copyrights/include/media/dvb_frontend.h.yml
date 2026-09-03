@@ -9,4 +9,6 @@ holders:
   - convergence GmbH
   - convergence integrated media GmbH
 authors:
-  - Ralph Metzler Overhauled by Holger Waechtler Kernel I2C stuff by Michael Hunold <hunold@convergence.de>
+  - Holger Waechtler
+  - Michael Hunold <hunold@convergence.de>
+  - Ralph Metzler

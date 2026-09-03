@@ -136,7 +136,10 @@ pub(super) fn extract_copyright_information(
     authors.retain(|author| {
         let raw_span = render_raw_span(&raw_lines, author.start_line, author.end_line);
         !is_binary_garbage_party_value(&author.author)
-            && !detection_is_source_code(&author.author, &raw_span)
+            && !looks_like_source_code(&author.author)
+            && (!looks_like_source_code(&raw_span)
+                || (has_author_contact_evidence(&author.author)
+                    && raw_span_has_author_attribution(&raw_span)))
             && seen_authors.insert((author.author.clone(), author.start_line, author.end_line))
     });
 
@@ -399,6 +402,19 @@ fn render_raw_span(raw_lines: &[&str], start_line: LineNumber, end_line: LineNum
 /// obviously source code, so it should be dropped from output.
 fn detection_is_source_code(value: &str, raw_span: &str) -> bool {
     looks_like_source_code(value) || looks_like_source_code(raw_span)
+}
+
+pub(super) fn has_author_contact_evidence(author: &str) -> bool {
+    if author.contains('@') {
+        return true;
+    }
+    let lower = author.to_ascii_lowercase();
+    lower.contains(" at ") && lower.contains(" dot ")
+}
+
+fn raw_span_has_author_attribution(raw_span: &str) -> bool {
+    static BY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bby\b").unwrap());
+    BY_RE.is_match(raw_span)
 }
 
 fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<String> {

@@ -303,6 +303,70 @@ pub(in super::super) fn drop_shadowed_prefix_authors(authors: &mut Vec<AuthorDet
     });
 }
 
+pub(in super::super) fn drop_same_span_contact_sentence_overruns(
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.len() < 2 {
+        return;
+    }
+    let originals = authors.clone();
+    authors.retain(|author| {
+        let candidate = author.author.trim();
+        !originals.iter().any(|other| {
+            if other.start_line != author.start_line || other.end_line != author.end_line {
+                return false;
+            }
+            let clean = other.author.trim();
+            if clean.len() >= candidate.len() || !clean.contains('@') {
+                return false;
+            }
+            let Some(tail) = candidate.strip_prefix(clean) else {
+                return false;
+            };
+            let tail = tail.trim_start();
+            matches!(tail.chars().next(), Some('.' | ';'))
+                && tail
+                    .trim_start_matches(['.', ';'])
+                    .trim_start()
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_uppercase)
+        })
+    });
+}
+
+pub(in super::super) fn drop_shadowed_author_prefixes(authors: &mut Vec<AuthorDetection>) {
+    if authors.len() < 2 {
+        return;
+    }
+    let originals = authors.clone();
+    authors.retain(|author| {
+        let candidate = author.author.trim();
+        !originals.iter().any(|other| {
+            if other.start_line != author.start_line
+                || other.end_line.get() < author.end_line.get()
+                || other.author.len() <= candidate.len()
+            {
+                return false;
+            }
+            let Some(tail) = other.author.trim().strip_prefix(candidate) else {
+                return false;
+            };
+            let tail = tail.trim_start();
+            let normalized_tail = tail
+                .trim_start_matches([',', ';'])
+                .trim_start()
+                .to_ascii_lowercase();
+            (other.end_line == author.end_line
+                && (tail.starts_with(',')
+                    || tail.starts_with(';')
+                    || normalized_tail.starts_with("and ")))
+                || normalized_tail.starts_with("with contributions from ")
+                || normalized_tail.starts_with("and contributions from ")
+        })
+    });
+}
+
 pub(in super::super) fn drop_shadowed_compound_email_authors(authors: &mut Vec<AuthorDetection>) {
     if authors.is_empty() {
         return;
@@ -528,38 +592,56 @@ pub(in super::super) fn drop_authors_after_sentence_final_label(
     });
 }
 
-/// Drop a weak, single-word author when it was harvested from surrounding
-/// prose rather than from an explicit attribution. Lowercase mononyms remain
-/// valid when the source gives them strong local evidence such as `Author:` or
-/// `written by`.
-pub(in super::super) fn drop_weak_single_word_prose_authors(
+/// Drop a weak compact author phrase when it was harvested without a bounded
+/// label or attribution. Lowercase names remain valid with explicit evidence.
+pub(in super::super) fn drop_weak_prose_authors(
     raw_lines: &[&str],
     authors: &mut Vec<AuthorDetection>,
 ) {
     authors.retain(|author| {
         let candidate = author.author.trim();
-        if candidate.split_whitespace().count() != 1
-            || !candidate.chars().all(|ch| ch.is_alphabetic())
-            || !candidate.chars().all(char::is_lowercase)
-        {
+        let normalized = candidate
+            .trim_matches(|ch: char| !ch.is_alphabetic() && !ch.is_whitespace())
+            .trim();
+        let words: Vec<&str> = normalized.split_whitespace().collect();
+        let is_weak_compact_phrase = !words.is_empty()
+            && words.len() <= 2
+            && normalized
+                .chars()
+                .all(|ch| ch.is_alphabetic() || ch.is_whitespace())
+            && normalized
+                .chars()
+                .find(|ch| ch.is_alphabetic())
+                .is_some_and(|ch| ch.is_lowercase());
+        if !is_weak_compact_phrase {
             return true;
         }
 
         let Some(raw_line) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
             return true;
         };
-        if raw_line.split_whitespace().count() <= 2 {
-            return true;
-        }
-
         let lower = raw_line.to_lowercase();
-        let candidate_lower = candidate.to_lowercase();
-        let has_explicit_label = ["author:", "author :", "authors:", "authors :"]
+        let candidate_lower = normalized.to_lowercase();
+        let has_explicit_label = ["author:", "author :", "authors:", "authors :", "@author"]
             .iter()
             .any(|label| lower.contains(&format!("{label} {candidate_lower}")));
-        let has_by_attribution = lower.contains(&format!("by {candidate_lower}"));
+        let has_structured_author_field = lower.find(&candidate_lower).is_some_and(|index| {
+            let prefix = &lower[..index];
+            prefix
+                .rfind("author")
+                .is_some_and(|label_index| prefix[label_index + "author".len()..].contains(':'))
+        });
+        let attribution = format!("by {candidate_lower}");
+        let has_bounded_by_attribution = lower.match_indices(&attribution).any(|(index, _)| {
+            let tail = lower[index + attribution.len()..].trim_start();
+            tail.is_empty()
+                || tail
+                    .chars()
+                    .next()
+                    .is_some_and(|ch| matches!(ch, '.' | ',' | ';' | ':' | ')' | ']' | '>'))
+        });
 
-        has_explicit_label || has_by_attribution
+        has_explicit_label || has_structured_author_field || has_bounded_by_attribution
     });
 }
 
@@ -772,38 +854,47 @@ pub(in super::super) fn repair_contact_author_before_new_attribution(
         if author.end_line <= author.start_line {
             continue;
         }
-        let Some(first_raw) = raw_lines.get(author.start_line.get().saturating_sub(1)) else {
-            continue;
-        };
-        let Some(next_raw) = raw_lines.get(author.start_line.get()) else {
-            continue;
-        };
-        let first = prepare_text_line(first_raw);
-        let first_lower = first.to_ascii_lowercase();
-        let next = prepare_text_line(next_raw).to_ascii_lowercase();
-        let has_contact =
-            first.contains('@') || (first_lower.contains(" at ") && first_lower.contains(" dot "));
-        if !has_contact
-            || !next.contains(" by ")
-            || next.starts_with("and ")
-            || next.starts_with("or ")
+        let start_index = author.start_line.get().saturating_sub(1);
+        let end_index = author.end_line.get().min(raw_lines.len());
+        let mut prefix = Vec::new();
+
+        for (index, raw_line) in raw_lines
+            .iter()
+            .enumerate()
+            .take(end_index)
+            .skip(start_index)
         {
-            continue;
-        }
-        let Some(captures) = TRAILING_BY_RE.captures(&first) else {
-            continue;
-        };
-        let who = captures
-            .name("who")
-            .map(|matched| matched.as_str())
-            .unwrap_or("")
-            .trim();
-        let Some(refined) = refine_author(who) else {
-            continue;
-        };
-        if author.author.starts_with(&refined) {
-            author.author = refined;
-            author.end_line = author.start_line;
+            let prepared = prepare_text_line(raw_line);
+            if index > start_index {
+                let lower = prepared.to_ascii_lowercase();
+                let opens_new_attribution = lower.contains(" by ")
+                    && !lower.starts_with("and ")
+                    && !lower.starts_with("or ");
+                let joined = prefix.join(" ");
+                let joined_lower = joined.to_ascii_lowercase();
+                let has_contact = joined.contains('@')
+                    || joined.contains('<')
+                    || (joined_lower.contains(" at ") && joined_lower.contains(" dot "));
+                if opens_new_attribution && has_contact {
+                    let Some(captures) = TRAILING_BY_RE.captures(&joined) else {
+                        break;
+                    };
+                    let who = captures
+                        .name("who")
+                        .map(|matched| matched.as_str())
+                        .unwrap_or("")
+                        .trim();
+                    let Some(refined) = refine_author(who) else {
+                        break;
+                    };
+                    if author.author.starts_with(&refined) {
+                        author.author = refined;
+                        author.end_line = LineNumber::new(index).expect("valid source line");
+                    }
+                    break;
+                }
+            }
+            prefix.push(prepared);
         }
     }
 }

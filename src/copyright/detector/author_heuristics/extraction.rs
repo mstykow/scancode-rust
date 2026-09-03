@@ -8,6 +8,8 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
+use serde_json::{Map as JsonMap, Value as JsonValue};
+use yaml_serde::Value as YamlValue;
 
 use super::super::token_utils::normalize_whitespace;
 use super::{
@@ -238,6 +240,26 @@ fn trim_attribution_tail(who: &str) -> String {
     }
 }
 
+fn trim_contact_attribution_suffix(who: &str) -> String {
+    static CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})").unwrap()
+    });
+    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for\s+\p{L})").unwrap());
+
+    let Some(contact) = CONTACT_RE.find_iter(who).last() else {
+        return who.to_string();
+    };
+    let tail = who[contact.end()..]
+        .trim_start_matches([',', ';'])
+        .trim_start();
+    if !tail.is_empty() && NON_AUTHOR_SUFFIX_RE.is_match(tail) {
+        who[..contact.end()].trim().to_string()
+    } else {
+        who.to_string()
+    }
+}
+
 fn trim_following_sentence_clause(who: &str) -> String {
     static FOLLOWING_SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?is)^(?P<head>.+?)\.\s+(?:it|this|these|those|the|a|an|no)\b.*$").unwrap()
@@ -367,6 +389,400 @@ fn extract_written_by_subject(line: &str) -> Option<String> {
         .captures(line)
         .or_else(|| WRITTEN_BY_ANYWHERE_RE.captures(line))
         .and_then(|cap| cap.name("who").map(|m| m.as_str().trim().to_string()))
+}
+
+fn extract_line_local_attribution_author(
+    line: &str,
+    allow_without_contact: bool,
+) -> Option<String> {
+    static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by)\s+(?P<who>.+)$",
+        )
+        .unwrap()
+    });
+    static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+        )
+        .unwrap()
+    });
+    static CONTACT_CHANGE_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+        )
+        .unwrap()
+    });
+    static COPYRIGHT_TAIL_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\s*(?:,\s*copyright\b|\(c\)\s*\d{4})\b.*$").unwrap());
+    static CONTACT_SENTENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+)[A-Z].*$").unwrap()
+    });
+
+    let normalized = strip_leading_dash_bullet(line);
+    let normalized_lower = normalized.to_ascii_lowercase();
+    if normalized_lower.find(" by ").is_some_and(|by_index| {
+        let prefix = &normalized_lower[..by_index];
+        prefix.contains("copyright") || prefix.contains("(c)")
+    }) {
+        return None;
+    }
+    let captures = ACTION_BY_RE
+        .captures(normalized)
+        .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))
+        .or_else(|| CONTACT_CHANGE_BY_RE.captures(normalized))?;
+    let who = captures.name("who")?.as_str().trim();
+    let has_contact = who.contains('@')
+        || who.contains('<')
+        || (who.to_ascii_lowercase().contains(" at ")
+            && who.to_ascii_lowercase().contains(" dot "));
+    if !allow_without_contact && !has_contact {
+        return None;
+    }
+    let who = trim_following_sentence_clause(who);
+    let who = COPYRIGHT_TAIL_RE.replace(&who, "");
+    let who = CONTACT_SENTENCE_TAIL_RE
+        .captures(&who)
+        .and_then(|captures| captures.name("head").map(|head| head.as_str().to_string()))
+        .unwrap_or_else(|| who.into_owned());
+    let who = trim_contact_attribution_suffix(&who);
+    let who = trim_attribution_tail(&who);
+    let who = who.find('>').map_or(who.as_str(), |contact_end| {
+        let tail = who[contact_end + 1..].trim_start();
+        if tail.starts_with('.') || tail.starts_with(';') {
+            &who[..=contact_end]
+        } else {
+            who.as_str()
+        }
+    });
+    let who = who.trim_end_matches('.').trim();
+    let who_lower = who.to_ascii_lowercase();
+    if who_lower.ends_with(" and") || who_lower.ends_with(" or") {
+        return None;
+    }
+    refine_author(who)
+}
+
+pub(in super::super) fn extract_line_local_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    let mut authors: Vec<AuthorDetection> = prepared_cache
+        .iter_non_empty()
+        .filter_map(|line| {
+            let author =
+                extract_line_local_attribution_author(line.prepared, false).or_else(|| {
+                    let normalized = strip_leading_dash_bullet(line.prepared);
+                    let lower = normalized.to_ascii_lowercase();
+                    let could_be_action_attribution = lower.contains(" by ")
+                        && [
+                            "written",
+                            "authored",
+                            "revised",
+                            "overhauled",
+                            "updated",
+                            "modified",
+                            "implemented",
+                            "originally",
+                            "original driver",
+                        ]
+                        .iter()
+                        .any(|prefix| lower.starts_with(prefix));
+                    (could_be_action_attribution
+                        && has_adjacent_copyright_hint(prepared_cache, line.line_number))
+                    .then(|| extract_line_local_attribution_author(line.prepared, true))
+                    .flatten()
+                })?;
+            Some(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            })
+        })
+        .collect();
+
+    for (line, next_line) in prepared_cache.adjacent_pairs() {
+        let first = line.prepared.trim_end();
+        let next = next_line.prepared.trim();
+        let first_lower = first.to_ascii_lowercase();
+        let has_by_boundary = first_lower.contains(" by ") || first_lower.ends_with(" by");
+        if first.contains('@') || !next.contains('@') || !has_by_boundary {
+            continue;
+        }
+        let attributed_party = if first_lower.ends_with(" by") {
+            ""
+        } else {
+            let Some((_, attributed_party)) = first_lower.rsplit_once(" by ") else {
+                continue;
+            };
+            attributed_party
+        };
+        if attributed_party.split_whitespace().count() > 6 {
+            continue;
+        }
+        let next = if next.starts_with('<') {
+            next.find('>').map_or(next, |end| &next[..=end])
+        } else {
+            next
+        };
+        if next
+            .split_whitespace()
+            .filter(|word| word.chars().any(|ch| ch.is_alphanumeric()))
+            .count()
+            > 3
+        {
+            continue;
+        }
+        let bare_contact = next.trim_end_matches('.');
+        let joined = if bare_contact.contains('@') && !bare_contact.contains(char::is_whitespace) {
+            if bare_contact.starts_with('<') && bare_contact.ends_with('>') {
+                format!("{first} {bare_contact}")
+            } else {
+                format!("{first} <{bare_contact}>")
+            }
+        } else {
+            format!("{first} {next}")
+        };
+        let Some(author) = extract_line_local_attribution_author(&joined, false) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: next_line.line_number,
+        });
+    }
+
+    authors
+}
+
+pub(in super::super) fn extract_subject_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    static SUBJECT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:originally\s+)?(?:written|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
+        )
+        .unwrap()
+    });
+    static POD_AUTHOR_HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^=head\d+\s+authors?\s*$").unwrap());
+    static POD_HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^=head\d+\b").unwrap());
+    static NON_AUTHOR_CLAUSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\s+and\s+(?:on|upon|for)\s+(?:which|whom)\b.*$").unwrap()
+    });
+    static BARE_EMAIL_SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+).*$").unwrap()
+    });
+
+    let mut authors = Vec::new();
+    let mut in_pod_author_section = false;
+    for line in prepared_cache.iter_non_empty() {
+        let prepared = line.prepared.trim();
+        if POD_HEADING_RE.is_match(prepared) {
+            in_pod_author_section = POD_AUTHOR_HEADING_RE.is_match(prepared);
+            continue;
+        }
+        let Some(captures) = SUBJECT_ATTRIBUTION_RE.captures(prepared) else {
+            continue;
+        };
+        let Some(raw_who) = captures.name("who").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let lower = raw_who.to_ascii_lowercase();
+        let has_contact = raw_who.contains('@')
+            || raw_who.contains('<')
+            || (lower.contains(" at ") && lower.contains(" dot "));
+        if !has_contact && !in_pod_author_section {
+            continue;
+        }
+
+        let mut who = NON_AUTHOR_CLAUSE_RE.replace(raw_who, "").into_owned();
+        if let Some(contact_end) = who.find('>') {
+            let tail = who[contact_end + 1..].trim_start();
+            if tail.starts_with('.') || tail.starts_with(';') {
+                who.truncate(contact_end + 1);
+            }
+        } else if let Some(captures) = BARE_EMAIL_SENTENCE_RE.captures(&who)
+            && let Some(head) = captures.name("head")
+        {
+            who = head.as_str().to_string();
+        }
+        let who = trim_attribution_tail(&who);
+        let Some(author) = refine_author(&who) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+    authors
+}
+
+pub(in super::super) fn repair_chained_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    static ACTIVE_SENTENCE_CHAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:written|authored|developed|created)\s+by\s+(?P<first>[^.]{2,100})\.\s+(?P<second>[\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){1,4})\s+(?:created|authored|wrote|developed|implemented|updated|modified|refactored)\b",
+        )
+        .unwrap()
+    });
+    static WRAPPED_ROLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:support|implementation|code|patch(?:es)?|maintenance|maintainership|documentation)\s*$",
+        )
+        .unwrap()
+    });
+    static LEADING_BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^by\s+(?P<who>.+)$").unwrap());
+    static CONJOINED_CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:support|implementation|code|patch(?:es)?|maintenance|maintainership|documentation)\s+by\s+(?P<who>.+?),?\s+and\s*$",
+        )
+        .unwrap()
+    });
+    static TRAILING_SECOND_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:expanded|updated|modified|integrated|supplemented|maintained|ported|adapted)\s+by\s+(?P<head>[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4})\s*$",
+        )
+        .unwrap()
+    });
+
+    let mut recovered = Vec::new();
+    for line in prepared_cache.iter_non_empty() {
+        let Some(captures) = ACTIVE_SENTENCE_CHAIN_RE.captures(line.prepared) else {
+            continue;
+        };
+        let Some(first) = captures
+            .name("first")
+            .and_then(|matched| refine_author(matched.as_str().trim_matches(&[' ', ',', ';'][..])))
+        else {
+            continue;
+        };
+        let Some(second) = captures
+            .name("second")
+            .and_then(|matched| refine_author(matched.as_str()))
+        else {
+            continue;
+        };
+
+        authors.retain(|author| {
+            !(author.start_line <= line.line_number
+                && author.end_line >= line.line_number
+                && author.author.contains(&first)
+                && author.author.contains(&second))
+        });
+        recovered.push(AuthorDetection {
+            author: first,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+        recovered.push(AuthorDetection {
+            author: second,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        if !WRAPPED_ROLE_RE.is_match(previous.prepared.trim()) {
+            continue;
+        }
+        let Some(captures) = LEADING_BY_RE.captures(next.prepared.trim()) else {
+            continue;
+        };
+        let Some(who) = captures.name("who").map(|matched| matched.as_str()) else {
+            continue;
+        };
+        let lower = who.to_ascii_lowercase();
+        let has_contact = who.contains('@')
+            || who.contains('<')
+            || (lower.contains(" at ") && lower.contains(" dot "));
+        if !has_contact {
+            continue;
+        }
+        let who = trim_attribution_tail(who);
+        let Some(author) = refine_author(&who) else {
+            continue;
+        };
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        let Some(captures) = CONJOINED_CONTACT_RE.captures(previous.prepared.trim()) else {
+            continue;
+        };
+        let Some(first) = captures.name("who").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let second = next.prepared.trim().trim_end_matches('.').trim();
+        if (!first.contains('@') && !first.contains('<'))
+            || (!second.contains('@') && !second.contains('<'))
+        {
+            continue;
+        }
+        let Some(author) = refine_author(&format!("{first}, and {second}")) else {
+            continue;
+        };
+        authors.retain(|existing| {
+            !(existing.start_line == previous.line_number && author.starts_with(&existing.author))
+        });
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    for (previous, next) in prepared_cache.adjacent_pairs() {
+        let Some(captures) = TRAILING_SECOND_BY_RE.captures(previous.prepared.trim()) else {
+            continue;
+        };
+        let Some(head) = captures.name("head").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let tail = next.prepared.trim().trim_end_matches('.').trim();
+        let tail_words: Vec<&str> = tail.split_whitespace().collect();
+        if tail_words.is_empty()
+            || tail_words.len() > 3
+            || !tail_words.iter().all(|word| {
+                word.chars()
+                    .find(|ch| ch.is_alphabetic())
+                    .is_some_and(|ch| ch.is_uppercase())
+                    && word
+                        .chars()
+                        .all(|ch| ch.is_alphabetic() || matches!(ch, '\'' | '’' | '-' | '.'))
+            })
+        {
+            continue;
+        }
+        let Some(author) = refine_author(&format!("{head} {tail}")) else {
+            continue;
+        };
+        authors.retain(|existing| {
+            !(existing.start_line == previous.line_number && author.starts_with(&existing.author))
+        });
+        recovered.push(AuthorDetection {
+            author,
+            start_line: previous.line_number,
+            end_line: next.line_number,
+        });
+    }
+
+    recovered.retain(|candidate| {
+        !authors
+            .iter()
+            .any(|author| author.author == candidate.author)
+    });
+    authors.extend(recovered);
 }
 
 fn has_adjacent_copyright_hint(
@@ -641,14 +1057,7 @@ pub(in super::super) fn extract_changes_by_authors(
             .map(|matched| matched.as_str())
             .unwrap_or("")
             .trim();
-        if who
-            .chars()
-            .filter(|ch| ch.is_alphabetic())
-            .all(|ch| ch.is_uppercase())
-        {
-            continue;
-        }
-        if let Some(author) = refine_author(who) {
+        if let Some(author) = refine_changes_by_party(who) {
             authors.push(AuthorDetection {
                 author,
                 start_line: line.line_number,
@@ -674,14 +1083,7 @@ pub(in super::super) fn extract_changes_by_authors(
             .map(|matched| matched.as_str())
             .unwrap_or("")
             .trim();
-        if who
-            .chars()
-            .filter(|ch| ch.is_alphabetic())
-            .all(|ch| ch.is_uppercase())
-        {
-            continue;
-        }
-        if let Some(author) = refine_author(who) {
+        if let Some(author) = refine_changes_by_party(who) {
             authors.push(AuthorDetection {
                 author,
                 start_line: line.line_number,
@@ -691,6 +1093,31 @@ pub(in super::super) fn extract_changes_by_authors(
     }
 
     authors
+}
+
+fn refine_changes_by_party(who: &str) -> Option<String> {
+    let party = who
+        .split_once(':')
+        .map(|(head, _)| head)
+        .unwrap_or(who)
+        .trim();
+    if party.is_empty()
+        || party
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+    {
+        return None;
+    }
+
+    refine_author(party).or_else(|| {
+        let mut letters = party.chars().filter(|ch| ch.is_alphabetic());
+        let first = letters.next()?;
+        (party.split_whitespace().count() == 1
+            && first.is_uppercase()
+            && letters.all(|ch| ch.is_lowercase()))
+        .then(|| party.to_string())
+    })
 }
 
 fn looks_like_contributed_person_name_token(word: &str) -> bool {
@@ -975,6 +1402,24 @@ pub(in super::super) fn extract_multiline_written_by_author_blocks(
                 || lower.starts_with("implemented ")
                 || lower.starts_with("copied from ")
         });
+
+        let line_local_authors: Vec<AuthorDetection> = block_lines
+            .iter()
+            .filter_map(|(line_number, raw_line)| {
+                let author = extract_line_local_attribution_author(raw_line, true)?;
+                Some(AuthorDetection {
+                    author,
+                    start_line: *line_number,
+                    end_line: *line_number,
+                })
+            })
+            .collect();
+        if line_local_authors.len() >= 2 {
+            authors.retain(|author| author.start_line < start_line || author.end_line > end_line);
+            authors.extend(line_local_authors);
+            line_number = next_line_number;
+            continue;
+        }
 
         if prefer_combined_block {
             let combined_raw = block_lines
@@ -2693,6 +3138,349 @@ pub(in super::super) fn extract_json_author_object_authors(
     }
 
     authors
+}
+
+fn structured_key_opens_code_or_schema_context(key: &str) -> bool {
+    key.starts_with('$')
+        || matches!(
+            key.to_ascii_lowercase().as_str(),
+            "example"
+                | "examples"
+                | "expectedstages"
+                | "filter"
+                | "pipeline"
+                | "pipelines"
+                | "properties"
+                | "query"
+                | "schema"
+        )
+}
+
+fn structured_key_is_package_metadata(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "abstract"
+            | "bomformat"
+            | "components"
+            | "description"
+            | "distribution_type"
+            | "homepage"
+            | "license"
+            | "licenses"
+            | "name"
+            | "package"
+            | "publisher"
+            | "purl"
+            | "release_status"
+            | "supplier"
+            | "url"
+            | "version"
+    )
+}
+
+fn structured_key_declares_authorship(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "author" | "authors" | "contributor" | "contributors" | "x_contributors"
+    )
+}
+
+fn structured_key_opens_package_inventory_context(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "bundledependencies"
+            | "bundleddependencies"
+            | "dependencies"
+            | "devdependencies"
+            | "optionaldependencies"
+            | "packages"
+            | "peerdependencies"
+    )
+}
+
+fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool {
+    object
+        .keys()
+        .any(|key| structured_key_is_package_metadata(key))
+}
+
+fn refine_structured_metadata_author(candidate: &str) -> Option<String> {
+    let context = format!(
+        r#"{{"name":"metadata","author":{}}}"#,
+        serde_json::to_string(candidate).ok()?
+    );
+    refine_json_author_candidate(candidate, &context)
+}
+
+fn collect_structured_author_values(
+    value: &JsonValue,
+    is_root: bool,
+    in_code_or_schema_context: bool,
+    in_package_inventory_context: bool,
+    allow_scalar_value: bool,
+    collect_excluded_values: bool,
+    values: &mut Vec<String>,
+) {
+    match value {
+        JsonValue::Object(object) => {
+            let object_is_metadata = is_root || json_object_has_package_metadata(object);
+            for (key, child) in object {
+                let child_is_code_or_schema =
+                    in_code_or_schema_context || structured_key_opens_code_or_schema_context(key);
+                let child_is_package_inventory = in_package_inventory_context
+                    || structured_key_opens_package_inventory_context(key);
+                let is_credit_key = structured_key_declares_authorship(key);
+
+                let should_collect = if collect_excluded_values {
+                    child_is_code_or_schema || in_package_inventory_context
+                } else {
+                    object_is_metadata && !child_is_code_or_schema && !in_package_inventory_context
+                };
+                if is_credit_key && should_collect {
+                    match child {
+                        JsonValue::Array(entries) => {
+                            for entry in entries {
+                                let candidate = match entry {
+                                    JsonValue::String(candidate) => Some(candidate.as_str()),
+                                    JsonValue::Object(author) => {
+                                        author.get("name").and_then(JsonValue::as_str)
+                                    }
+                                    _ => None,
+                                };
+                                if let Some(candidate) = candidate {
+                                    values.push(candidate.to_string());
+                                }
+                            }
+                        }
+                        JsonValue::String(candidate) if allow_scalar_value => {
+                            values.push(candidate.to_string());
+                        }
+                        JsonValue::Object(author) if allow_scalar_value => {
+                            if let Some(candidate) = author.get("name").and_then(JsonValue::as_str)
+                            {
+                                values.push(candidate.to_string());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                collect_structured_author_values(
+                    child,
+                    false,
+                    child_is_code_or_schema,
+                    child_is_package_inventory,
+                    allow_scalar_value,
+                    collect_excluded_values,
+                    values,
+                );
+            }
+        }
+        JsonValue::Array(entries) => {
+            for entry in entries {
+                collect_structured_author_values(
+                    entry,
+                    false,
+                    in_code_or_schema_context,
+                    in_package_inventory_context,
+                    allow_scalar_value,
+                    collect_excluded_values,
+                    values,
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Extract independent author and contributor credits from validated JSON arrays.
+///
+/// Array entries are kept separate because each item is an independent
+/// declaration. Nested query, example, and schema structures are excluded by
+/// their structural path rather than by candidate text.
+pub(in super::super) fn extract_json_credit_array_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    if raw_lines.is_empty()
+        || !raw_lines.iter().any(|line| {
+            line.contains("\"author\"")
+                || line.contains("\"authors\"")
+                || line.contains("\"contributor\"")
+                || line.contains("\"contributors\"")
+                || line.contains("\"x_contributors\"")
+        })
+    {
+        return Vec::new();
+    }
+
+    let content = raw_lines.join("\n");
+    let Ok(json) = serde_json::from_str::<JsonValue>(&content) else {
+        return Vec::new();
+    };
+
+    let mut candidates = Vec::new();
+    collect_structured_author_values(&json, true, false, false, false, false, &mut candidates);
+
+    let mut used_source_lines = HashSet::new();
+    let fallback_source_index = raw_lines
+        .iter()
+        .position(|line| {
+            line.contains("\"author\"")
+                || line.contains("\"authors\"")
+                || line.contains("\"contributor\"")
+                || line.contains("\"contributors\"")
+                || line.contains("\"x_contributors\"")
+        })
+        .unwrap_or(0);
+    candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let author = refine_structured_metadata_author(&candidate)?;
+            let encoded = serde_json::to_string(&candidate).ok()?;
+            let source_index = raw_lines
+                .iter()
+                .enumerate()
+                .find(|(idx, line)| !used_source_lines.contains(idx) && line.contains(&encoded))
+                .map(|(idx, _)| idx)
+                .unwrap_or(fallback_source_index);
+            used_source_lines.insert(source_index);
+            let line = LineNumber::from_0_indexed(source_index);
+            Some(AuthorDetection {
+                author,
+                start_line: line,
+                end_line: line,
+            })
+        })
+        .collect()
+}
+
+fn line_has_structured_credit_key(line: &str) -> bool {
+    let Some((key, _value)) = line.trim_start().split_once(':') else {
+        return false;
+    };
+    structured_key_declares_authorship(key.trim().trim_matches(&['\'', '"'][..]))
+}
+
+/// Extract independent author and contributor credits from validated YAML arrays.
+pub(in super::super) fn extract_yaml_credit_array_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    let Some(fallback_source_index) = raw_lines
+        .iter()
+        .position(|line| line_has_structured_credit_key(line))
+    else {
+        return Vec::new();
+    };
+
+    let content = raw_lines.join("\n");
+    let Ok(yaml) = yaml_serde::from_str::<YamlValue>(&content) else {
+        return Vec::new();
+    };
+    let Ok(yaml_as_json) = serde_json::to_value(yaml) else {
+        return Vec::new();
+    };
+
+    let mut candidates = Vec::new();
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        false,
+        false,
+        &mut candidates,
+    );
+
+    let mut used_source_lines = HashSet::new();
+    candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let author = refine_structured_metadata_author(&candidate)?;
+            let source_index = raw_lines
+                .iter()
+                .enumerate()
+                .find(|(idx, line)| {
+                    !used_source_lines.contains(idx) && line.contains(candidate.as_str())
+                })
+                .map(|(idx, _)| idx)
+                .unwrap_or(fallback_source_index);
+            used_source_lines.insert(source_index);
+            let line = LineNumber::from_0_indexed(source_index);
+            Some(AuthorDetection {
+                author,
+                start_line: line,
+                end_line: line,
+            })
+        })
+        .collect()
+}
+
+/// Drop line-based detections that parsed JSON or YAML places in code/schema
+/// contexts or nested package inventories rather than document-level credits.
+pub(in super::super) fn drop_out_of_scope_structured_credit_authors(
+    raw_lines: &[&str],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.is_empty()
+        || !raw_lines
+            .iter()
+            .any(|line| line_has_structured_credit_key(line))
+    {
+        return;
+    }
+
+    let content = raw_lines.join("\n");
+    let Ok(yaml) = yaml_serde::from_str::<YamlValue>(&content) else {
+        return;
+    };
+    let Ok(yaml_as_json) = serde_json::to_value(yaml) else {
+        return;
+    };
+
+    let mut excluded_candidates = Vec::new();
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        true,
+        true,
+        &mut excluded_candidates,
+    );
+    let mut included_candidates = Vec::new();
+    collect_structured_author_values(
+        &yaml_as_json,
+        true,
+        false,
+        false,
+        true,
+        false,
+        &mut included_candidates,
+    );
+    let included: HashSet<String> = included_candidates
+        .into_iter()
+        .filter_map(|candidate| refine_structured_metadata_author(&candidate))
+        .collect();
+    let excluded: Vec<(String, LineNumber)> = excluded_candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let author = refine_structured_metadata_author(&candidate)?;
+            if included.contains(&author) {
+                return None;
+            }
+            let source_index = raw_lines
+                .iter()
+                .position(|line| line.contains(candidate.as_str()))?;
+            Some((author, LineNumber::from_0_indexed(source_index)))
+        })
+        .collect();
+
+    authors.retain(|author| {
+        !excluded.iter().any(|(excluded_author, source_line)| {
+            author.author == *excluded_author
+                && author.start_line.get().abs_diff(source_line.get()) <= 1
+        })
+    });
 }
 
 pub(in super::super) fn extract_maintained_by_authors(

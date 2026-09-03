@@ -1164,6 +1164,27 @@ fn test_extract_copyright_information_keeps_real_notice_and_name_with_email() {
 }
 
 #[test]
+fn test_extract_copyright_information_keeps_attributed_author_after_namespace() {
+    let text = "Pod::Simple was created by Sean M. Burke <sburke@cpan.org>.\n";
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("Simple.pm"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    assert_eq!(file.authors.len(), 1, "authors: {:?}", file.authors);
+    assert_eq!(file.authors[0].author, "Sean M. Burke <sburke@cpan.org>");
+}
+
+#[test]
+fn test_extract_copyright_information_rejects_author_in_source_container() {
+    let text = "$is_list->( authors => [ q{Michael G Schwern <schwern@pobox.com>} ] );\n";
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("basic.t"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    assert!(file.authors.is_empty(), "authors: {:?}", file.authors);
+}
+
+#[test]
 fn test_extract_copyright_information_drops_code_line_with_embedded_email_literal() {
     // A C++ source line whose argument list embeds an email literal must still be
     // rejected: the namespace/address-of code signals are not bypassed by the

@@ -108,6 +108,24 @@ fn drops_year_free_party_inside_license_body_region() {
 }
 
 #[test]
+fn keeps_contact_backed_author_inside_license_body_region() {
+    let mut file_info = file_info_with_region(107);
+    file_info.authors = vec![Author {
+        author: "Sean M. Burke <sburke@cpan.org>".to_string(),
+        start_line: line(8),
+        end_line: line(8),
+    }];
+
+    suppress_license_text_region_parties(&mut file_info);
+
+    assert_eq!(
+        file_info.authors.len(),
+        1,
+        "contact-backed attribution must survive a coarse license region"
+    );
+}
+
+#[test]
 fn keeps_real_notice_and_its_bare_name_party_inside_license_body_region() {
     let mut file_info = file_info_with_region(107);
     // A genuine embedded copyright notice with a year, inside the region. The

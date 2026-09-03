@@ -546,3 +546,57 @@ fn test_process_file_drops_license_prose_parties_but_keeps_real_notice() {
         file_info.authors,
     );
 }
+
+#[test]
+fn test_process_file_keeps_contact_backed_author_inside_license_region() {
+    use crate::license_detection::LicenseDetectionEngine;
+    use std::sync::Arc;
+
+    let fixture = Path::new("testdata/license-golden/datadriven/lic2/bsd-original_1.txt");
+    let source = fs::read_to_string(fixture).expect("read BSD fixture");
+    let source = source.replacen(
+        " * 4. Neither",
+        concat!(
+            " * Pod::Simple was created by Sean M. Burke <sburke@cpan.org>.\n",
+            " *\n",
+            " * 4. Neither",
+        ),
+        1,
+    );
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("license-region-author.c");
+    fs::write(&path, source).expect("write synthetic source");
+
+    let engine =
+        Arc::new(LicenseDetectionEngine::from_embedded().expect("embedded engine should load"));
+    let metadata = fs::metadata(&path).expect("metadata");
+    let progress = ScanProgress::new(ProgressMode::Quiet);
+    let file_info = process_file(
+        &path,
+        &metadata,
+        &progress,
+        Some(engine),
+        LicenseScanOptions::default(),
+        &TextDetectionOptions::default(),
+    );
+
+    assert!(
+        file_info.license_detections.iter().any(|detection| {
+            detection.matches.iter().any(|matched| {
+                matched.start_line.get() <= 22
+                    && matched.end_line.get() >= 22
+                    && matched.matched_length.unwrap_or(0) >= 80
+            })
+        }),
+        "synthetic attribution must overlap a license-body region: {:?}",
+        file_info.license_detections,
+    );
+    assert!(
+        file_info
+            .authors
+            .iter()
+            .any(|author| author.author == "Sean M. Burke <sburke@cpan.org>"),
+        "contact-backed author dropped: {:?}",
+        file_info.authors,
+    );
+}
