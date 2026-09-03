@@ -242,7 +242,8 @@ fn trim_attribution_tail(who: &str) -> String {
 
 fn trim_contact_attribution_suffix(who: &str) -> String {
     static CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})").unwrap()
+        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\([^()\s]*@[^()]*\)|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})")
+            .unwrap()
     });
     static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for\s+\p{L})").unwrap());
@@ -397,13 +398,13 @@ fn extract_line_local_attribution_author(
 ) -> Option<String> {
     static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by)\s+(?P<who>.+)$",
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|original\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by):?\s+(?P<who>.+)$",
         )
         .unwrap()
     });
     static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|hints?|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
@@ -415,6 +416,12 @@ fn extract_line_local_attribution_author(
     });
     static COPYRIGHT_TAIL_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\s*(?:,\s*copyright\b|\(c\)\s*\d{4})\b.*$").unwrap());
+    static CHAINED_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i),\s*(?:adapted|authored|implemented|merged|modified|ported|revised|updated|written)\s+by\b.*$",
+        )
+        .unwrap()
+    });
     static CONTACT_SENTENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+)[A-Z].*$").unwrap()
     });
@@ -440,6 +447,7 @@ fn extract_line_local_attribution_author(
         return None;
     }
     let who = trim_following_sentence_clause(who);
+    let who = CHAINED_ATTRIBUTION_RE.replace(&who, "");
     let who = COPYRIGHT_TAIL_RE.replace(&who, "");
     let who = CONTACT_SENTENCE_TAIL_RE
         .captures(&who)
@@ -466,6 +474,12 @@ fn extract_line_local_attribution_author(
 pub(in super::super) fn extract_line_local_attribution_authors(
     prepared_cache: &PreparedLines<'_>,
 ) -> Vec<AuthorDetection> {
+    static CHAINED_ATTRIBUTION_CLAUSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i),\s*(?P<clause>(?:adapted|authored|implemented|merged|modified|ported|revised|updated|written)\s+by\s+.+)$",
+        )
+        .unwrap()
+    });
     let mut authors: Vec<AuthorDetection> = prepared_cache
         .iter_non_empty()
         .filter_map(|line| {
@@ -500,15 +514,34 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         })
         .collect();
 
+    for line in prepared_cache.iter_non_empty() {
+        let Some(clause) = CHAINED_ATTRIBUTION_CLAUSE_RE
+            .captures(line.prepared)
+            .and_then(|captures| captures.name("clause"))
+        else {
+            continue;
+        };
+        let Some(author) = extract_line_local_attribution_author(clause.as_str(), false) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+
     for (line, next_line) in prepared_cache.adjacent_pairs() {
         let first = line.prepared.trim_end();
         let next = next_line.prepared.trim();
         let first_lower = first.to_ascii_lowercase();
-        let has_by_boundary = first_lower.contains(" by ") || first_lower.ends_with(" by");
+        let ends_with_by_colon = first_lower.ends_with(" by:");
+        let ends_with_by = first_lower.ends_with(" by") || ends_with_by_colon;
+        let has_by_boundary = first_lower.contains(" by ") || ends_with_by;
         if first.contains('@') || !next.contains('@') || !has_by_boundary {
             continue;
         }
-        let attributed_party = if first_lower.ends_with(" by") {
+        let attributed_party = if ends_with_by {
             ""
         } else {
             let Some((_, attributed_party)) = first_lower.rsplit_once(" by ") else {
@@ -524,15 +557,24 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         } else {
             next
         };
+        let next_has_delimited_contact =
+            next.contains('<') || (next.contains('(') && next.contains(')') && next.contains('@'));
+        let next_word_limit = if ends_with_by_colon || (ends_with_by && next_has_delimited_contact)
+        {
+            12
+        } else {
+            3
+        };
         if next
             .split_whitespace()
             .filter(|word| word.chars().any(|ch| ch.is_alphanumeric()))
             .count()
-            > 3
+            > next_word_limit
         {
             continue;
         }
         let bare_contact = next.trim_end_matches('.');
+        let first = first.trim_end_matches(':');
         let joined = if bare_contact.contains('@') && !bare_contact.contains(char::is_whitespace) {
             if bare_contact.starts_with('<') && bare_contact.ends_with('>') {
                 format!("{first} {bare_contact}")

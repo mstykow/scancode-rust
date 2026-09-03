@@ -512,6 +512,52 @@ fn test_contact_backed_change_attribution_wraps_onto_next_line() {
 }
 
 #[test]
+fn test_source_header_credit_variants_are_authors() {
+    let input = concat!(
+        "# Original by Neil Bowers <neil@example.net>; Tue Oct 4 1994\n",
+        "# XD88/10 platform hints by Kaveh Ghazi (ghazi@example.net) 2/11/92\n",
+        "# Merged with the distribution by\n",
+        "# Andy Dougherty <andy@example.net>\n",
+        "# First modified 6/30/96 by:\n",
+        "# Luther Huffman, Example Systems, Inc., luther@example.net\n",
+        "# Last modified May 2020 by:\n",
+        "# David Romano, david@example.net\n",
+        "# Original by first@example.net, modified by second@example.net\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Neil Bowers <neil@example.net>",
+        "Kaveh Ghazi (ghazi@example.net)",
+        "Andy Dougherty <andy@example.net>",
+        "Luther Huffman, Example Systems, Inc., luther@example.net",
+        "David Romano, david@example.net",
+        "first@example.net",
+        "second@example.net",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+}
+
+#[test]
+fn test_source_header_credit_words_without_people_are_not_authors() {
+    let input = concat!(
+        "The result is original by design.\n",
+        "The generated files are merged by the build tool.\n",
+        "Compiler hints by default improve diagnostics.\n",
+        "This file uses a compiler written by\n",
+        "Jean Example. Send mail to support@example.net for a copy.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
 fn test_contact_backed_non_author_by_phrases_are_not_authors() {
     let input = concat!(
         "This package is distributed by Example Support <support@example.net>.\n",

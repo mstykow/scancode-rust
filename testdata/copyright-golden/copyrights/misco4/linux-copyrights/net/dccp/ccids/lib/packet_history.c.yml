@@ -12,4 +12,5 @@ holders:
   - Nils-Erik Mattsson, Joacim Haggmark, Magnus Erixzon
   - The University of Aberdeen, Scotland, UK
   - The University of Waikato, Hamilton, New Zealand. An
-authors: []
+authors:
+  - Arnaldo Carvalho de Melo <acme@conectiva.com.br>
