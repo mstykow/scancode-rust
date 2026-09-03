@@ -238,6 +238,26 @@ fn trim_attribution_tail(who: &str) -> String {
     }
 }
 
+fn trim_contact_attribution_suffix(who: &str) -> String {
+    static CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})").unwrap()
+    });
+    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for\s+\p{L})").unwrap());
+
+    let Some(contact) = CONTACT_RE.find_iter(who).last() else {
+        return who.to_string();
+    };
+    let tail = who[contact.end()..]
+        .trim_start_matches([',', ';'])
+        .trim_start();
+    if !tail.is_empty() && NON_AUTHOR_SUFFIX_RE.is_match(tail) {
+        who[..contact.end()].trim().to_string()
+    } else {
+        who.to_string()
+    }
+}
+
 fn trim_following_sentence_clause(who: &str) -> String {
     static FOLLOWING_SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?is)^(?P<head>.+?)\.\s+(?:it|this|these|those|the|a|an|no)\b.*$").unwrap()
@@ -385,6 +405,12 @@ fn extract_line_local_attribution_author(
         )
         .unwrap()
     });
+    static CONTACT_CHANGE_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+        )
+        .unwrap()
+    });
     static COPYRIGHT_TAIL_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\s*(?:,\s*copyright\b|\(c\)\s*\d{4})\b.*$").unwrap());
     static CONTACT_SENTENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -401,7 +427,8 @@ fn extract_line_local_attribution_author(
     }
     let captures = ACTION_BY_RE
         .captures(normalized)
-        .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))?;
+        .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))
+        .or_else(|| CONTACT_CHANGE_BY_RE.captures(normalized))?;
     let who = captures.name("who")?.as_str().trim();
     let has_contact = who.contains('@')
         || who.contains('<')
@@ -416,6 +443,7 @@ fn extract_line_local_attribution_author(
         .captures(&who)
         .and_then(|captures| captures.name("head").map(|head| head.as_str().to_string()))
         .unwrap_or_else(|| who.into_owned());
+    let who = trim_contact_attribution_suffix(&who);
     let who = trim_attribution_tail(&who);
     let who = who.find('>').map_or(who.as_str(), |contact_end| {
         let tail = who[contact_end + 1..].trim_start();
@@ -436,7 +464,7 @@ fn extract_line_local_attribution_author(
 pub(in super::super) fn extract_line_local_attribution_authors(
     prepared_cache: &PreparedLines<'_>,
 ) -> Vec<AuthorDetection> {
-    prepared_cache
+    let mut authors: Vec<AuthorDetection> = prepared_cache
         .iter_non_empty()
         .filter_map(|line| {
             let author =
@@ -468,7 +496,61 @@ pub(in super::super) fn extract_line_local_attribution_authors(
                 end_line: line.line_number,
             })
         })
-        .collect()
+        .collect();
+
+    for (line, next_line) in prepared_cache.adjacent_pairs() {
+        let first = line.prepared.trim_end();
+        let next = next_line.prepared.trim();
+        let first_lower = first.to_ascii_lowercase();
+        let has_by_boundary = first_lower.contains(" by ") || first_lower.ends_with(" by");
+        if first.contains('@') || !next.contains('@') || !has_by_boundary {
+            continue;
+        }
+        let attributed_party = if first_lower.ends_with(" by") {
+            ""
+        } else {
+            let Some((_, attributed_party)) = first_lower.rsplit_once(" by ") else {
+                continue;
+            };
+            attributed_party
+        };
+        if attributed_party.split_whitespace().count() > 6 {
+            continue;
+        }
+        let next = if next.starts_with('<') {
+            next.find('>').map_or(next, |end| &next[..=end])
+        } else {
+            next
+        };
+        if next
+            .split_whitespace()
+            .filter(|word| word.chars().any(|ch| ch.is_alphanumeric()))
+            .count()
+            > 3
+        {
+            continue;
+        }
+        let bare_contact = next.trim_end_matches('.');
+        let joined = if bare_contact.contains('@') && !bare_contact.contains(char::is_whitespace) {
+            if bare_contact.starts_with('<') && bare_contact.ends_with('>') {
+                format!("{first} {bare_contact}")
+            } else {
+                format!("{first} <{bare_contact}>")
+            }
+        } else {
+            format!("{first} {next}")
+        };
+        let Some(author) = extract_line_local_attribution_author(&joined, false) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: next_line.line_number,
+        });
+    }
+
+    authors
 }
 
 pub(in super::super) fn extract_subject_attribution_authors(

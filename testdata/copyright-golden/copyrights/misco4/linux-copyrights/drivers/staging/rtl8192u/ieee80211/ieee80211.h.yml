@@ -12,4 +12,5 @@ holders:
   - Jouni Malinen
   - SSH Communications Security Corp and Jouni Malinen
   - the original
-authors: []
+authors:
+  - Andrea Merello <andrea.merello@gmail.com>

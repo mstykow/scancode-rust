@@ -246,6 +246,10 @@ fn test_refine_author_truncates_trailing_prose_after_contact() {
         refine_author("Jean-Loup Gailly <gzip@prep.ai.mit.edu> . Since this"),
         Some("Jean-Loup Gailly <gzip@prep.ai.mit.edu>".to_string())
     );
+    assert_eq!(
+        refine_author("Charles Bailey <bailey@example.net> in 1996"),
+        Some("Charles Bailey <bailey@example.net>".to_string())
+    );
 }
 
 #[test]

@@ -1471,7 +1471,7 @@ fn truncate_trailing_clause_after_contact(s: &str) -> String {
     let tail_lower = prose_tail.to_ascii_lowercase();
     let prose_like_tail = [
         "the ", "a ", "an ", "i ", "since ", "this ", "these ", "those ", "is ", "was ", "visit ",
-        "for ", "from ",
+        "for ", "from ", "in ", "on ",
     ]
     .iter()
     .any(|prefix_text| tail_lower.starts_with(prefix_text));

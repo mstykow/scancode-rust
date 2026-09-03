@@ -13,4 +13,5 @@ holders:
   - Red Hat TCP
   - Red Hat TCP NFS related read
   - Trond Myklebust
-authors: []
+authors:
+  - Gilles Quillard, Bull Open Source, 2005. <gilles.quillard@bull.net>

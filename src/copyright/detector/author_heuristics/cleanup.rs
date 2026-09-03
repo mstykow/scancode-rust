@@ -335,9 +335,7 @@ pub(in super::super) fn drop_same_span_contact_sentence_overruns(
     });
 }
 
-pub(in super::super) fn drop_shadowed_contribution_author_prefixes(
-    authors: &mut Vec<AuthorDetection>,
-) {
+pub(in super::super) fn drop_shadowed_author_prefixes(authors: &mut Vec<AuthorDetection>) {
     if authors.len() < 2 {
         return;
     }
@@ -354,12 +352,17 @@ pub(in super::super) fn drop_shadowed_contribution_author_prefixes(
             let Some(tail) = other.author.trim().strip_prefix(candidate) else {
                 return false;
             };
-            let tail = tail
+            let tail = tail.trim_start();
+            let normalized_tail = tail
                 .trim_start_matches([',', ';'])
                 .trim_start()
                 .to_ascii_lowercase();
-            tail.starts_with("with contributions from ")
-                || tail.starts_with("and contributions from ")
+            (other.end_line == author.end_line
+                && (tail.starts_with(',')
+                    || tail.starts_with(';')
+                    || normalized_tail.starts_with("and ")))
+                || normalized_tail.starts_with("with contributions from ")
+                || normalized_tail.starts_with("and contributions from ")
         })
     });
 }
