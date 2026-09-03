@@ -15,7 +15,7 @@ use super::refine_particle_name;
 pub(crate) fn is_pod_author_heading(line: &str) -> bool {
     static AUTHOR_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^=head\d+\s+authors?(?:\s+(?:and|&)\s+(?:maintenance|maintainers?|modification\s+history))?\s*$",
+            r"(?i)^=head\d+\s+authors?(?:\s*(?:,?\s*(?:and|&)|,)\s*(?:copyright(?:\s+information)?|license|maintenance|maintainers?|modification\s+history))*\s*$",
         )
         .expect("valid POD author heading regex")
     });
@@ -518,7 +518,21 @@ pub(in super::super) fn extract_pod_author_section_narrative_credit_authors(
 
 #[cfg(test)]
 mod tests {
-    use super::contactless_author_values;
+    use super::{contactless_author_values, is_pod_author_heading};
+
+    #[test]
+    fn mixed_author_headings_remain_author_sections() {
+        for heading in [
+            "=head1 AUTHOR AND COPYRIGHT",
+            "=head1 Author and Copyright Information",
+            "=head2 AUTHOR, COPYRIGHT, AND LICENSE",
+            "=head3 AUTHORS & MAINTENANCE",
+        ] {
+            assert!(is_pod_author_heading(heading), "heading: {heading}");
+        }
+        assert!(!is_pod_author_heading("=head1 COPYRIGHT"));
+        assert!(!is_pod_author_heading("=head1 AUTHOR AND DESCRIPTION"));
+    }
 
     #[test]
     fn contactless_rosters_keep_particle_names_and_mixed_collectives() {

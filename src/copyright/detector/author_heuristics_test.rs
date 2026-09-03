@@ -435,6 +435,78 @@ fn test_subject_attribution_uses_bounded_pod_author_section() {
 }
 
 #[test]
+fn test_contactless_narrative_attributions_require_person_names() {
+    let input = concat!(
+        "Fcntl and Socket have been rewritten by Nicholas Clark to use the new API.\n",
+        "The entire library package, as authored by me, Ozan S.\n",
+        "Yigit, is hereby placed in the public domain.\n",
+        "The manual, as authored by me, Ada Lovelace,\n",
+        "Most of the documentation is taken from JSON::XS by Marc Lehmann\n",
+        "Archives were created by Release Tool 2.0.\n",
+        "This file is written by Callgrind, and it is upwards compatible.\n",
+        "Perl is developed by a global team of volunteers.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Nicholas Clark",
+        "Ozan S. Yigit",
+        "Ada Lovelace",
+        "Marc Lehmann",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+    for rejected in ["Release Tool", "Callgrind", "global team of volunteers"] {
+        assert!(
+            values.iter().all(|author| !author.contains(rejected)),
+            "unexpected {rejected}: {values:?}"
+        );
+    }
+    let ozan = authors
+        .iter()
+        .find(|author| author.author == "Ozan S. Yigit")
+        .expect("wrapped first-person attribution");
+    assert_eq!((ozan.start_line.get(), ozan.end_line.get()), (2, 3));
+    let ada = authors
+        .iter()
+        .find(|author| author.author == "Ada Lovelace")
+        .expect("single-line first-person attribution");
+    assert_eq!((ada.start_line.get(), ada.end_line.get()), (4, 4));
+}
+
+#[test]
+fn test_subject_maintainer_attribution_keeps_named_collectives() {
+    let input = concat!(
+        "Filter::Simple is now maintained by the Perl5-Porters. Please submit bugs.\n",
+        "This package is currently maintained by the Perl Toolchain Gang.\n",
+        "This package is now maintained by the Safe Team. Thus, use the supported API.\n",
+        "The cache is maintained by the package manager.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"the Perl5-Porters"), "authors: {values:?}");
+    assert!(
+        values.contains(&"the Perl Toolchain Gang"),
+        "authors: {values:?}"
+    );
+    assert!(values.contains(&"the Safe Team"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("package manager")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
 fn test_contact_backed_change_attributions_cover_varied_actions() {
     let input = concat!(
         "- Updated backport to 5.6.1 by Steffen Mueller <smueller@cpan.org>.\n",
@@ -527,6 +599,9 @@ fn test_source_header_credit_variants_are_authors() {
         "# Improved by Jake Hamby <jake@example.net> to support both compilers\n",
         "# Originally contributed by: Mark Kettenis <mark@example.net> Dec 1998\n",
         "# DCL-ified by Peter Prymmer <peter@example.net> 22-DEC-1995\n",
+        "$! DCL-ified by VMS Author <vms@example.net> 22-DEC-1995\n",
+        "& Written 02-05-05 by Macro Author (macro@example.net)\n",
+        "sub helper { # Compatibility code. Written by Alexandr Ciornii, version 0.23.\n",
         "(contributed by Peter J. Holzer, peter@example.net)\n",
         "DataBase Editor by Janick Bergeron [janick@example.net] for testing\n",
     );
@@ -548,6 +623,9 @@ fn test_source_header_credit_variants_are_authors() {
         "Jake Hamby <jake@example.net>",
         "Mark Kettenis <mark@example.net>",
         "Peter Prymmer <peter@example.net>",
+        "VMS Author <vms@example.net>",
+        "Macro Author (macro@example.net)",
+        "Alexandr Ciornii",
         "Peter J. Holzer, peter@example.net",
         "Janick Bergeron janick@example.net",
     ] {
@@ -565,6 +643,8 @@ fn test_source_header_credit_words_without_people_are_not_authors() {
         "Jean Example. Send mail to support@example.net for a copy.\n",
         "Configured by root@localhost\n",
         "* Configured by     : root@localhost\n",
+        "$! Written 02-05-05 by the build system\n",
+        "value & Written by Build Generator, then cached.\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
 
@@ -614,6 +694,34 @@ fn test_bounded_pod_author_action_credits_are_authors() {
     ] {
         assert!(values.contains(&expected), "missing {expected}: {values:?}");
     }
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_mixed_pod_author_copyright_heading_keeps_maintainer_credit() {
+    let input = concat!(
+        "=head1 AUTHOR AND COPYRIGHT\n",
+        "\n",
+        "Copyright 2013 Tom Christiansen; now maintained by Perl5 Porters.\n",
+        "\n",
+        "This documentation is free and may be redistributed.\n",
+        "\n",
+        "=head1 DESCRIPTION\n",
+        "\n",
+        "The output is maintained by Build Generator.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Perl5 Porters"), "authors: {values:?}");
     assert!(
         values
             .iter()
@@ -1721,6 +1829,32 @@ fn test_chained_active_attributions_are_distinct_authors() {
         values
             .iter()
             .all(|author| !author.contains("Black. Nicholas")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_chained_action_attribution_keeps_contactless_people() {
+    let input = concat!(
+        "Created by Rodney Brown from an earlier version, modified by Chr. Spieler.\n",
+        "This stat() is by Paul Wells, modified by Paul Kienitz.\n",
+        "Output created by Release Tool, modified by Build Generator.\n",
+        "The output is by default, modified by Build Generator.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Rodney Brown"), "authors: {values:?}");
+    assert!(values.contains(&"Chr. Spieler"), "authors: {values:?}");
+    assert!(values.contains(&"Paul Wells"), "authors: {values:?}");
+    assert!(values.contains(&"Paul Kienitz"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
         "authors: {values:?}"
     );
 }

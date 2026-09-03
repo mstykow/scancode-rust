@@ -140,6 +140,7 @@ pub(super) fn extract_copyright_information(
             && (!looks_like_source_code(&raw_span)
                 || (has_author_contact_evidence(&author.author)
                     && raw_span_has_author_attribution(&raw_span))
+                || raw_span_has_explicit_contactless_author_attribution(&raw_span)
                 || (raw_span_has_author_attribution(&raw_span)
                     && span_is_in_pod_author_section(&raw_lines, author.start_line)))
             && seen_authors.insert((author.author.clone(), author.start_line, author.end_line))
@@ -417,6 +418,16 @@ pub(super) fn has_author_contact_evidence(author: &str) -> bool {
 fn raw_span_has_author_attribution(raw_span: &str) -> bool {
     static BY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bby\b").unwrap());
     BY_RE.is_match(raw_span)
+}
+
+fn raw_span_has_explicit_contactless_author_attribution(raw_span: &str) -> bool {
+    static EXPLICIT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)(?:\b(?:rewritten\s+by|(?:is|are)\s+(?:currently\s+|now\s+)?maintained\s+by|as\s+authored\s+by\s+me,|(?:documentation|code|implementation|work|text|material)\b[^\r\n]{0,80}?\b(?:taken|copied|derived|adapted|borrowed)\s+from\b[^\r\n]{1,120}?\s+by)\b|[.;]\s*(?:adapted|authored|configured|contributed|created|developed|edited|implemented|improved|modified|ported|revised|updated|written)\s+by\b)",
+        )
+        .expect("valid explicit contactless author attribution regex")
+    });
+    EXPLICIT_ATTRIBUTION_RE.is_match(raw_span)
 }
 
 fn span_is_in_pod_author_section(raw_lines: &[&str], start_line: LineNumber) -> bool {
