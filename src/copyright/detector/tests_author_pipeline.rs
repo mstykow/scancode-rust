@@ -470,6 +470,97 @@ author:
 }
 
 #[test]
+fn test_pod_author_section_recovers_multiple_contact_backed_authors() {
+    let input = r#"=head1 AUTHOR
+
+Russ Allbery <russ@example.com>, based heavily on the original module
+by Tom Christiansen <tom@example.com> and its conversion by
+Brad Appleton <brad@example.com>.
+
+=head1 NOTES
+
+Outside Person <outside@example.com>.
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    for expected in [
+        "Russ Allbery <russ@example.com>",
+        "Tom Christiansen <tom@example.com>",
+        "Brad Appleton <brad@example.com>",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+    assert!(!values.contains(&"Outside Person <outside@example.com>"));
+}
+
+#[test]
+fn test_pod_author_section_joins_wrapped_name_and_parenthesized_contact() {
+    let input = r#"=head1 AUTHOR
+
+This guide was initially drafted by Jason McIntosh
+(jmac@example.com), under a documentation grant.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.author == "Jason McIntosh (jmac@example.com)"),
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_pod_author_section_normalizes_roles_and_email_name_rosters() {
+    let input = r#"=head1 AUTHORS
+
+Original author: Andy Dougherty <andy@example.com>
+
+Previous maintainers:
+  brown@example.com (Rob Brown)
+  karrer@example.com (Andreas Karrer)
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Andy Dougherty <andy@example.com>",
+        "Rob Brown <brown@example.com>",
+        "Andreas Karrer <karrer@example.com>",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_drops_operational_and_copyright_contacts() {
+    let input = r#"=head1 AUTHOR
+
+This module is copyright 2010 Example Holder <holder@example.com>.
+
+Please report bugs to <bugs@example.com>.
+
+Send patches and ideas to patches@example.com.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
 fn test_plain_json_author_string_machine_token_dropped_without_metadata_context() {
     let input = r#""author": "makeappicon", "images": []"#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
