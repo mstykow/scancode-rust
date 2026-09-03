@@ -924,6 +924,68 @@ pub(super) fn looks_like_generic_field_label_token(s: &str) -> bool {
     is_explicit_generic_field_label_token(s) || looks_like_generic_field_label_shape(s)
 }
 
+/// Return true if an author candidate is the type-and-constraint tail of a
+/// relational schema field, such as `INTEGER REFERENCES (id)`.
+///
+/// Author grammars can encounter a column named `author` and interpret the
+/// remainder of its declaration as a credited party. Requiring both a leading
+/// SQL data type and a structural constraint keeps this bounded to declarations
+/// rather than rejecting organizations whose names happen to contain words such
+/// as "Integer" or "Text".
+pub(super) fn looks_like_schema_declaration_fragment(s: &str) -> bool {
+    const DATA_TYPES: &[&str] = &[
+        "bigint",
+        "binary",
+        "blob",
+        "bool",
+        "boolean",
+        "char",
+        "date",
+        "decimal",
+        "double",
+        "float",
+        "int",
+        "integer",
+        "numeric",
+        "real",
+        "serial",
+        "smallint",
+        "text",
+        "timestamp",
+        "uuid",
+        "varchar",
+    ];
+
+    let trimmed = s.trim();
+    if trimmed.is_empty() || trimmed.len() > 160 {
+        return false;
+    }
+
+    let words: Vec<String> = trimmed
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect();
+    if !words
+        .first()
+        .is_some_and(|word| DATA_TYPES.contains(&word.as_str()))
+    {
+        return false;
+    }
+
+    let has_pair = |left: &str, right: &str| {
+        words
+            .windows(2)
+            .any(|pair| pair[0] == left && pair[1] == right)
+    };
+    let has_parenthesized_constraint = (words.iter().any(|word| word == "references")
+        || words.iter().any(|word| word == "check"))
+        && trimmed.contains('(')
+        && trimmed.contains(')');
+
+    has_parenthesized_constraint || has_pair("primary", "key") || has_pair("not", "null")
+}
+
 pub(super) fn contains_code_call_fragment(s: &str) -> bool {
     static NATURAL_PAREN_VARIANT_RE: LazyLock<Regex> = LazyLock::new(|| {
         compile_static_regex(r"\b[a-z][a-z-]{5,}\((?:-)?[a-z-]{1,8}\)(?:$|[^A-Za-z0-9_])")

@@ -100,6 +100,10 @@ pub fn refine_author(s: &str) -> Option<String> {
         return None;
     }
 
+    if looks_like_schema_declaration_fragment(&a) {
+        return None;
+    }
+
     if contains_code_call_fragment(&a) {
         return None;
     }
