@@ -621,6 +621,78 @@ pub(in super::super) fn extract_name_contributed_authors(
         .collect()
 }
 
+/// Extract explicit `changes by NAME` credits, including the common wrapped
+/// form where `changes` closes one comment line and `by NAME` opens the next.
+pub(in super::super) fn extract_changes_by_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    static CHANGES_BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\bchanges\s+by\s+(?P<who>.+)$").unwrap());
+    static BY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^by\s+(?P<who>.+)$").unwrap());
+
+    let mut authors = Vec::new();
+    for line in prepared_cache.iter_non_empty() {
+        let Some(captures) = CHANGES_BY_RE.captures(line.prepared) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        if who
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+        {
+            continue;
+        }
+        if let Some(author) = refine_author(who) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            });
+        }
+    }
+
+    for (line, next_line) in prepared_cache.adjacent_pairs() {
+        if !line
+            .prepared
+            .trim_end()
+            .to_ascii_lowercase()
+            .ends_with("changes")
+        {
+            continue;
+        }
+        let Some(captures) = BY_RE.captures(next_line.prepared.trim()) else {
+            continue;
+        };
+        let who = captures
+            .name("who")
+            .map(|matched| matched.as_str())
+            .unwrap_or("")
+            .trim();
+        if who
+            .chars()
+            .filter(|ch| ch.is_alphabetic())
+            .all(|ch| ch.is_uppercase())
+        {
+            continue;
+        }
+        if let Some(author) = refine_author(who) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: next_line.line_number,
+            });
+        }
+    }
+
+    authors
+}
+
 fn looks_like_contributed_person_name_token(word: &str) -> bool {
     let trimmed_word = word.trim_matches(|ch: char| {
         !ch.is_alphabetic() && ch != '\'' && ch != '’' && ch != '.' && ch != '-'
@@ -2171,10 +2243,13 @@ pub(in super::super) fn extract_comment_author_label_authors(
         LazyLock::new(|| Regex::new(r"(?i)^\\author\s+(?P<who>.+?)\s*$").unwrap());
     static YEAR_ONLY_COPY_LINE_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?ix)^copyright\s*\(c\)\s*[0-9\s,\-–/]+$").unwrap());
+    static COMMENT_PREFIX_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^\s*(?:#+|;+|//+|/\*+|\*+|!+|--+|>+|\|+|\.\!+)\s*").unwrap());
     let normalize_comment_line = |line: &str| {
         line.trim()
             .trim_start_matches(|ch: char| {
-                ch.is_whitespace() || matches!(ch, '#' | ';' | '/' | '*' | '!' | '-' | '>')
+                ch.is_whitespace()
+                    || matches!(ch, '#' | ';' | '/' | '*' | '!' | '-' | '>' | '|' | '.')
             })
             .trim()
             .to_string()
@@ -2223,9 +2298,20 @@ pub(in super::super) fn extract_comment_author_label_authors(
                 continue;
             }
 
-            if who.contains('<') && who.contains('>') && who_lower.contains(" at ") {
+            let has_comment_prefix = COMMENT_PREFIX_RE.is_match(raw_line);
+            let has_obfuscated_angle_contact =
+                who.contains('<') && who.contains('>') && who_lower.contains(" at ");
+            if has_obfuscated_angle_contact {
                 authors.push(AuthorDetection {
                     author: who.to_string(),
+                    start_line,
+                    end_line: start_line,
+                });
+            } else if has_comment_prefix
+                && let Some(author) = refine_author_with_optional_handle_suffix(who)
+            {
+                authors.push(AuthorDetection {
+                    author,
                     start_line,
                     end_line: start_line,
                 });

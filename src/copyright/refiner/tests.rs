@@ -249,6 +249,18 @@ fn test_refine_author_truncates_trailing_prose_after_contact() {
 }
 
 #[test]
+fn test_refine_author_keeps_conjoined_name_after_contact() {
+    assert_eq!(
+        refine_author("John Smith <js@example.com> and Jane Doe"),
+        Some("John Smith <js@example.com> and Jane Doe".to_string())
+    );
+    assert_eq!(
+        refine_author("John Smith <js@example.com> and this module is maintained"),
+        Some("John Smith <js@example.com>".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_truncates_prose_sentence_after_a_name() {
     assert_eq!(
         refine_author(
@@ -1937,6 +1949,18 @@ fn test_refine_author_strips_trailing_comma_year() {
 }
 
 #[test]
+fn test_refine_author_strips_year_range_after_angle_email() {
+    assert_eq!(
+        refine_author("Peter John Acklam <pjacklam@gmail.com> 2010-2021"),
+        Some("Peter John Acklam <pjacklam@gmail.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("Peter John Acklam <pjacklam@gmail.com>, 2011-"),
+        Some("Peter John Acklam <pjacklam@gmail.com>".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_strips_better_known_as_clause() {
     let result =
         refine_author("Alexander Peslyak, better known as Solar Designer <solar at openwall.com>");
@@ -2406,6 +2430,100 @@ fn test_refine_author_empty() {
 fn test_refine_author_junk() {
     assert_eq!(refine_author("james hacker"), None);
     assert_eq!(refine_author("who hopes"), None);
+}
+
+#[test]
+fn test_refine_author_does_not_let_email_bypass_prose_evidence() {
+    assert_eq!(
+        refine_author(
+            "Development questions, bug reports, and patches should be sent to the Module-Build mailing list at <module-build@perl.org>"
+        ),
+        None
+    );
+    assert_eq!(
+        refine_author("Jane Smith <jane@example.com>"),
+        Some("Jane Smith <jane@example.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("maintainer@example.com"),
+        Some("maintainer@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "Ken Williams <kwilliams@cpan.org> ' - 'Development questions, bug reports, and patches should be sent to the Module-Build mailing list at <module-build@perl.org>"
+        ),
+        Some("Ken Williams <kwilliams@cpan.org>".to_string())
+    );
+    assert_eq!(
+        refine_author("Nasca Iacob <sy@another-d-mention.ro> (https://github.com/cthackers)"),
+        Some("Nasca Iacob <sy@another-d-mention.ro> (https://github.com/cthackers)".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "Donald Becker (becker@scyld.com), Rowan Hughes (x-csrdh@jcu.edu.au), David Hinds (dahinds@users.sourceforge.net), and Erik Stahlman (erik@vt.edu). Donald wrote the code"
+        ),
+        Some(
+            "Donald Becker (becker@scyld.com), Rowan Hughes (x-csrdh@jcu.edu.au), David Hinds (dahinds@users.sourceforge.net), and Erik Stahlman (erik@vt.edu)".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_refine_author_respects_revision_and_contact_metadata_boundaries() {
+    assert_eq!(
+        refine_author(
+            "Bill Davidsen, original 10/13/91, revised 23 Oct 1991. This program is public domain"
+        ),
+        Some("Bill Davidsen".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "George Petrov, 11 Apr 1995 (VMCOMPIL EXEC) Modified for IBM C V3R1 by Ian E. Gorman"
+        ),
+        Some("George Petrov".to_string())
+    );
+    assert_eq!(
+        refine_author("John Doe, 7/2000"),
+        Some("John Doe".to_string())
+    );
+    assert_eq!(
+        refine_author("Greg Hartwig. e-mail ghartwig@example.com"),
+        Some("Greg Hartwig".to_string())
+    );
+    assert_eq!(
+        refine_author("Andy Dougherty July 14, 1998"),
+        Some("Andy Dougherty".to_string())
+    );
+    assert_eq!(
+        refine_author("Yves Orton (demerphq) 2007. Maintained by Perl5 Porters"),
+        Some("Yves Orton (demerphq)".to_string())
+    );
+    assert_eq!(
+        refine_author("Andy Dougherty doughera@example.com, borrowing very"),
+        Some("Andy Dougherty doughera@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author("Michael G Schwern schwern@example.com within the"),
+        Some("Michael G Schwern schwern@example.com".to_string())
+    );
+    assert_eq!(
+        refine_author("Russ Allbery <rra@example.com> . Subsequently updated by Russ Allbery"),
+        Some("Russ Allbery <rra@example.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("Jane Doe <jane@example.com> and John Roe <john@example.com>"),
+        Some("Jane Doe <jane@example.com> and John Roe <john@example.com>".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_normalizes_contact_evidence_without_contact_instructions() {
+    assert_eq!(
+        refine_author("Francesco Potorti` <pot@example.com>"),
+        Some("Francesco Potorti <pot@example.com>".to_string())
+    );
+    assert_eq!(refine_author("at bugs@example.com or"), None);
+    assert_eq!(refine_author("via maintainers@example.com"), None);
 }
 
 #[test]

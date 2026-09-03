@@ -1380,3 +1380,178 @@ fn test_placeholder_prose_behind_any_punctuation_keeps_the_notice() {
         );
     }
 }
+
+#[test]
+fn test_unicode_name_cross_references_are_not_copyright_notices() {
+    let data_groups = [
+        concat!(
+            "00A8\tDIAERESIS\n",
+            "\t* this is a spacing character\n",
+            "\tx (combining diaeresis - 0308)\n",
+            "\t# 0020 0308\n",
+            "00A9\tCOPYRIGHT SIGN\n",
+            "\tx (sound recording copyright - 2117)\n",
+            "\tx (circled latin capital letter c - 24B8)\n",
+            "\tx (copyleft symbol - 1F12F)\n",
+            "\tx (mask work symbol - 1F1AD)\n",
+            "00AA\tFEMININE ORDINAL INDICATOR\n",
+        ),
+        concat!(
+            "2117\tSOUND RECORDING COPYRIGHT\n",
+            "\t= published\n",
+            "\t= phonorecord sign\n",
+            "\tx (copyright sign - 00A9)\n",
+            "\tx (circled latin capital letter p - 24C5)\n",
+            "2118\tSCRIPT CAPITAL P\n",
+        ),
+        concat!(
+            "24B8\tCIRCLED LATIN CAPITAL LETTER C\n",
+            "\tx (copyright sign - 00A9)\n",
+            "\t# <circle> 0043\n",
+            "24B9\tCIRCLED LATIN CAPITAL LETTER D\n",
+        ),
+        concat!(
+            "24C5\tCIRCLED LATIN CAPITAL LETTER P\n",
+            "\tx (sound recording copyright - 2117)\n",
+            "\t# <circle> 0050\n",
+            "24C6\tCIRCLED LATIN CAPITAL LETTER Q\n",
+        ),
+        concat!(
+            "1F1AD\tMASK WORK SYMBOL\n",
+            "\t* indicates intellectual property protection for integrated circuit layouts\n",
+            "\tx (copyright sign - 00A9)\n",
+            "\tx (circled latin capital letter m - 24C2)\n",
+            "@\t\tRegional indicator symbols\n",
+            "@+\t\tThese characters can be used in pairs to represent regional codes.\n",
+            "1F1E6\tREGIONAL INDICATOR SYMBOL LETTER A\n",
+        ),
+    ];
+
+    for input in data_groups {
+        let (copyrights, holders, authors) = detect_copyrights_from_text(input);
+        assert!(copyrights.is_empty(), "copyrights: {copyrights:#?}");
+        assert!(holders.is_empty(), "holders: {holders:#?}");
+        assert!(authors.is_empty(), "authors: {authors:#?}");
+    }
+
+    let (copyrights, holders, _authors) =
+        detect_copyrights_from_text("@+\t\t© 2022 Unicode®, Inc.\n");
+    assert_eq!(copyrights[0].copyright, "(c) 2022 Unicode(r), Inc.");
+    assert_eq!(holders[0].holder, "Unicode(r), Inc.");
+}
+
+#[test]
+fn test_document_section_headings_are_not_copyright_notices() {
+    for heading in [
+        "=head1 COPYRIGHT AND LICENSE",
+        "=head1 COPYRIGHT & LICENSE",
+        "=head1 COPYRIGHT AND DISCLAIMERS",
+        ".SH \"COPYRIGHT AND LICENSE\"",
+        "COPYRIGHT AND LICENSE",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(heading);
+        assert!(
+            copyrights.is_empty(),
+            "heading produced copyrights: {copyrights:?} for {heading:?}"
+        );
+        assert!(
+            holders.is_empty(),
+            "heading produced holders: {holders:?} for {heading:?}"
+        );
+    }
+}
+
+#[test]
+fn test_copyright_operational_prose_is_not_a_notice() {
+    for prose in [
+        "23. Update copyrights. crc32.c, deflate.c, globals.c, revision.h, ziperr.h",
+        "1. Update copyrights to 2008. zip.c, zipcloak.c, zipfile.c",
+        "NOTE on copyright history:",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(prose);
+        assert!(
+            copyrights.is_empty(),
+            "prose produced copyrights: {copyrights:?} for {prose:?}"
+        );
+        assert!(
+            holders.is_empty(),
+            "prose produced holders: {holders:?} for {prose:?}"
+        );
+    }
+}
+
+#[test]
+fn test_non_ownership_copyright_descriptions_are_not_notices() {
+    for description in [
+        "CP = 1 (Copyright unasserted)\nAN = 0 (Audio data)\nP = 0 (Consumer)",
+        "Le logiciel est protege par un copyright et licencie par des fournisseurs de Sun.",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(description);
+        assert!(
+            copyrights.is_empty(),
+            "description produced copyrights: {copyrights:?} for {description:?}"
+        );
+        assert!(
+            holders.is_empty(),
+            "description produced holders: {holders:?} for {description:?}"
+        );
+    }
+}
+
+#[test]
+fn test_copyright_identifiers_are_not_notices() {
+    for code in [
+        "extern ZCONST char *copyright[1];",
+        "nlm_COPYRIGHT = Op Copyright '$(copyright)'",
+        "const char *copyright_notice;",
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(code);
+        assert!(
+            copyrights.is_empty(),
+            "code produced copyrights: {copyrights:?} for {code:?}"
+        );
+        assert!(
+            holders.is_empty(),
+            "code produced holders: {holders:?} for {code:?}"
+        );
+    }
+}
+
+#[test]
+fn test_fallback_evidence_keeps_real_undated_notices() {
+    for (notice, expected_holder) in [
+        ("Copyright CERN", "CERN"),
+        ("Copyright The NetBSD Foundation, Inc.", "NetBSD Foundation"),
+        (
+            "(c) Free Software Foundation, Inc.",
+            "Free Software Foundation",
+        ),
+        (
+            "This code is copyrighted by Acme Research.",
+            "Acme Research",
+        ),
+    ] {
+        let (copyrights, holders, _authors) = detect_copyrights_from_text(notice);
+        assert!(!copyrights.is_empty(), "notice was rejected: {notice:?}");
+        assert!(
+            holders
+                .iter()
+                .any(|holder| holder.holder.contains(expected_holder)),
+            "holder missing from {holders:?} for {notice:?}"
+        );
+    }
+}
+
+#[test]
+fn test_fallback_does_not_flatten_structured_holder_record() {
+    let input = concat!(
+        "copyrights:\n",
+        "  - holder: Russ Allbery <rra@cpan.org>\n",
+        "    years: 1999-2010, 2012-2022\n",
+    );
+
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(copyrights.is_empty(), "copyrights: {copyrights:#?}");
+    assert!(holders.is_empty(), "holders: {holders:#?}");
+}

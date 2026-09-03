@@ -90,6 +90,268 @@ fn test_extract_comment_author_label_authors_keeps_obfuscated_angle_contact() {
 }
 
 #[test]
+fn test_extract_comment_author_label_authors_requires_comment_evidence() {
+    let raw_lines = vec![
+        "! Author: Hunter Goatley",
+        "| Author: Bill Davidsen",
+        "author: package metadata value",
+    ];
+    let authors = extract_comment_author_label_authors(&raw_lines);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Hunter Goatley"), "authors: {values:?}");
+    assert!(values.contains(&"Bill Davidsen"), "authors: {values:?}");
+    assert!(
+        !values.contains(&"package metadata value"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_detect_comment_author_label_when_grammar_has_no_author() {
+    let input = "!  Program: CVTHELP.TPU\n!  Author: Hunter Goatley\n!  Date: January 12, 1992\n";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.author == "Hunter Goatley"),
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_comment_author_after_year_only_copyright_remains_holder_only() {
+    let raw_lines = vec![
+        "* Copyright (C) 2016-2018",
+        "* Author: Matt Ranostay <matt.ranostay@konsulko.com>",
+    ];
+    let authors = extract_comment_author_label_authors(&raw_lines);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_drop_weak_single_word_authors_uses_local_attribution_evidence() {
+    let raw_lines = vec![
+        "Contributors, please see AUTHORS",
+        "let the script author decide",
+        "Written by chunchu",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "please".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::ONE,
+        },
+        AuthorDetection {
+            author: "decide".to_string(),
+            start_line: LineNumber::new(2).expect("valid line"),
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "chunchu".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(3).expect("valid line"),
+        },
+    ];
+
+    drop_weak_single_word_prose_authors(&raw_lines, &mut authors);
+
+    assert_eq!(authors.len(), 1, "authors: {authors:?}");
+    assert_eq!(authors[0].author, "chunchu");
+}
+
+#[test]
+fn test_author_cleanup_respects_complete_line_and_hyphenated_prose_boundaries() {
+    let raw_lines = vec![
+        "| Written by Darren Salt",
+        "| Assumes that unzipsfx is on Run$Path",
+        "originally written by Martin Minow, poss-",
+        "ibly modified by Jerry Leichter",
+        "Created by Jason Hunter and Brett McLaughlin",
+        "Revised by Ryusuke Konishi",
+        "Pulled in another direction by Nick Ing-Simmons",
+        "<nick AT ing-simmons DOT net>",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "Darren Salt Assumes".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Martin Minow, poss".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(4).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Jason Hunter and Brett McLaughlin Revised by Ryusuke Konishi".to_string(),
+            start_line: LineNumber::new(5).expect("valid line"),
+            end_line: LineNumber::new(6).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Nick Ing-Simmons nick AT ing-simmons DOT net".to_string(),
+            start_line: LineNumber::new(7).expect("valid line"),
+            end_line: LineNumber::new(8).expect("valid line"),
+        },
+    ];
+
+    repair_complete_by_line_author_boundaries(&raw_lines, &mut authors);
+    repair_hyphenated_prose_tail_authors(&raw_lines, &mut authors);
+
+    assert_eq!(authors[0].author, "Darren Salt");
+    assert_eq!(authors[0].end_line, LineNumber::ONE);
+    assert_eq!(authors[1].author, "Martin Minow");
+    assert_eq!(authors[1].end_line, LineNumber::new(3).expect("valid line"));
+    assert_eq!(
+        authors[2].author,
+        "Jason Hunter and Brett McLaughlin Revised by Ryusuke Konishi"
+    );
+    assert_eq!(authors[2].end_line, LineNumber::new(6).expect("valid line"));
+    assert_eq!(
+        authors[3].author,
+        "Nick Ing-Simmons nick AT ing-simmons DOT net"
+    );
+    assert_eq!(authors[3].end_line, LineNumber::new(8).expect("valid line"));
+}
+
+#[test]
+fn test_embedded_authors_product_name_is_not_an_author_label() {
+    let raw_lines = vec!["Perl Authors Upload Server. Contains module links."];
+    let mut authors = vec![AuthorDetection {
+        author: "Upload Server".to_string(),
+        start_line: LineNumber::ONE,
+        end_line: LineNumber::ONE,
+    }];
+
+    drop_embedded_authors_title_phrases(&raw_lines, &mut authors);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_shadowed_multiline_author_overrun_stops_at_new_attribution() {
+    let raw_lines = vec![
+        "Contributed by Artur Bergman <sky AT example DOT net>",
+        "Pulled in another direction by Nick Ing-Simmons",
+        "Original author: Andy Dougherty andy@example.com.",
+        "Additions by Chip Salzenberg",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "Artur Bergman sky AT example DOT net Pulled".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Artur Bergman sky AT example DOT net".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::ONE,
+        },
+        AuthorDetection {
+            author: "Andy Dougherty andy@example.com Additions".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(4).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "Andy Dougherty andy@example.com".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(3).expect("valid line"),
+        },
+    ];
+
+    drop_shadowed_multiline_author_overruns(&raw_lines, &mut authors);
+
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    assert_eq!(
+        values,
+        vec![
+            "Artur Bergman sky AT example DOT net",
+            "Andy Dougherty andy@example.com"
+        ]
+    );
+
+    let input = "Contributed by Artur Bergman <sky AT example DOT net>\n\
+                 Pulled in another direction by Nick Ing-Simmons\n\
+                 <nick AT example DOT net>";
+    let (_copyrights, _holders, detected) = super::super::detect_copyrights_from_text(input);
+    assert!(
+        detected
+            .iter()
+            .all(|author| !author.author.ends_with(" Pulled")),
+        "authors: {detected:?}"
+    );
+}
+
+#[test]
+fn test_conjoined_contact_attribution_continuation_is_preserved() {
+    let raw_lines = vec![
+        "Written by Sherm Pendley <sherm@example.com>",
+        "and subsequently updated by Dominic Dunlop <dom@example.com>",
+    ];
+    let mut authors = vec![AuthorDetection {
+        author: "Sherm Pendley <sherm@example.com>, and subsequently updated by Dominic Dunlop <dom@example.com>".to_string(),
+        start_line: LineNumber::ONE,
+        end_line: LineNumber::new(2).expect("valid line"),
+    }];
+
+    repair_contact_author_before_new_attribution(&raw_lines, &mut authors);
+
+    assert!(authors[0].author.contains("Dominic Dunlop"));
+    assert_eq!(authors[0].end_line, LineNumber::new(2).expect("valid line"));
+}
+
+#[test]
+fn test_passive_product_creation_is_not_human_authorship() {
+    let input = "Archive entry names behave like those created by ZipTool's MSDOS port.\n\
+                 Therefore archives created by MacTool 1.0 (March 1999) need conversion.";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_passive_creation_keeps_person_and_contact_backed_authors() {
+    let raw_lines = vec![
+        "Files were created by Jane Doe.",
+        "Archives were created by Release Tool 2.0.",
+        "Files were created by maintainer@example.com.",
+    ];
+    let mut authors = vec![
+        AuthorDetection {
+            author: "Jane Doe".to_string(),
+            start_line: LineNumber::ONE,
+            end_line: LineNumber::ONE,
+        },
+        AuthorDetection {
+            author: "Release Tool 2.0".to_string(),
+            start_line: LineNumber::new(2).expect("valid line"),
+            end_line: LineNumber::new(2).expect("valid line"),
+        },
+        AuthorDetection {
+            author: "maintainer@example.com".to_string(),
+            start_line: LineNumber::new(3).expect("valid line"),
+            end_line: LineNumber::new(3).expect("valid line"),
+        },
+    ];
+
+    drop_passive_product_creation_authors(&raw_lines, &mut authors);
+
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    assert_eq!(values, vec!["Jane Doe", "maintainer@example.com"]);
+}
+
+#[test]
 fn test_extract_comment_author_label_authors_detects_doxygen_author_tags() {
     let raw_lines = vec![
         "*> \\author Univ. of California Berkeley",
@@ -846,6 +1108,16 @@ fn test_detect_author() {
 }
 
 #[test]
+fn test_written_by_author_stops_before_following_notice_sentence() {
+    let input = "Copyright (c) 1986 by University of Toronto.\n\
+                 Written by Henry Spencer. Not derived from licensed software.";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert_eq!(authors.len(), 1, "authors: {authors:?}");
+    assert_eq!(authors[0].author, "Henry Spencer");
+}
+
+#[test]
 fn test_detect_author_from_xml_author_attribute() {
     let text = r#"<note author="Vinnie Falco">C++11 is the minimum requirement.</note>"#;
     let (c, h, a) = super::super::detect_copyrights_from_text(text);
@@ -1003,6 +1275,41 @@ fn test_name_contributed_line_is_detected_as_author() {
         "expected Randall Prium author, got: {:?}",
         authors
     );
+}
+
+#[test]
+fn test_changes_by_attribution_is_detected_inline_and_across_lines() {
+    let input = concat!(
+        "This platform file is based on unix.c; changes by Ruslan Nickolaev (nruslan@hotbox.ru)\n",
+        "This other port is based on unix.c; changes\n",
+        " by Chris Herborth (chrish@pobox.com).\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(&"Ruslan Nickolaev (nruslan@hotbox.ru)"),
+        "authors: {values:?}"
+    );
+    assert!(
+        values.contains(&"Chris Herborth (chrish@pobox.com)"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_changes_by_prose_does_not_create_an_author() {
+    let input = concat!(
+        "The value changes by adding one to the previous result.\n",
+        "The rate changes by 2 percent.\n",
+        "MAJOR CHANGES BY BETA VERSION\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
 }
 
 #[test]

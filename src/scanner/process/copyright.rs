@@ -203,11 +203,11 @@ fn render_raw_copyright_from_text(
     }
 }
 
-/// Replace an anchor with the URL it points at, dropping anchors that carry none.
+/// Replace an anchor with an absolute attribution URL and its visible text.
 ///
-/// The URL in `<a href="URL">Name</a>` is part of the attribution, so a linked
-/// notice renders as the same `<marker> <url> <name>` shape the detector already
-/// produces for a single-line linked notice.
+/// Absolute URLs can identify the attributed party and are kept. Relative links
+/// only navigate within the scanned document set (`dist.authors.html`, `#team`),
+/// so they are markup scaffolding and contribute visible text only.
 fn inline_anchor_hrefs(text: &str) -> String {
     // Quoted segments may hold a `>` (`<a title="a > b" href="...">`), so the
     // attribute run alternates quoted values with unquoted non-`>` text rather
@@ -254,6 +254,7 @@ fn inline_anchor_hrefs(text: &str) -> String {
                     .or_else(|| attr.name("sq"))
                     .or_else(|| attr.name("bare"))
             })
+            .filter(|url| is_absolute_attribution_href(url.as_str()))
             .map(|url| format!(" {} ", decode_html_entities(url.as_str())))
             .unwrap_or_else(|| " ".to_string())
     });
@@ -264,6 +265,20 @@ fn inline_anchor_hrefs(text: &str) -> String {
         .replace_all(&tidied, "$b")
         .trim()
         .to_string()
+}
+
+fn is_absolute_attribution_href(value: &str) -> bool {
+    let value = value.trim();
+    if value.starts_with("//") {
+        return true;
+    }
+    let Some((scheme, _)) = value.split_once(':') else {
+        return false;
+    };
+    matches!(
+        scheme.to_ascii_lowercase().as_str(),
+        "http" | "https" | "ftp" | "mailto"
+    )
 }
 
 /// Decode the HTML entities an `href` can carry, so the emitted URL is the
@@ -310,21 +325,22 @@ fn decode_html_entities(value: &str) -> String {
 /// Strip presentational HTML tags from a source-faithful copyright value, e.g.
 /// `<small>Copyright © 1999 <b>Acme</b></small>` → `Copyright © 1999 Acme`.
 ///
-/// Only an allowlist of attribute-free formatting tags is removed, matched
+/// Only an allowlist of formatting tags is removed, matched
 /// anywhere in the value (not just the ends) so nested wrappers cannot leave an
-/// unbalanced interior tag behind. The allowlist is deliberately narrow: it
-/// excludes attributed tags (`<label text="©...">`, whose notice lives in the
-/// attribute), the semantic `<copyright>`/`<author>` wrappers handled by the
-/// projection helpers below (which also normalize the sign), and angle-bracket
-/// emails/URLs/domains/`<year>` markers — none of which are bare formatting tag
-/// names. The interior text (including a literal `©`) is untouched; the caller
-/// collapses the resulting whitespace.
+/// unbalanced interior tag behind. Quoted attribute values are consumed as part
+/// of the tag, including values containing `>`. The allowlist is deliberately
+/// narrow: it excludes elements such as `<label text="©...">`, whose notice can
+/// live in an attribute, the semantic `<copyright>`/`<author>` wrappers handled
+/// below, and angle-bracket emails/URLs/domains/`<year>` markers. The interior
+/// visible text (including a literal `©`) is untouched.
 fn strip_edge_html_tags(text: &str) -> String {
     static FORMATTING_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?ix)
-            \s*<\s*/?\s*(?:small|span|b|i|em|strong|u|s|sub|sup|font|big|tt|code|pre|p|div|br|blockquote|q|mark|cite|abbr|samp|kbd|var|h[1-6]|li|ul|ol|td|th|tr|nav|header|footer|section|article)\s*/?\s*>\s*
-            ",
+            r#"(?ix)
+            \s*<\s*/?\s*(?:small|span|b|i|em|strong|u|s|sub|sup|font|big|tt|code|pre|p|div|br|blockquote|q|mark|cite|abbr|samp|kbd|var|h[1-6]|li|ul|ol|td|th|tr|nav|header|footer|section|article)\b
+            (?:"[^"]*"|'[^']*'|[^>"'])*
+            >\s*
+            "#,
         )
         .expect("valid regex")
     });
@@ -385,7 +401,7 @@ fn detection_is_source_code(value: &str, raw_span: &str) -> bool {
     looks_like_source_code(value) || looks_like_source_code(raw_span)
 }
 
-fn project_wrapped_copyright_value(rendered: &str, _fallback: &str) -> Option<String> {
+fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<String> {
     static VALUE_LEGALCOPYRIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r#"(?ix)
@@ -459,7 +475,7 @@ fn project_wrapped_copyright_value(rendered: &str, _fallback: &str) -> Option<St
             .name("value")
             .map(|m| m.as_str().trim().to_string())
     } else {
-        None
+        project_static_notice_literal(rendered, fallback)
     }?;
 
     let projected = prepare_text_line(&extracted)
@@ -467,6 +483,45 @@ fn project_wrapped_copyright_value(rendered: &str, _fallback: &str) -> Option<St
         .collect::<Vec<_>>()
         .join(" ");
     Some(projected)
+}
+
+/// Extract the single static string literal from a declaration or assignment
+/// when that literal independently refines to the detected notice. This covers
+/// language-neutral metadata constants without treating generated templates,
+/// concatenations, function calls, or arbitrary quoted prose as notices.
+fn project_static_notice_literal(rendered: &str, fallback: &str) -> Option<String> {
+    let rendered = rendered.trim().strip_suffix(';').unwrap_or(rendered.trim());
+    let (prefix, value) = rendered.split_once('=')?;
+    let prefix = prefix.trim();
+    if prefix.is_empty()
+        || prefix.ends_with(['!', '<', '>'])
+        || value.contains('=')
+        || prefix.contains(['(', ')', '{', '}', '?'])
+        || !prefix
+            .chars()
+            .any(|ch| ch.is_ascii_alphabetic() || ch == '_')
+    {
+        return None;
+    }
+
+    let value = value.trim();
+    let quote = value.chars().next().filter(|ch| matches!(ch, '\'' | '"'))?;
+    let literal = value.strip_prefix(quote)?.strip_suffix(quote)?.trim();
+    if literal.contains(quote) {
+        return None;
+    }
+    let prepared = prepare_text_line(literal);
+    let fallback_prepared = prepare_text_line(fallback);
+    let prepared_lower = prepared.to_ascii_lowercase();
+    let fallback_lower = fallback_prepared.to_ascii_lowercase();
+    let same_notice = prepared_lower == fallback_lower
+        || fallback_lower
+            .strip_prefix("copyright ")
+            .is_some_and(|without_marker| without_marker == prepared_lower)
+        || refine_copyright(&prepared).is_some_and(|refined| {
+            refine_copyright(&fallback_prepared).as_deref() == Some(refined.as_str())
+        });
+    same_notice.then(|| literal.to_string())
 }
 
 fn project_native_copyright_value(rendered: &str, fallback: &str) -> String {

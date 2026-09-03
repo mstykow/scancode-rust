@@ -11,9 +11,9 @@ use url::Url;
 
 use crate::models::LineNumber;
 
-use super::DetectionConfig;
 use super::host::is_good_url_host_domain;
 use super::junk_data::classify_url;
+use super::{DetectionConfig, decode_pod_angle_escapes};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UrlDetection {
@@ -226,6 +226,8 @@ pub fn find_urls(text: &str, config: &DetectionConfig) -> Vec<UrlDetection> {
         let normalized_line = line.replace("\\r\\n", "\\n").replace("\\r", "\\n");
 
         for segment in normalized_line.split("\\n") {
+            let segment = decode_pod_angle_escapes(segment);
+            let segment = segment.as_ref();
             for matched in URLS_REGEX.find_iter(segment) {
                 if matched.start() > 0 {
                     let prev_byte = segment.as_bytes()[matched.start() - 1];

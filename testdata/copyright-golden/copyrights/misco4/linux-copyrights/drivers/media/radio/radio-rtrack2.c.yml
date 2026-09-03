@@ -14,7 +14,6 @@ authors:
   - Converted to new API by Alan Cox <alan@lxorguk.ukuu.org.uk>
   - Converted to the radio-isa framework by Hans Verkuil <hans.verkuil@cisco.com>
   - Hans Verkuil <hans.verkuil@cisco.com>
-  - Hans Verkuil <hans.verkuil@cisco.com> Converted
   - Mauro Carvalho Chehab <mchehab@kernel.org>
   - Russell Kroll <rkroll@exploits.org>
   - Various bugfixes and enhancements by Russell Kroll <rkroll@exploits.org>

@@ -1288,6 +1288,53 @@ fn test_nested_html_wrapper_tags_fully_stripped_from_native_copyright() {
 }
 
 #[test]
+fn test_attributed_html_wrappers_project_visible_notice_text() {
+    let text = concat!(
+        "<div align=\"center\"><p class=\"copyright\">Copyright © 2000-2025 \n",
+        "  <a class=\"link\" href=\"dist.authors.html\" title=\"1. AUTHORS\">AUTHORS</a>\n",
+        "</p></div>\n",
+    );
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("index.html"), text, 120.0, false);
+    let file = build_named_file(builder, "index.html", ".html");
+
+    assert_eq!(
+        file.copyrights.len(),
+        1,
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert_eq!(
+        file.copyrights[0].copyright,
+        "Copyright © 2000-2025 AUTHORS"
+    );
+    assert!(!file.copyrights[0].copyright.contains("dist.authors.html"));
+    assert!(!file.copyrights[0].copyright.contains("class="));
+}
+
+#[test]
+fn test_static_notice_literal_projects_without_code_container() {
+    let text = "char _copyright[] = \"(c) Info-ZIP Group\";\n";
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("qdos.c"), text, 120.0, false);
+    let file = build_named_file(builder, "qdos.c", ".c");
+
+    assert_eq!(
+        file.copyrights.len(),
+        1,
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert_eq!(
+        file.copyrights[0].copyright, "(c) Info-ZIP Group",
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert_eq!(file.holders.len(), 1, "holders: {:?}", file.holders);
+    assert_eq!(file.holders[0].holder, "Info-ZIP Group");
+}
+
+#[test]
 fn test_csharp_assembly_copyright_attribute_unwraps_to_notice() {
     // `[assembly: AssemblyCopyright("…")]` is C# attribute syntax; only the inner
     // notice should be reported as the copyright.
@@ -1527,6 +1574,12 @@ fn test_inline_anchor_hrefs_keeps_the_url_and_drops_the_tag() {
     // An anchor with no href leaves only its text behind.
     assert_eq!(
         inline_anchor_hrefs("Copyright 2024 <a name=\"x\">Example Corp.</a>"),
+        "Copyright 2024 Example Corp."
+    );
+
+    // A relative target navigates within the documentation and is not party text.
+    assert_eq!(
+        inline_anchor_hrefs("Copyright 2024 <a href=\"dist.authors.html\">Example Corp.</a>"),
         "Copyright 2024 Example Corp."
     );
 

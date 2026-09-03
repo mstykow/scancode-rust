@@ -16,21 +16,6 @@ use crate::copyright::types::{
     AuthorDetection, CopyrightDetection, HolderDetection, ParseNode, PosTag, Token,
 };
 
-/// Whether a fallback copyright span carries a real holder anchor: a proper
-/// noun, company/university token, email/URL, or a year.
-///
-/// The grammar productions never build a copyright from `<Copy>` plus only
-/// common-noun (`<NN>`) prose — a holder must be an `<NNP>`/`<NAME>`/`<COMPANY>`
-/// or a year must be present. The span fallbacks run only when the grammar
-/// produced no copyright node, and they otherwise sweep in common nouns, so a
-/// bare `copyright paperwork` / `copyright and the source code` prose fragment
-/// slips through. Requiring the same holder anchor the grammar demands keeps the
-/// fallback from manufacturing copyrights out of ordinary prose that merely
-/// mentions the word "copyright".
-fn span_has_strong_holder_or_year(span: &[&Token]) -> bool {
-    span.iter().any(|t| is_strong_holder_or_year_token(t))
-}
-
 /// Whether one token can anchor a copyright span: a year, a proper noun /
 /// company / university token, an email or URL, or an organization acronym.
 fn is_strong_holder_or_year_token(t: &Token) -> bool {
@@ -51,6 +36,60 @@ fn is_strong_holder_or_year_token(t: &Token) -> bool {
                     | PosTag::Url2
             )
             || is_acronym_like(&t.value))
+}
+
+/// Whether a word-form copyright marker occurs where an ownership assertion
+/// can begin.
+///
+/// A fallback is allowed at the start of a prepared line, after punctuation,
+/// or after an ownership connective (`is copyrighted`, `portions copyright`).
+/// This keeps a rejected grammar parse from turning an operational phrase such
+/// as `Update copyrights to 2008` or an inline data description into a notice.
+fn marker_has_notice_context(tokens: &[&Token], marker_index: usize) -> bool {
+    let marker = tokens[marker_index];
+    if marker.tag == PosTag::SpdxContrib || is_bare_c_sign(marker) {
+        return true;
+    }
+
+    let next = tokens[marker_index + 1..]
+        .iter()
+        .copied()
+        .find(|token| token.start_line == marker.start_line);
+    if next.is_some_and(|token| matches!(token.tag, PosTag::Copy | PosTag::Holder)) {
+        return true;
+    }
+    if marker.value == "Copyright" && next.is_some_and(detector::token_utils::is_year_like_token) {
+        return true;
+    }
+
+    let Some(previous) = tokens[..marker_index]
+        .iter()
+        .rev()
+        .copied()
+        .find(|token| token.start_line == marker.start_line)
+    else {
+        return true;
+    };
+
+    if matches!(
+        previous.tag,
+        PosTag::Is | PosTag::Held | PosTag::By | PosTag::Portions
+    ) {
+        return true;
+    }
+    if previous.tag == PosTag::Dash || (previous.tag == PosTag::Cc && previous.value.trim() == ",")
+    {
+        return true;
+    }
+
+    let word = previous
+        .value
+        .trim_matches(|character: char| character.is_ascii_punctuation())
+        .to_ascii_lowercase();
+    matches!(
+        word.as_str(),
+        "are" | "was" | "were" | "remain" | "remains" | "owned" | "owns" | "not"
+    ) || previous.value.ends_with('.')
 }
 
 /// Whether the token is a bare `(c)` copyright sign, the only copyright marker
@@ -101,11 +140,82 @@ fn bare_c_span_names_holder_up_front(span: &[&Token]) -> bool {
         .is_some_and(|t| is_strong_holder_or_year_token(t))
 }
 
-/// Whether a fallback span carries a usable holder anchor. `leads_with_bare_c`
-/// tightens the check to an up-front holder when the span opens on a bare `(c)`
-/// sign; see [`bare_c_span_names_holder_up_front`].
-fn span_has_holder_anchor(span: &[&Token], leads_with_bare_c: bool) -> bool {
-    span_has_strong_holder_or_year(span)
+/// Whether the marker is followed locally by a year or holder.
+///
+/// Flat fallback spans can cover several continuation lines. An entity-like
+/// token at the far end of that span is not evidence for the marker near its
+/// beginning: data dictionaries commonly contain a `copyright` cross-reference
+/// followed by an unrelated all-caps record name. Require the evidence on the
+/// marker line, or on the immediately following line when the marker line ends
+/// with only connective punctuation.
+fn marker_has_local_holder_or_year(marker_span: &[&Token]) -> bool {
+    let Some(marker) = marker_span.first() else {
+        return false;
+    };
+
+    let evaluate_line = |tokens: &[&Token]| -> Option<bool> {
+        if tokens
+            .iter()
+            .any(|token| detector::token_utils::is_year_like_token(token))
+        {
+            return Some(true);
+        }
+
+        tokens
+            .iter()
+            .copied()
+            .find(|token| {
+                if token.tag == PosTag::Copy {
+                    return false;
+                }
+                let word = token
+                    .value
+                    .trim_matches(|character: char| !character.is_alphanumeric())
+                    .to_ascii_lowercase();
+                !(matches!(
+                    word.as_str(),
+                    "" | "the" | "a" | "an" | "by" | "is" | "held"
+                ) || matches!(token.tag, PosTag::Dash)
+                    || token.tag == PosTag::Holder && token.start_line == marker.start_line
+                    || token.tag == PosTag::Cc && token.value.trim() == ",")
+            })
+            .map(is_strong_holder_or_year_token)
+    };
+
+    let same_line: Vec<&Token> = marker_span
+        .iter()
+        .copied()
+        .skip(1)
+        .take_while(|token| token.start_line == marker.start_line)
+        .collect();
+    if let Some(has_evidence) = evaluate_line(&same_line) {
+        return has_evidence;
+    }
+
+    let Some(next_line) = marker_span
+        .iter()
+        .skip(1)
+        .find(|token| token.start_line != marker.start_line)
+        .map(|token| token.start_line)
+    else {
+        return false;
+    };
+    let continuation: Vec<&Token> = marker_span
+        .iter()
+        .copied()
+        .skip(1)
+        .filter(|token| token.start_line == next_line)
+        .collect();
+    evaluate_line(&continuation).unwrap_or(false)
+}
+
+/// Whether a fallback span carries usable, locally owned evidence.
+fn span_has_holder_anchor(
+    span: &[&Token],
+    marker_span: &[&Token],
+    leads_with_bare_c: bool,
+) -> bool {
+    marker_has_local_holder_or_year(marker_span)
         && (!leads_with_bare_c || bare_c_span_names_holder_up_front(span))
 }
 
@@ -313,7 +423,10 @@ pub fn extract_from_spans(
                     .iter()
                     .any(|t| detector::token_utils::is_year_like_token(t));
                 let filtered = detector::token_utils::strip_all_rights_reserved_slice(span);
-                if span_has_holder_anchor(&filtered, leads_with_bare_c)
+                let marker_span = &all_leaves[copy_idx..i];
+                let has_fallback_evidence = marker_has_notice_context(&all_leaves, copy_idx)
+                    && span_has_holder_anchor(&filtered, marker_span, leads_with_bare_c);
+                if has_fallback_evidence
                     && let Some(det) = detector::token_utils::build_copyright_from_tokens(&filtered)
                 {
                     copyrights.push(det);
@@ -323,7 +436,7 @@ pub fn extract_from_spans(
                     continue;
                 }
 
-                if !skip_holder_from_span && span_has_holder_anchor(&filtered, leads_with_bare_c) {
+                if !skip_holder_from_span && has_fallback_evidence {
                     let holder_span = filtered.as_slice();
                     let holder_tokens: Vec<&Token> = holder_span
                         .iter()
@@ -564,7 +677,10 @@ pub fn extract_copyrights_from_spans(
 
                 let leads_with_bare_c = start == copy_idx && is_bare_c_sign(token);
                 let filtered = detector::token_utils::strip_all_rights_reserved_slice(span);
-                if span_has_holder_anchor(&filtered, leads_with_bare_c)
+                let marker_span = &all_leaves[copy_idx..i];
+                let has_fallback_evidence = marker_has_notice_context(&all_leaves, copy_idx)
+                    && span_has_holder_anchor(&filtered, marker_span, leads_with_bare_c);
+                if has_fallback_evidence
                     && let Some(det) = detector::token_utils::build_copyright_from_tokens(&filtered)
                 {
                     copyrights.push(det);
@@ -574,7 +690,7 @@ pub fn extract_copyrights_from_spans(
                     continue;
                 }
 
-                if !skip_holder_from_span && span_has_holder_anchor(&filtered, leads_with_bare_c) {
+                if !skip_holder_from_span && has_fallback_evidence {
                     let holder_span = filtered.as_slice();
                     let holder_tokens: Vec<&Token> = holder_span
                         .iter()
