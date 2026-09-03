@@ -2795,6 +2795,18 @@ fn test_refine_author_drops_code_call_and_graphql_fragments() {
 }
 
 #[test]
+fn test_refine_author_drops_schema_declaration_fragments() {
+    assert_eq!(refine_author("INTEGER REFERENCES (id)"), None);
+    assert_eq!(refine_author("VARCHAR(255) NOT NULL"), None);
+    assert_eq!(refine_author("INTEGER PRIMARY KEY"), None);
+    assert_eq!(refine_author("TEXT CHECK (length(name) > 0)"), None);
+    assert_eq!(
+        refine_author("Integer Research Group"),
+        Some("Integer Research Group".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_drops_point_to_the_phrase() {
     assert_eq!(refine_author("point to the"), None);
 }

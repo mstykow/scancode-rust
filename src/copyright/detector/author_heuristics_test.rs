@@ -2088,3 +2088,20 @@ fn test_originally_by_author() {
         a
     );
 }
+
+#[test]
+fn test_schema_author_column_does_not_create_an_author() {
+    let content = "\
+CREATE TABLE author(
+    id INTEGER PRIMARY KEY,
+    name text NOT NULL
+);
+CREATE TABLE book(
+    id INTEGER PRIMARY KEY,
+    author INTEGER REFERENCES author (id),
+    title text NOT NULL
+);";
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(content);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
