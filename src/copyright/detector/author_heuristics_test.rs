@@ -523,6 +523,12 @@ fn test_source_header_credit_variants_are_authors() {
         "# Last modified May 2020 by:\n",
         "# David Romano, david@example.net\n",
         "# Original by first@example.net, modified by second@example.net\n",
+        "# Configured by: Config Author, config@example.net\n",
+        "# Improved by Jake Hamby <jake@example.net> to support both compilers\n",
+        "# Originally contributed by: Mark Kettenis <mark@example.net> Dec 1998\n",
+        "# DCL-ified by Peter Prymmer <peter@example.net> 22-DEC-1995\n",
+        "(contributed by Peter J. Holzer, peter@example.net)\n",
+        "DataBase Editor by Janick Bergeron [janick@example.net] for testing\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
     let values: Vec<&str> = authors
@@ -538,6 +544,12 @@ fn test_source_header_credit_variants_are_authors() {
         "David Romano, david@example.net",
         "first@example.net",
         "second@example.net",
+        "Config Author, config@example.net",
+        "Jake Hamby <jake@example.net>",
+        "Mark Kettenis <mark@example.net>",
+        "Peter Prymmer <peter@example.net>",
+        "Peter J. Holzer, peter@example.net",
+        "Janick Bergeron janick@example.net",
     ] {
         assert!(values.contains(&expected), "missing {expected}: {values:?}");
     }
@@ -551,6 +563,8 @@ fn test_source_header_credit_words_without_people_are_not_authors() {
         "Compiler hints by default improve diagnostics.\n",
         "This file uses a compiler written by\n",
         "Jean Example. Send mail to support@example.net for a copy.\n",
+        "Configured by root@localhost\n",
+        "* Configured by     : root@localhost\n",
     );
     let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
 

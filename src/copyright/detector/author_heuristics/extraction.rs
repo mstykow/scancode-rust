@@ -242,11 +242,15 @@ fn trim_attribution_tail(who: &str) -> String {
 
 fn trim_contact_attribution_suffix(who: &str) -> String {
     static CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\([^()\s]*@[^()]*\)|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})")
+        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\([^()\s]*@[^()]*\)|\[[^\[\]\s]*@[^\[\]]*\]|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})")
             .unwrap()
     });
-    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for\s+\p{L})").unwrap());
+    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for(?:\s|$)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d)",
+        )
+        .unwrap()
+    });
 
     let Some(contact) = CONTACT_RE.find_iter(who).last() else {
         return who.to_string();
@@ -398,19 +402,19 @@ fn extract_line_local_attribution_author(
 ) -> Option<String> {
     static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|original\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by):?\s+(?P<who>.+)$",
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:authored|configured|contributed|created|improved|implemented|overhauled|revised|written|[\p{L}\d][\p{L}\d-]{0,30}-ified)\s+by|original\s+by|(?:adapted|edited|modified|ported|updated)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by)[ \t]*:?[ \t]+(?P<who>.+)$",
         )
         .unwrap()
     });
     static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|hints?|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)^(?:.{1,80}\s+)?(?:code|copy|driver|editor|hints?|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
     static CONTACT_CHANGE_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|configured|contributed|edited|improved|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s*:?[ \t]+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
@@ -439,6 +443,12 @@ fn extract_line_local_attribution_author(
         .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))
         .or_else(|| CONTACT_CHANGE_BY_RE.captures(normalized))?;
     let who = captures.name("who")?.as_str().trim();
+    if normalized_lower.contains("configured by")
+        && who.split_whitespace().count() == 1
+        && who.contains('@')
+    {
+        return None;
+    }
     let has_contact = who.contains('@')
         || who.contains('<')
         || (who.to_ascii_lowercase().contains(" at ")
