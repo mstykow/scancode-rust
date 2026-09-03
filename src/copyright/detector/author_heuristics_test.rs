@@ -675,6 +675,34 @@ fn test_bounded_pod_author_action_credits_are_authors() {
 }
 
 #[test]
+fn test_mixed_pod_author_copyright_heading_keeps_maintainer_credit() {
+    let input = concat!(
+        "=head1 AUTHOR AND COPYRIGHT\n",
+        "\n",
+        "Copyright 2013 Tom Christiansen; now maintained by Perl5 Porters.\n",
+        "\n",
+        "This documentation is free and may be redistributed.\n",
+        "\n",
+        "=head1 DESCRIPTION\n",
+        "\n",
+        "The output is maintained by Build Generator.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Perl5 Porters"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
 fn test_pod_author_modification_history_recovers_embedded_action_credit() {
     let input = concat!(
         "=head1 Author and Modification History\n",
