@@ -103,6 +103,30 @@ pub(in super::super) fn refine_author_with_optional_handle_suffix(
     refine_author(trimmed)
 }
 
+pub(in super::super) fn refine_particle_name(candidate: &str) -> Option<String> {
+    const NAME_PARTICLES: &[&str] = &[
+        "al", "bin", "da", "de", "del", "della", "der", "di", "dos", "du", "la", "le", "the",
+        "van", "von", "y",
+    ];
+
+    let candidate = candidate.trim().trim_end_matches('.').trim();
+    let words: Vec<&str> = candidate.split_whitespace().collect();
+    if words.len() < 3 || words.len() > 6 {
+        return None;
+    }
+    let mut uppercase_words = 0;
+    for word in words {
+        let normalized = word.trim_matches(|ch: char| !ch.is_alphanumeric());
+        let first = normalized.chars().find(|ch| ch.is_alphabetic())?;
+        if first.is_uppercase() {
+            uppercase_words += 1;
+        } else if !NAME_PARTICLES.contains(&normalized.to_ascii_lowercase().as_str()) {
+            return None;
+        }
+    }
+    (uppercase_words >= 2).then(|| candidate.to_string())
+}
+
 pub(in super::super) fn drop_authors_embedded_in_copyrights(
     copyrights: &[CopyrightDetection],
     authors: &mut Vec<AuthorDetection>,

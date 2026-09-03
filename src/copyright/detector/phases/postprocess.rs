@@ -364,6 +364,11 @@ fn run_author_extraction_and_repairs(
         super::author_heuristics::extract_pod_author_section_contactless_authors(raw_lines);
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
+
+    let mut new_a =
+        super::author_heuristics::extract_pod_author_section_narrative_credit_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
 }
 
 // Copyright postprocess phase fn; the long argument list threads the shared detection-pipeline state.

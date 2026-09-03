@@ -570,6 +570,8 @@ Yves Orton, Kenichi Ishigaki and Max Maischein
 
 Tim Bunce, 2nd June 1995.
 
+Larry Wall and others
+
 =head1 NOTES
 "#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
@@ -584,6 +586,7 @@ Tim Bunce, 2nd June 1995.
         "Kenichi Ishigaki",
         "Max Maischein",
         "Tim Bunce",
+        "Larry Wall",
     ] {
         assert!(values.contains(&expected), "authors: {authors:?}");
     }
@@ -655,6 +658,99 @@ Outside Person
 
     assert!(values.contains(&"Tokuhiro Matsuno"), "authors: {authors:?}");
     assert!(!values.contains(&"Outside Person"), "authors: {authors:?}");
+}
+
+#[test]
+fn test_pod_author_section_recovers_cue_backed_narrative_rosters() {
+    let input = r#"=head1 AUTHORS
+
+David Fiander and Peter Prymmer with thanks to Dennis Longnecker
+and William Raffloer for valuable reports. Thanks to Mike MacIsaac and
+Egon Terwedow for feedback. Thanks to Ignasi Roca for diagnostics.
+
+Mike Fulton and Karl Williamson have provided later updates.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "David Fiander",
+        "Peter Prymmer",
+        "Dennis Longnecker",
+        "William Raffloer",
+        "Mike MacIsaac",
+        "Egon Terwedow",
+        "Ignasi Roca",
+        "Mike Fulton",
+        "Karl Williamson",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_recovers_narrative_roster_after_contact() {
+    let input = r#"=head1 AUTHOR
+
+Stephen McCamant <stephen@example.com>, based on an earlier version by
+Malcolm Beattie <malcolm@example.com>, with contributions from Gisle Aas,
+James Duncan, Hugo van der Sanden, Robin Houston, and Rafael Garcia-Suarez.
+
+Nicholas Clark <nicholas@example.com>, collating wisdom supplied by
+Slaven Rezic and Tim Bunce.
+
+This code is attributable to Larry Wall and the Perl Porters.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Gisle Aas",
+        "James Duncan",
+        "Hugo van der Sanden",
+        "Robin Houston",
+        "Rafael Garcia-Suarez",
+        "Slaven Rezic",
+        "Tim Bunce",
+        "Larry Wall",
+        "the Perl Porters",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_does_not_treat_generic_credit_objects_as_names() {
+    let input = r#"=head1 AUTHOR
+
+Documentation with contributions from examples.
+
+Research and Development Team
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(!values.contains(&"Documentation"), "authors: {authors:?}");
+    assert!(!values.contains(&"examples"), "authors: {authors:?}");
+    assert!(
+        values.contains(&"Research and Development Team"),
+        "authors: {authors:?}"
+    );
 }
 
 #[test]

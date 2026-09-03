@@ -10,6 +10,8 @@ use crate::copyright::refiner::refine_author;
 use crate::copyright::types::AuthorDetection;
 use crate::models::LineNumber;
 
+use super::refine_particle_name;
+
 fn extract_contact_authors_from_paragraph(
     paragraph: &str,
     start_line: LineNumber,
@@ -214,6 +216,15 @@ fn strip_trailing_author_date(candidate: &str) -> String {
     TRAILING_DATE_RE.replace(candidate, "").trim().to_string()
 }
 
+fn is_collective_noun(word: &str) -> bool {
+    matches!(
+        word.trim_matches(|ch: char| !ch.is_alphanumeric())
+            .to_ascii_lowercase()
+            .as_str(),
+        "contributors" | "developers" | "gang" | "group" | "porters" | "project" | "team"
+    )
+}
+
 fn refine_contactless_author(candidate: &str) -> Option<String> {
     const NON_NAME_WORDS: &[&str] = &[
         "author",
@@ -234,7 +245,8 @@ fn refine_contactless_author(candidate: &str) -> Option<String> {
         return None;
     }
     let candidate = strip_trailing_author_date(candidate);
-    let author = refine_author(candidate.trim_end_matches('.').trim())?;
+    let candidate = candidate.trim_end_matches('.').trim();
+    let author = refine_particle_name(candidate).or_else(|| refine_author(candidate))?;
     let words: Vec<&str> = author.split_whitespace().collect();
     if words.is_empty() || words.len() > 6 {
         return None;
@@ -261,27 +273,31 @@ fn refine_contactless_author(candidate: &str) -> Option<String> {
         .filter(|ch| ch.is_uppercase() || ch.is_lowercase())
         .collect();
     let uppercase_words = cased_words.iter().filter(|ch| ch.is_uppercase()).count();
-    let has_collective_noun = words.iter().any(|word| {
-        matches!(
-            word.trim_matches(|ch: char| !ch.is_alphanumeric())
-                .to_ascii_lowercase()
-                .as_str(),
-            "contributors" | "developers" | "gang" | "group" | "porters" | "project" | "team"
-        )
-    });
-    if cased_words.is_empty() || uppercase_words >= 2 || words.len() == 1 || has_collective_noun {
+    let has_collective_noun = words.iter().any(|word| is_collective_noun(word));
+    if cased_words.is_empty()
+        || uppercase_words >= 2
+        || (words.len() == 1 && uppercase_words == 1)
+        || has_collective_noun
+    {
         Some(author)
     } else {
         None
     }
 }
 
-fn extract_contactless_authors_from_paragraph(
-    paragraph: &str,
-    start_line: LineNumber,
-    end_line: LineNumber,
-) -> Vec<AuthorDetection> {
-    let normalized = strip_trailing_author_date(paragraph).replace(", and ", ", ");
+fn contactless_author_values(paragraph: &str) -> Vec<String> {
+    let mut normalized = strip_trailing_author_date(paragraph)
+        .trim_end_matches('.')
+        .trim()
+        .to_string();
+    for suffix in [", and others", " and others", ", et al", " et al"] {
+        if normalized.to_ascii_lowercase().ends_with(suffix) {
+            let end = normalized.len() - suffix.len();
+            normalized.truncate(end);
+            break;
+        }
+    }
+    let normalized = normalized.replace(", and ", ", ");
     let mut comma_parts: Vec<&str> = normalized
         .split(',')
         .map(str::trim)
@@ -304,10 +320,13 @@ fn extract_contactless_authors_from_paragraph(
                 .all(|part| part.split_whitespace().count() >= 2))
     {
         comma_parts
-    } else if let Some((left, right)) = normalized.split_once(" and ") {
+    } else if let Some((left, right)) = normalized.split_once(" and ")
+        && (!normalized.split_whitespace().any(is_collective_noun)
+            || left.split_whitespace().count() >= 2)
+    {
         vec![left.trim(), right.trim()]
     } else {
-        vec![paragraph.trim()]
+        vec![normalized.trim()]
     };
     let candidate_count = candidates.len();
     let refined: Vec<String> = candidates
@@ -319,6 +338,81 @@ fn extract_contactless_authors_from_paragraph(
     }
 
     refined
+}
+
+fn extract_contactless_authors_from_paragraph(
+    paragraph: &str,
+    start_line: LineNumber,
+    end_line: LineNumber,
+) -> Vec<AuthorDetection> {
+    contactless_author_values(paragraph)
+        .into_iter()
+        .map(|author| AuthorDetection {
+            author,
+            start_line,
+            end_line,
+        })
+        .collect()
+}
+
+fn truncate_credit_roster(value: &str) -> &str {
+    let lower = value.to_ascii_lowercase();
+    let end = [" for ", ", and many ", " and many ", " over the years"]
+        .into_iter()
+        .filter_map(|boundary| lower.find(boundary))
+        .min()
+        .unwrap_or(value.len());
+
+    let roster = value[..end].trim().trim_matches(&[' ', ',', '.', ';'][..]);
+    roster
+        .strip_suffix(" and")
+        .or_else(|| roster.strip_suffix(" And"))
+        .unwrap_or(roster)
+        .trim_end()
+}
+
+fn extract_narrative_credit_authors_from_paragraph(
+    paragraph: &str,
+    start_line: LineNumber,
+    end_line: LineNumber,
+) -> Vec<AuthorDetection> {
+    static CREDIT_CUE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:(?:with\s+)?(?:contributions?|(?:invaluable|valuable)\s+help|help|advice)\s+from|(?:with\s+)?thanks\s+to|supplied\s+by|attributable\s+to)\b",
+        )
+        .expect("valid POD narrative credit cue regex")
+    });
+    static SUBJECT_CREDIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?P<names>.+?)\s+(?:has|have)\s+(?:added|contributed|created|maintained|provided|updated|written)\b",
+        )
+        .expect("valid POD subject credit regex")
+    });
+
+    let mut rosters = Vec::new();
+    let cues: Vec<_> = CREDIT_CUE_RE.find_iter(paragraph).collect();
+    if let Some(first) = cues.first() {
+        let prefix = paragraph[..first.start()].trim();
+        if !prefix.is_empty() && (prefix.contains(',') || prefix.contains(" and ")) {
+            rosters.extend(contactless_author_values(prefix));
+        }
+        for (index, cue) in cues.iter().enumerate() {
+            let tail_end = cues
+                .get(index + 1)
+                .map_or(paragraph.len(), |next| next.start());
+            let tail = truncate_credit_roster(&paragraph[cue.end()..tail_end]);
+            if !tail.is_empty() {
+                rosters.extend(contactless_author_values(tail));
+            }
+        }
+    }
+    if let Some(captures) = SUBJECT_CREDIT_RE.captures(paragraph)
+        && let Some(names) = captures.name("names")
+    {
+        rosters.extend(contactless_author_values(names.as_str()));
+    }
+
+    rosters
         .into_iter()
         .map(|author| AuthorDetection {
             author,
@@ -355,4 +449,43 @@ pub(in super::super) fn extract_pod_author_section_contactless_authors(
     });
 
     authors
+}
+
+/// Recover cue-backed contributor rosters from bounded POD AUTHOR(S) sections.
+pub(in super::super) fn extract_pod_author_section_narrative_credit_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    let mut authors = Vec::new();
+    walk_author_section_paragraphs(raw_lines, |paragraph, start_line, end_line| {
+        authors.extend(extract_narrative_credit_authors_from_paragraph(
+            paragraph, start_line, end_line,
+        ));
+    });
+
+    authors
+}
+
+#[cfg(test)]
+mod tests {
+    use super::contactless_author_values;
+
+    #[test]
+    fn contactless_rosters_keep_particle_names_and_mixed_collectives() {
+        assert_eq!(
+            contactless_author_values(
+                "Gisle Aas, James Duncan, Hugo van der Sanden, Robin Houston, and Rafael Garcia-Suarez."
+            ),
+            [
+                "Gisle Aas",
+                "James Duncan",
+                "Hugo van der Sanden",
+                "Robin Houston",
+                "Rafael Garcia-Suarez",
+            ]
+        );
+        assert_eq!(
+            contactless_author_values("Larry Wall and the Perl Porters."),
+            ["Larry Wall", "the Perl Porters"]
+        );
+    }
 }
