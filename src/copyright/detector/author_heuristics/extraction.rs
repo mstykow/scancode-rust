@@ -612,7 +612,19 @@ pub(in super::super) fn extract_subject_attribution_authors(
 ) -> Vec<AuthorDetection> {
     static SUBJECT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:originally\s+)?(?:written|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
+            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:originally\s+)?(?:written|rewritten|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
+        )
+        .unwrap()
+    });
+    static FIRST_PERSON_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\bas\s+authored\s+by\s+me,\s*(?P<who>.+?)(?:,\s*(?:(?:is|are|was|were)\b.*)?|$)",
+        )
+        .unwrap()
+    });
+    static PROVENANCE_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:documentation|code|implementation|work|text|material)\b[^\r\n]{0,80}?\b(?:taken|copied|derived|adapted|borrowed)\s+from\b[^\r\n]{1,120}?\s+by\s+(?P<who>.+)$",
         )
         .unwrap()
     });
@@ -645,10 +657,6 @@ pub(in super::super) fn extract_subject_attribution_authors(
         let has_contact = raw_who.contains('@')
             || raw_who.contains('<')
             || (lower.contains(" at ") && lower.contains(" dot "));
-        if !has_contact && !in_pod_author_section {
-            continue;
-        }
-
         let mut who = NON_AUTHOR_CLAUSE_RE.replace(raw_who, "").into_owned();
         if let Some(contact_end) = who.find('>') {
             let tail = who[contact_end + 1..].trim_start();
@@ -664,11 +672,74 @@ pub(in super::super) fn extract_subject_attribution_authors(
         let Some(author) = refine_author(&who) else {
             continue;
         };
+        if !has_contact && !in_pod_author_section && !looks_like_contactless_person_name(&author) {
+            continue;
+        }
         authors.push(AuthorDetection {
             author,
             start_line: line.line_number,
             end_line: line.line_number,
         });
+    }
+
+    for line in prepared_cache.iter_non_empty() {
+        let next_line = prepared_cache.line(line.line_number.next());
+        let combined = next_line
+            .filter(|next| !next.prepared.is_empty())
+            .map(|next| format!("{} {}", line.prepared, next.prepared));
+        let matched = combined
+            .as_deref()
+            .and_then(|text| {
+                FIRST_PERSON_ATTRIBUTION_RE
+                    .captures(text)
+                    .and_then(|captures| {
+                        let who = captures.name("who")?;
+                        let full_match = captures.get(0)?;
+                        if full_match.start() >= line.prepared.len() {
+                            return None;
+                        }
+                        let end_line = if who.end() <= line.prepared.len() {
+                            line.line_number
+                        } else {
+                            next_line.map_or(line.line_number, |next| next.line_number)
+                        };
+                        Some((who.as_str(), end_line))
+                    })
+            })
+            .or_else(|| {
+                FIRST_PERSON_ATTRIBUTION_RE
+                    .captures(line.prepared)
+                    .and_then(|captures| captures.name("who"))
+                    .map(|who| (who.as_str(), line.line_number))
+            });
+        if let Some((raw_who, end_line)) = matched
+            && let Some(author) = refine_author(raw_who)
+            && looks_like_contactless_person_name(&author)
+        {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line,
+            });
+        }
+
+        let Some(raw_who) = PROVENANCE_ATTRIBUTION_RE
+            .captures(line.prepared)
+            .and_then(|captures| captures.name("who"))
+            .map(|who| who.as_str())
+        else {
+            continue;
+        };
+        let Some(author) = refine_author(raw_who) else {
+            continue;
+        };
+        if looks_like_contactless_person_name(&author) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: line.line_number,
+                end_line: line.line_number,
+            });
+        }
     }
     authors
 }
@@ -939,6 +1010,55 @@ fn looks_like_plaintext_roster_author_candidate(who: &str) -> bool {
         && !words
             .iter()
             .any(|word| is_contributed_non_person_token(word))
+}
+
+fn looks_like_contactless_person_name(who: &str) -> bool {
+    const NAME_PARTICLES: &[&str] = &[
+        "al", "bin", "da", "de", "del", "della", "der", "di", "dos", "du", "la", "le", "van",
+        "von", "y",
+    ];
+
+    if who.contains('@') || who.chars().any(|ch| ch.is_ascii_digit()) {
+        return false;
+    }
+
+    let words: Vec<&str> = who.split_whitespace().collect();
+    if !(2..=6).contains(&words.len()) {
+        return false;
+    }
+
+    let mut uppercase_words = 0;
+    for word in words {
+        let normalized = word.trim_matches(|ch: char| {
+            !ch.is_alphabetic() && ch != '\'' && ch != '’' && ch != '.' && ch != '-'
+        });
+        if matches!(
+            normalized.to_ascii_lowercase().as_str(),
+            "archive"
+                | "compiler"
+                | "generator"
+                | "module"
+                | "package"
+                | "program"
+                | "project"
+                | "release"
+                | "software"
+                | "team"
+                | "tool"
+        ) {
+            return false;
+        }
+        let Some(first) = normalized.chars().find(|ch| ch.is_alphabetic()) else {
+            return false;
+        };
+        if first.is_uppercase() {
+            uppercase_words += 1;
+        } else if !NAME_PARTICLES.contains(&normalized.to_ascii_lowercase().as_str()) {
+            return false;
+        }
+    }
+
+    uppercase_words >= 2
 }
 
 fn looks_like_written_by_and_continuation(line: &str) -> bool {

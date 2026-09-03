@@ -381,10 +381,19 @@ pub(in super::super) fn drop_shadowed_author_prefixes(authors: &mut Vec<AuthorDe
                 .trim_start_matches([',', ';'])
                 .trim_start()
                 .to_ascii_lowercase();
+            let ends_with_initial = candidate
+                .split_whitespace()
+                .next_back()
+                .map(|word| word.trim_matches(|ch: char| !ch.is_alphabetic()))
+                .is_some_and(|word| {
+                    let mut chars = word.chars();
+                    chars.next().is_some_and(char::is_uppercase) && chars.next().is_none()
+                });
             (other.end_line == author.end_line
                 && (tail.starts_with(',')
                     || tail.starts_with(';')
                     || normalized_tail.starts_with("and ")))
+                || (ends_with_initial && other.end_line >= author.end_line)
                 || normalized_tail.starts_with("with contributions from ")
                 || normalized_tail.starts_with("and contributions from ")
         })

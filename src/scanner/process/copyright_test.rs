@@ -1202,6 +1202,25 @@ fn test_extract_copyright_information_keeps_attributed_author_in_pod_code_span()
 }
 
 #[test]
+fn test_extract_copyright_information_keeps_explicit_contactless_code_attributions() {
+    let text = concat!(
+        "Fcntl, Socket, and Sys::Syslog have been rewritten by Nicholas Clark to use the new API.\n",
+        "Most of the documentation is taken from JSON::XS by Marc Lehmann\n",
+    );
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("Credits.pm"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    let values: Vec<&str> = file
+        .authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    assert!(values.contains(&"Nicholas Clark"), "authors: {values:?}");
+    assert!(values.contains(&"Marc Lehmann"), "authors: {values:?}");
+}
+
+#[test]
 fn test_extract_copyright_information_drops_code_line_with_embedded_email_literal() {
     // A C++ source line whose argument list embeds an email literal must still be
     // rejected: the namespace/address-of code signals are not bypassed by the

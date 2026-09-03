@@ -435,6 +435,50 @@ fn test_subject_attribution_uses_bounded_pod_author_section() {
 }
 
 #[test]
+fn test_contactless_narrative_attributions_require_person_names() {
+    let input = concat!(
+        "Fcntl and Socket have been rewritten by Nicholas Clark to use the new API.\n",
+        "The entire library package, as authored by me, Ozan S.\n",
+        "Yigit, is hereby placed in the public domain.\n",
+        "The manual, as authored by me, Ada Lovelace,\n",
+        "Most of the documentation is taken from JSON::XS by Marc Lehmann\n",
+        "Archives were created by Release Tool 2.0.\n",
+        "This file is written by Callgrind, and it is upwards compatible.\n",
+        "Perl is developed by a global team of volunteers.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Nicholas Clark",
+        "Ozan S. Yigit",
+        "Ada Lovelace",
+        "Marc Lehmann",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+    for rejected in ["Release Tool", "Callgrind", "global team of volunteers"] {
+        assert!(
+            values.iter().all(|author| !author.contains(rejected)),
+            "unexpected {rejected}: {values:?}"
+        );
+    }
+    let ozan = authors
+        .iter()
+        .find(|author| author.author == "Ozan S. Yigit")
+        .expect("wrapped first-person attribution");
+    assert_eq!((ozan.start_line.get(), ozan.end_line.get()), (2, 3));
+    let ada = authors
+        .iter()
+        .find(|author| author.author == "Ada Lovelace")
+        .expect("single-line first-person attribution");
+    assert_eq!((ada.start_line.get(), ada.end_line.get()), (4, 4));
+}
+
+#[test]
 fn test_contact_backed_change_attributions_cover_varied_actions() {
     let input = concat!(
         "- Updated backport to 5.6.1 by Steffen Mueller <smueller@cpan.org>.\n",
