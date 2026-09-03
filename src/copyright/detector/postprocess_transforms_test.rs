@@ -116,6 +116,42 @@ fn test_refine_final_authors_keeps_named_collective() {
 }
 
 #[test]
+fn test_author_dedup_prefers_precise_overlapping_span() {
+    let mut authors = vec![
+        AuthorDetection {
+            author: "Nick Ing-Simmons".to_string(),
+            start_line: LineNumber::new(10).unwrap(),
+            end_line: LineNumber::new(11).unwrap(),
+        },
+        AuthorDetection {
+            author: "Nick Ing-Simmons".to_string(),
+            start_line: LineNumber::new(10).unwrap(),
+            end_line: LineNumber::new(10).unwrap(),
+        },
+        AuthorDetection {
+            author: "Nick Ing-Simmons".to_string(),
+            start_line: LineNumber::new(20).unwrap(),
+            end_line: LineNumber::new(20).unwrap(),
+        },
+    ];
+
+    dedupe_overlapping_authors(&mut authors);
+
+    assert_eq!(authors.len(), 2, "authors: {authors:?}");
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.start_line == LineNumber::new(10).unwrap()
+                && author.end_line == LineNumber::new(10).unwrap())
+    );
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.start_line == LineNumber::new(20).unwrap())
+    );
+}
+
+#[test]
 fn test_derive_holder_from_simple_copyright_string_keeps_iso_date_holder() {
     assert_eq!(
         derive_holder_from_simple_copyright_string("Copyright (c) 2006-07-24 John Boolage"),

@@ -1185,6 +1185,23 @@ fn test_extract_copyright_information_rejects_author_in_source_container() {
 }
 
 #[test]
+fn test_extract_copyright_information_keeps_attributed_author_in_pod_code_span() {
+    let text = concat!(
+        "=head1 Author and Modification History\n",
+        "\n",
+        "Renamed to C<Class::Struct> and modified by Jim Miner, 1997-04-02.\n",
+        "\n",
+        "=cut\n",
+    );
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(&mut builder, Path::new("Struct.pm"), text, 120.0, false);
+
+    let file = build_single_file(builder);
+    assert_eq!(file.authors.len(), 1, "authors: {:?}", file.authors);
+    assert_eq!(file.authors[0].author, "Jim Miner");
+}
+
+#[test]
 fn test_extract_copyright_information_drops_code_line_with_embedded_email_literal() {
     // A C++ source line whose argument list embeds an email literal must still be
     // rejected: the namespace/address-of code signals are not bypassed by the

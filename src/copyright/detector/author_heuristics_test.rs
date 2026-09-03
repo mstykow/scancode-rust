@@ -558,6 +558,103 @@ fn test_source_header_credit_words_without_people_are_not_authors() {
 }
 
 #[test]
+fn test_bounded_pod_author_action_credits_are_authors() {
+    let input = concat!(
+        "=head1 AUTHORS and MAINTENANCE\n",
+        "\n",
+        "Original math code by Mark Biggar, rewritten by Tels L<http://example.net/>\n",
+        "in late 2000.\n",
+        "\n",
+        "Separated from the original and shaped with the help of John Peacock.\n",
+        "\n",
+        "Further streamlining (api_version 1 etc.) by Tels 2004-2007.\n",
+        "\n",
+        "Currently maintained by the Perl Toolchain Gang.\n",
+        "\n",
+        "This program was introduced by Andy Dougherty, based on earlier work by ",
+        "Tom Christiansen. It is maintained by the Perl 5 Porters.\n",
+        "\n",
+        "Existing code by Graham Barr. Currently maintained by the Perl Porters. ",
+        "Please report bugs elsewhere.\n",
+        "\n",
+        "=head1 DESCRIPTION\n",
+        "\n",
+        "A component written by Build Generator <tool@example.net>.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Mark Biggar",
+        "Tels",
+        "John Peacock",
+        "the Perl Toolchain Gang",
+        "Andy Dougherty",
+        "Tom Christiansen",
+        "the Perl 5 Porters",
+        "Graham Barr",
+        "the Perl Porters",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_pod_author_modification_history_recovers_embedded_action_credit() {
+    let input = concat!(
+        "=head1 Author and Modification History\n",
+        "\n",
+        "Modified by Damian Conway, 2001-09-10, v0.62.\n",
+        "\n",
+        "Modified implicit construction of nested objects.\n",
+        "\n",
+        "Modified by Casey West, 2000-11-08, v0.59.\n",
+        "\n",
+        "Added the ability for compile time class creation.\n",
+        "\n",
+        "Renamed to C<Class::Struct> and modified by Jim Miner, 1997-04-02.\n",
+        "\n",
+        "=cut\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Jim Miner"), "authors: {values:?}");
+}
+
+#[test]
+fn test_pod_author_section_keeps_leading_author_before_maintainer_credit() {
+    let input = concat!(
+        "=head1 AUTHOR\n",
+        "\n",
+        "Graham Barr. Currently maintained by the Perl Porters. Please report all ",
+        "bugs elsewhere.\n",
+        "\n",
+        "=cut\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Graham Barr"), "authors: {values:?}");
+    assert!(values.contains(&"the Perl Porters"), "authors: {values:?}");
+}
+
+#[test]
 fn test_contact_backed_non_author_by_phrases_are_not_authors() {
     let input = concat!(
         "This package is distributed by Example Support <support@example.net>.\n",

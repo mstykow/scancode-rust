@@ -33,6 +33,8 @@ use super::types::{
     AuthorDetection, CopyrightDetection, HolderDetection, ParseNode, PosTag, TreeLabel,
 };
 
+pub(crate) use author_heuristics::is_pod_author_heading;
+
 const NON_COPYRIGHT_LABELS: &[TreeLabel] = &[];
 const NON_HOLDER_LABELS: &[TreeLabel] = &[TreeLabel::YrRange, TreeLabel::YrAnd];
 const NON_HOLDER_LABELS_MINI: &[TreeLabel] = &[TreeLabel::YrRange, TreeLabel::YrAnd];
@@ -403,7 +405,7 @@ pub fn detect_copyrights_from_text_with_deadline(
         author_heuristics::drop_weak_prose_authors(&raw_lines, &mut authors);
         dedupe_exact_span_copyrights(&mut copyrights);
         dedupe_exact_span_holders(&mut holders);
-        dedupe_exact_span_authors(&mut authors);
+        dedupe_overlapping_authors(&mut authors);
         return (copyrights, holders, authors);
     }
 
@@ -491,7 +493,7 @@ pub fn detect_copyrights_from_text_with_deadline(
 
     dedupe_exact_span_copyrights(&mut copyrights);
     dedupe_exact_span_holders(&mut holders);
-    dedupe_exact_span_authors(&mut authors);
+    dedupe_overlapping_authors(&mut authors);
 
     (copyrights, holders, authors)
 }
@@ -719,7 +721,7 @@ use pattern_extract::{
 };
 use postprocess_transforms::{
     add_missing_holders_for_bare_c_name_year_suffixes, deadline_exceeded,
-    dedupe_exact_span_authors, dedupe_exact_span_copyrights, dedupe_exact_span_holders,
+    dedupe_exact_span_copyrights, dedupe_exact_span_holders, dedupe_overlapping_authors,
     extend_authors_see_url_copyrights, extend_dash_obfuscated_email_suffixes,
     extend_leading_dash_suffixes, extend_multiline_copyright_c_no_year_names,
     extend_multiline_copyright_c_year_holder_continuations, extend_trailing_copy_year_suffixes,

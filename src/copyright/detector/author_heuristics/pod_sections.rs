@@ -12,6 +12,17 @@ use crate::models::LineNumber;
 
 use super::refine_particle_name;
 
+pub(crate) fn is_pod_author_heading(line: &str) -> bool {
+    static AUTHOR_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^=head\d+\s+authors?(?:\s+(?:and|&)\s+(?:maintenance|maintainers?|modification\s+history))?\s*$",
+        )
+        .expect("valid POD author heading regex")
+    });
+
+    AUTHOR_HEADING_RE.is_match(line)
+}
+
 fn extract_contact_authors_from_paragraph(
     paragraph: &str,
     start_line: LineNumber,
@@ -90,9 +101,6 @@ fn walk_author_section_paragraphs(
     raw_lines: &[&str],
     mut visit: impl FnMut(&str, LineNumber, LineNumber),
 ) {
-    static AUTHOR_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)^=head\d+\s+authors?\s*$").expect("valid POD author heading regex")
-    });
     static HEADING_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)^=head\d+\b").expect("valid POD heading regex"));
     static BLOCK_DIRECTIVE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -130,7 +138,7 @@ fn walk_author_section_paragraphs(
                 &mut paragraph_end,
                 &mut visit,
             );
-            in_author_section = AUTHOR_HEADING_RE.is_match(prepared);
+            in_author_section = is_pod_author_heading(prepared);
             continue;
         }
         if !in_author_section {
@@ -209,11 +217,20 @@ fn walk_author_section_paragraphs(
 
 fn strip_trailing_author_date(candidate: &str) -> String {
     static TRAILING_DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i),?\s+\d{1,2}(?:st|nd|rd|th)?\s+[a-z]+\s+\d{4}\.?$")
-            .expect("valid trailing author date regex")
+        Regex::new(
+            r"(?i),?\s+(?:(?:in\s+)?(?:\d{1,2}(?:st|nd|rd|th)?\s+)?[a-z]+\s+\d{4}|(?:\d{4}-\d{2}-\d{2})|(?:\d{4}(?:-\d{2,4})?))\.?$",
+        )
+        .expect("valid trailing author date regex")
+    });
+    static TRAILING_POD_URL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\s+(?:L\s+)?https?://\S+.*$").expect("valid trailing POD URL regex")
     });
 
-    TRAILING_DATE_RE.replace(candidate, "").trim().to_string()
+    let without_url = TRAILING_POD_URL_RE.replace(candidate, "");
+    TRAILING_DATE_RE
+        .replace(without_url.as_ref(), "")
+        .trim()
+        .to_string()
 }
 
 fn is_collective_noun(word: &str) -> bool {
@@ -246,7 +263,16 @@ fn refine_contactless_author(candidate: &str) -> Option<String> {
     }
     let candidate = strip_trailing_author_date(candidate);
     let candidate = candidate.trim_end_matches('.').trim();
-    let author = refine_particle_name(candidate).or_else(|| refine_author(candidate))?;
+    let author = refine_particle_name(candidate)
+        .or_else(|| refine_author(candidate))
+        .or_else(|| {
+            let mut chars = candidate.chars();
+            let starts_uppercase = chars.next().is_some_and(char::is_uppercase);
+            let words: Vec<&str> = candidate.split_whitespace().collect();
+            ((starts_uppercase && words.len() == 1 && candidate.chars().all(char::is_alphabetic))
+                || words.iter().any(|word| is_collective_noun(word)))
+            .then(|| candidate.to_string())
+        })?;
     let words: Vec<&str> = author.split_whitespace().collect();
     if words.is_empty() || words.len() > 6 {
         return None;
@@ -357,11 +383,25 @@ fn extract_contactless_authors_from_paragraph(
 
 fn truncate_credit_roster(value: &str) -> &str {
     let lower = value.to_ascii_lowercase();
-    let end = [" for ", ", and many ", " and many ", " over the years"]
-        .into_iter()
-        .filter_map(|boundary| lower.find(boundary))
-        .min()
-        .unwrap_or(value.len());
+    let end = [
+        " for ",
+        ", and many ",
+        " and many ",
+        " and on ",
+        ", based on ",
+        " based on earlier ",
+        ". currently ",
+        ". it ",
+        ". please ",
+        ". the ",
+        ". this ",
+        " in late ",
+        " over the years",
+    ]
+    .into_iter()
+    .filter_map(|boundary| lower.find(boundary))
+    .min()
+    .unwrap_or(value.len());
 
     let roster = value[..end].trim().trim_matches(&[' ', ',', '.', ';'][..]);
     roster
@@ -378,7 +418,7 @@ fn extract_narrative_credit_authors_from_paragraph(
 ) -> Vec<AuthorDetection> {
     static CREDIT_CUE_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:(?:with\s+)?(?:contributions?|(?:invaluable|valuable)\s+help|help|advice)\s+from|(?:with\s+)?thanks\s+to|supplied\s+by|attributable\s+to)\b",
+            r"(?i)\b(?:(?:with\s+)?(?:contributions?|(?:invaluable|valuable)\s+help|help|advice)\s+from|with\s+(?:the\s+)?help\s+of|(?:with\s+)?thanks\s+to|supplied\s+by|attributable\s+to|(?:code|documentation|implementation|module|program|software|streamlining|work)\b[^.;]{0,80}?\s+by|(?:authored|created|developed|enhanced|introduced|maintained|modified|originated|rewritten|written)\b[^.;]{0,80}?\s+by)\b",
         )
         .expect("valid POD narrative credit cue regex")
     });
@@ -388,6 +428,12 @@ fn extract_narrative_credit_authors_from_paragraph(
         )
         .expect("valid POD subject credit regex")
     });
+    static LEADING_AUTHOR_BEFORE_ROLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?P<names>.+?)\.\s+(?:(?:it|this\s+(?:module|package|program))\s+is\s+)?(?:currently|later|now|previously|subsequently)?\s*$",
+        )
+        .expect("valid leading author before role regex")
+    });
 
     let mut rosters = Vec::new();
     let cues: Vec<_> = CREDIT_CUE_RE.find_iter(paragraph).collect();
@@ -395,6 +441,11 @@ fn extract_narrative_credit_authors_from_paragraph(
         let prefix = paragraph[..first.start()].trim();
         if !prefix.is_empty() && (prefix.contains(',') || prefix.contains(" and ")) {
             rosters.extend(contactless_author_values(prefix));
+        } else if let Some(names) = LEADING_AUTHOR_BEFORE_ROLE_RE
+            .captures(prefix)
+            .and_then(|captures| captures.name("names"))
+        {
+            rosters.extend(contactless_author_values(names.as_str()));
         }
         for (index, cue) in cues.iter().enumerate() {
             let tail_end = cues
@@ -486,6 +537,14 @@ mod tests {
         assert_eq!(
             contactless_author_values("Larry Wall and the Perl Porters."),
             ["Larry Wall", "the Perl Porters"]
+        );
+        assert_eq!(
+            contactless_author_values("the Perl 5 Porters."),
+            ["the Perl 5 Porters"]
+        );
+        assert_eq!(
+            contactless_author_values("Tels http://example.net/"),
+            ["Tels"]
         );
     }
 }
