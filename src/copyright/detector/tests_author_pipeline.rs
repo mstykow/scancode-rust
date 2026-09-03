@@ -561,6 +561,103 @@ Send patches and ideas to patches@example.com.
 }
 
 #[test]
+fn test_pod_author_section_recovers_contactless_names_and_rosters() {
+    let input = r#"=head1 AUTHORS
+
+Thomas Dorner
+
+Yves Orton, Kenichi Ishigaki and Max Maischein
+
+Tim Bunce, 2nd June 1995.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Thomas Dorner",
+        "Yves Orton",
+        "Kenichi Ishigaki",
+        "Max Maischein",
+        "Tim Bunce",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_recovers_collectives_and_list_items() {
+    let input = r#"=head1 AUTHOR
+
+Perl Toolchain Gang
+
+=over
+
+=item * Jarkko Hietaniemi E<lt>jhi@example.comE<gt>
+
+=item * Thomas Dorner
+
+=back
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Perl Toolchain Gang",
+        "Jarkko Hietaniemi <jhi@example.com>",
+        "Thomas Dorner",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_rejects_role_labels_and_narrative() {
+    let input = r#"=head1 AUTHOR
+
+Current maintainers:
+
+External protocol:
+
+First version July 22, 1998.
+
+This section explains who maintains the software.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_pod_author_section_stops_at_embedded_document_fence() {
+    let input = r#"=head1 AUTHOR
+
+Tokuhiro Matsuno
+...
+Outside Person
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Tokuhiro Matsuno"), "authors: {authors:?}");
+    assert!(!values.contains(&"Outside Person"), "authors: {authors:?}");
+}
+
+#[test]
 fn test_plain_json_author_string_machine_token_dropped_without_metadata_context() {
     let input = r#""author": "makeappicon", "images": []"#;
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
