@@ -305,6 +305,10 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::normalize_json_blob_authors(raw_lines, authors);
     seen.authors = authors.iter().map(|a| a.author.clone()).collect();
 
+    let mut new_a = super::author_heuristics::extract_json_author_array_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let mut new_a =
         super::postprocess_transforms::extract_following_authors_holders(raw_lines, prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
