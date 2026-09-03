@@ -139,7 +139,9 @@ pub(super) fn extract_copyright_information(
             && !looks_like_source_code(&author.author)
             && (!looks_like_source_code(&raw_span)
                 || (has_author_contact_evidence(&author.author)
-                    && raw_span_has_author_attribution(&raw_span)))
+                    && raw_span_has_author_attribution(&raw_span))
+                || (raw_span_has_author_attribution(&raw_span)
+                    && span_is_in_pod_author_section(&raw_lines, author.start_line)))
             && seen_authors.insert((author.author.clone(), author.start_line, author.end_line))
     });
 
@@ -415,6 +417,27 @@ pub(super) fn has_author_contact_evidence(author: &str) -> bool {
 fn raw_span_has_author_attribution(raw_span: &str) -> bool {
     static BY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bby\b").unwrap());
     BY_RE.is_match(raw_span)
+}
+
+fn span_is_in_pod_author_section(raw_lines: &[&str], start_line: LineNumber) -> bool {
+    static POD_HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^=head\d+\b").expect("valid POD heading regex"));
+    let start_index = start_line.get().saturating_sub(1).min(raw_lines.len());
+    raw_lines[..start_index]
+        .iter()
+        .rev()
+        .take(512)
+        .find_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.eq_ignore_ascii_case("=cut") {
+                Some(false)
+            } else if POD_HEADING_RE.is_match(trimmed) {
+                Some(copyright::is_pod_author_heading(trimmed))
+            } else {
+                None
+            }
+        })
+        == Some(true)
 }
 
 fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<String> {

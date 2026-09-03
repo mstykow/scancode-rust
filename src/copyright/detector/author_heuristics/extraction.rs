@@ -242,10 +242,15 @@ fn trim_attribution_tail(who: &str) -> String {
 
 fn trim_contact_attribution_suffix(who: &str) -> String {
     static CONTACT_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})").unwrap()
+        Regex::new(r"(?i)(?:<[^>\s]+@[^>\s]+>|\([^()\s]*@[^()]*\)|\[[^\[\]\s]*@[^\[\]]*\]|\b[\w.+-]+@[\w.-]+\.[a-z]{2,})")
+            .unwrap()
     });
-    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for\s+\p{L})").unwrap());
+    static NON_AUTHOR_SUFFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?:(?:on\s+)?\d|in\s+\d{4}\b|for(?:\s|$)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d)",
+        )
+        .unwrap()
+    });
 
     let Some(contact) = CONTACT_RE.find_iter(who).last() else {
         return who.to_string();
@@ -397,24 +402,30 @@ fn extract_line_local_attribution_author(
 ) -> Option<String> {
     static ACTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:written|authored|revised|overhauled|implemented)\s+by|(?:updated|modified|ported|adapted)(?:\s+to\s+.*?)?\s+by)\s+(?P<who>.+)$",
+            r"(?i)^(?:original(?:ly)?\s+)?(?:original\s+driver\s+)?(?:(?:authored|configured|contributed|created|improved|implemented|overhauled|revised|written|[\p{L}\d][\p{L}\d-]{0,30}-ified)\s+by|original\s+by|(?:adapted|edited|modified|ported|updated)(?:\s+to\s+.*?)?\s+by|(?:first|last)\s+modified\b.{0,40}?\s+by|merged\b.{0,80}?\s+by)[ \t]*:?[ \t]+(?P<who>.+)$",
         )
         .unwrap()
     });
     static CONTACT_CONTRIBUTION_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^(?:.{1,80}\s+)?(?:code|driver|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)^(?:.{1,80}\s+)?(?:code|copy|driver|editor|hints?|kernel|stuff|support|work|patch(?:es)?|implementation|maintenance|module|program|software)\b.*\s+by\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
     static CONTACT_CHANGE_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
+            r"(?i)\b(?:backport(?:ed)?|changes?|fix(?:ed)?|reported|suggested|added|configured|contributed|edited|improved|updated|modified|revised|overhauled|implemented|futzed|tweaked|threaded|enabled|done)\b[^\r\n]{0,120}?\bby\s*:?[ \t]+(?P<who>.+(?:@|\s+at\s+.+\s+dot\s+).*)$",
         )
         .unwrap()
     });
     static COPYRIGHT_TAIL_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\s*(?:,\s*copyright\b|\(c\)\s*\d{4})\b.*$").unwrap());
+    static CHAINED_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i),\s*(?:adapted|authored|implemented|merged|modified|ported|revised|updated|written)\s+by\b.*$",
+        )
+        .unwrap()
+    });
     static CONTACT_SENTENCE_TAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+)[A-Z].*$").unwrap()
     });
@@ -432,6 +443,12 @@ fn extract_line_local_attribution_author(
         .or_else(|| CONTACT_CONTRIBUTION_BY_RE.captures(normalized))
         .or_else(|| CONTACT_CHANGE_BY_RE.captures(normalized))?;
     let who = captures.name("who")?.as_str().trim();
+    if normalized_lower.contains("configured by")
+        && who.split_whitespace().count() == 1
+        && who.contains('@')
+    {
+        return None;
+    }
     let has_contact = who.contains('@')
         || who.contains('<')
         || (who.to_ascii_lowercase().contains(" at ")
@@ -440,6 +457,7 @@ fn extract_line_local_attribution_author(
         return None;
     }
     let who = trim_following_sentence_clause(who);
+    let who = CHAINED_ATTRIBUTION_RE.replace(&who, "");
     let who = COPYRIGHT_TAIL_RE.replace(&who, "");
     let who = CONTACT_SENTENCE_TAIL_RE
         .captures(&who)
@@ -466,6 +484,12 @@ fn extract_line_local_attribution_author(
 pub(in super::super) fn extract_line_local_attribution_authors(
     prepared_cache: &PreparedLines<'_>,
 ) -> Vec<AuthorDetection> {
+    static CHAINED_ATTRIBUTION_CLAUSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i),\s*(?P<clause>(?:adapted|authored|implemented|merged|modified|ported|revised|updated|written)\s+by\s+.+)$",
+        )
+        .unwrap()
+    });
     let mut authors: Vec<AuthorDetection> = prepared_cache
         .iter_non_empty()
         .filter_map(|line| {
@@ -500,15 +524,34 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         })
         .collect();
 
+    for line in prepared_cache.iter_non_empty() {
+        let Some(clause) = CHAINED_ATTRIBUTION_CLAUSE_RE
+            .captures(line.prepared)
+            .and_then(|captures| captures.name("clause"))
+        else {
+            continue;
+        };
+        let Some(author) = extract_line_local_attribution_author(clause.as_str(), false) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+
     for (line, next_line) in prepared_cache.adjacent_pairs() {
         let first = line.prepared.trim_end();
         let next = next_line.prepared.trim();
         let first_lower = first.to_ascii_lowercase();
-        let has_by_boundary = first_lower.contains(" by ") || first_lower.ends_with(" by");
+        let ends_with_by_colon = first_lower.ends_with(" by:");
+        let ends_with_by = first_lower.ends_with(" by") || ends_with_by_colon;
+        let has_by_boundary = first_lower.contains(" by ") || ends_with_by;
         if first.contains('@') || !next.contains('@') || !has_by_boundary {
             continue;
         }
-        let attributed_party = if first_lower.ends_with(" by") {
+        let attributed_party = if ends_with_by {
             ""
         } else {
             let Some((_, attributed_party)) = first_lower.rsplit_once(" by ") else {
@@ -524,15 +567,24 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         } else {
             next
         };
+        let next_has_delimited_contact =
+            next.contains('<') || (next.contains('(') && next.contains(')') && next.contains('@'));
+        let next_word_limit = if ends_with_by_colon || (ends_with_by && next_has_delimited_contact)
+        {
+            12
+        } else {
+            3
+        };
         if next
             .split_whitespace()
             .filter(|word| word.chars().any(|ch| ch.is_alphanumeric()))
             .count()
-            > 3
+            > next_word_limit
         {
             continue;
         }
         let bare_contact = next.trim_end_matches('.');
+        let first = first.trim_end_matches(':');
         let joined = if bare_contact.contains('@') && !bare_contact.contains(char::is_whitespace) {
             if bare_contact.starts_with('<') && bare_contact.ends_with('>') {
                 format!("{first} {bare_contact}")
@@ -3205,11 +3257,41 @@ fn json_object_has_package_metadata(object: &JsonMap<String, JsonValue>) -> bool
 }
 
 fn refine_structured_metadata_author(candidate: &str) -> Option<String> {
+    let candidate = strip_redundant_structured_handle_prefix(candidate);
     let context = format!(
         r#"{{"name":"metadata","author":{}}}"#,
         serde_json::to_string(candidate).ok()?
     );
     refine_json_author_candidate(candidate, &context)
+}
+
+fn strip_redundant_structured_handle_prefix(candidate: &str) -> &str {
+    let Some((handle, identity)) = candidate.split_once(':') else {
+        return candidate;
+    };
+    let handle = handle.trim();
+    let identity = identity.trim();
+    if handle.is_empty()
+        || handle.chars().any(char::is_whitespace)
+        || !handle
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        return candidate;
+    }
+
+    let Some(contact_start) = identity.rfind('<') else {
+        return candidate;
+    };
+    let Some(at_offset) = identity[contact_start + 1..].find('@') else {
+        return candidate;
+    };
+    let contact_user = identity[contact_start + 1..contact_start + 1 + at_offset].trim();
+    if handle.eq_ignore_ascii_case(contact_user) {
+        identity
+    } else {
+        candidate
+    }
 }
 
 fn collect_structured_author_values(
@@ -3361,9 +3443,9 @@ fn line_has_structured_credit_key(line: &str) -> bool {
     structured_key_declares_authorship(key.trim().trim_matches(&['\'', '"'][..]))
 }
 
-/// Extract independent author and contributor credits from validated YAML arrays.
-pub(in super::super) fn extract_yaml_credit_array_authors(
+fn extract_yaml_credit_array_authors_from_slice(
     raw_lines: &[&str],
+    line_offset: usize,
 ) -> Vec<AuthorDetection> {
     let Some(fallback_source_index) = raw_lines
         .iter()
@@ -3405,7 +3487,7 @@ pub(in super::super) fn extract_yaml_credit_array_authors(
                 .map(|(idx, _)| idx)
                 .unwrap_or(fallback_source_index);
             used_source_lines.insert(source_index);
-            let line = LineNumber::from_0_indexed(source_index);
+            let line = LineNumber::from_0_indexed(source_index + line_offset);
             Some(AuthorDetection {
                 author,
                 start_line: line,
@@ -3413,6 +3495,60 @@ pub(in super::super) fn extract_yaml_credit_array_authors(
             })
         })
         .collect()
+}
+
+/// Extract independent author and contributor credits from validated YAML arrays.
+pub(in super::super) fn extract_yaml_credit_array_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    extract_yaml_credit_array_authors_from_slice(raw_lines, 0)
+}
+
+/// Extract credit arrays from explicitly bounded YAML front matter and tagged
+/// YAML sections embedded in a larger text document.
+pub(in super::super) fn extract_embedded_yaml_credit_authors(
+    raw_lines: &[&str],
+) -> Vec<AuthorDetection> {
+    let mut authors = Vec::new();
+
+    let first_non_empty = raw_lines.iter().position(|line| !line.trim().is_empty());
+    if let Some(start) = first_non_empty
+        && raw_lines[start]
+            .trim_start_matches('\u{feff}')
+            .trim()
+            .eq("---")
+        && let Some(end) = raw_lines[start + 1..]
+            .iter()
+            .position(|line| line.trim() == "---")
+            .map(|relative| start + 1 + relative)
+    {
+        authors.extend(extract_yaml_credit_array_authors_from_slice(
+            &raw_lines[start..end],
+            start,
+        ));
+    }
+
+    for (marker_index, marker) in raw_lines.iter().enumerate() {
+        if !marker.trim().eq_ignore_ascii_case("--- yaml") {
+            continue;
+        }
+        let start = marker_index + 1;
+        let end = raw_lines[start..]
+            .iter()
+            .position(|line| {
+                let trimmed = line.trim();
+                trimmed
+                    .get(..4)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("--- "))
+            })
+            .map_or(raw_lines.len(), |relative| start + relative);
+        authors.extend(extract_yaml_credit_array_authors_from_slice(
+            &raw_lines[start..end],
+            start,
+        ));
+    }
+
+    authors
 }
 
 /// Drop line-based detections that parsed JSON or YAML places in code/schema

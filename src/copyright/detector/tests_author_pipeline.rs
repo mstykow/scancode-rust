@@ -251,6 +251,62 @@ fn test_json_author_array_keeps_explicit_email_identity() {
 }
 
 #[test]
+fn test_json_author_array_keeps_punctuated_obfuscated_contact() {
+    let input = r#"{
+  "name": "example-package",
+  "author": ["Masaaki Goshima (goccy) <goccy(at)cpan.org>"]
+}"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Masaaki Goshima (goccy) goccy at cpan.org"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_author_cleanup_uses_grammatical_boundaries_and_deduplicates_quotes() {
+    let inputs = [
+        (
+            "C<Devel::PPPort>, maintained by Paul Marquess, has been added. It is primarily used\n",
+            vec!["Paul Marquess"],
+        ),
+        (
+            "December, 2001; by Nicholas Clark: make timestr recognise the style 'none'\n",
+            vec!["Nicholas Clark"],
+        ),
+        (
+            "# Updated for threads by \"Timur I. Bakeyev\" <bsdi@example.com>\n",
+            vec!["Timur I. Bakeyev <bsdi@example.com>"],
+        ),
+        (
+            "module-starter --module=Foo::Bar --author=\"Your Name\" --email=yourname@cpan.org\n",
+            vec![],
+        ),
+        (
+            "A self-described geek, Kent was the author or maintainer of 178 CPAN distributions, the Perl maintainer for Gentoo. He is mourned by his friends.\n",
+            vec![],
+        ),
+    ];
+
+    for (input, expected) in inputs {
+        let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+        assert_eq!(
+            authors
+                .iter()
+                .map(|author| author.author.as_str())
+                .collect::<Vec<_>>(),
+            expected,
+            "input: {input:?}; authors: {authors:?}"
+        );
+    }
+}
+
+#[test]
 fn test_json_author_array_in_query_or_schema_is_not_file_authorship() {
     let input = r#"{
   "name": "query-fixtures",
@@ -420,6 +476,335 @@ fn test_nested_document_metadata_contributors_are_authors() {
             .map(|author| author.author.as_str())
             .collect::<Vec<_>>(),
         vec!["Document Contributor"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_yaml_front_matter_credit_array_is_bounded_before_document_body() {
+    let input = r#"---
+title: Example package
+authors:
+  - 'Ada Lovelace <ada@example.com>'
+---
+# Guide
+
+The author field in prose is not another declaration.
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Ada Lovelace <ada@example.com>"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_tagged_embedded_yaml_credit_array_strips_redundant_handle() {
+    let input = r#"=== metadata round trip
+--- yaml
+---
+author:
+  - 'mst: Matt S. Trout <mst@shadowcatsystems.co.uk>'
+--- output
+[{ author => ['mst: Matt S. Trout <mst@shadowcatsystems.co.uk>'] }]
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(
+        authors
+            .iter()
+            .map(|author| author.author.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Matt S. Trout <mst@shadowcatsystems.co.uk>"],
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_pod_author_section_recovers_multiple_contact_backed_authors() {
+    let input = r#"=head1 AUTHOR
+
+Russ Allbery <russ@example.com>, based heavily on the original module
+by Tom Christiansen <tom@example.com> and its conversion by
+Brad Appleton <brad@example.com>.
+
+=head1 NOTES
+
+Outside Person <outside@example.com>.
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+    for expected in [
+        "Russ Allbery <russ@example.com>",
+        "Tom Christiansen <tom@example.com>",
+        "Brad Appleton <brad@example.com>",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+    assert!(!values.contains(&"Outside Person <outside@example.com>"));
+}
+
+#[test]
+fn test_pod_author_section_joins_wrapped_name_and_parenthesized_contact() {
+    let input = r#"=head1 AUTHOR
+
+This guide was initially drafted by Jason McIntosh
+(jmac@example.com), under a documentation grant.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        authors
+            .iter()
+            .any(|author| author.author == "Jason McIntosh (jmac@example.com)"),
+        "authors: {authors:?}"
+    );
+}
+
+#[test]
+fn test_pod_author_section_normalizes_roles_and_email_name_rosters() {
+    let input = r#"=head1 AUTHORS
+
+Original author: Andy Dougherty <andy@example.com>
+
+Previous maintainers:
+  brown@example.com (Rob Brown)
+  karrer@example.com (Andreas Karrer)
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Andy Dougherty <andy@example.com>",
+        "Rob Brown <brown@example.com>",
+        "Andreas Karrer <karrer@example.com>",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_drops_operational_and_copyright_contacts() {
+    let input = r#"=head1 AUTHOR
+
+This module is copyright 2010 Example Holder <holder@example.com>.
+
+Please report bugs to <bugs@example.com>.
+
+Send patches and ideas to patches@example.com.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_pod_author_section_recovers_contactless_names_and_rosters() {
+    let input = r#"=head1 AUTHORS
+
+Thomas Dorner
+
+Yves Orton, Kenichi Ishigaki and Max Maischein
+
+Tim Bunce, 2nd June 1995.
+
+Larry Wall and others
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Thomas Dorner",
+        "Yves Orton",
+        "Kenichi Ishigaki",
+        "Max Maischein",
+        "Tim Bunce",
+        "Larry Wall",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_recovers_collectives_and_list_items() {
+    let input = r#"=head1 AUTHOR
+
+Perl Toolchain Gang
+
+=over
+
+=item * Jarkko Hietaniemi E<lt>jhi@example.comE<gt>
+
+=item * Thomas Dorner
+
+=back
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Perl Toolchain Gang",
+        "Jarkko Hietaniemi <jhi@example.com>",
+        "Thomas Dorner",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_rejects_role_labels_and_narrative() {
+    let input = r#"=head1 AUTHOR
+
+Current maintainers:
+
+External protocol:
+
+First version July 22, 1998.
+
+This section explains who maintains the software.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_pod_author_section_stops_at_embedded_document_fence() {
+    let input = r#"=head1 AUTHOR
+
+Tokuhiro Matsuno
+...
+Outside Person
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Tokuhiro Matsuno"), "authors: {authors:?}");
+    assert!(!values.contains(&"Outside Person"), "authors: {authors:?}");
+}
+
+#[test]
+fn test_pod_author_section_recovers_cue_backed_narrative_rosters() {
+    let input = r#"=head1 AUTHORS
+
+David Fiander and Peter Prymmer with thanks to Dennis Longnecker
+and William Raffloer for valuable reports. Thanks to Mike MacIsaac and
+Egon Terwedow for feedback. Thanks to Ignasi Roca for diagnostics.
+
+Mike Fulton and Karl Williamson have provided later updates.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "David Fiander",
+        "Peter Prymmer",
+        "Dennis Longnecker",
+        "William Raffloer",
+        "Mike MacIsaac",
+        "Egon Terwedow",
+        "Ignasi Roca",
+        "Mike Fulton",
+        "Karl Williamson",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_recovers_narrative_roster_after_contact() {
+    let input = r#"=head1 AUTHOR
+
+Stephen McCamant <stephen@example.com>, based on an earlier version by
+Malcolm Beattie <malcolm@example.com>, with contributions from Gisle Aas,
+James Duncan, Hugo van der Sanden, Robin Houston, and Rafael Garcia-Suarez.
+
+Nicholas Clark <nicholas@example.com>, collating wisdom supplied by
+Slaven Rezic and Tim Bunce.
+
+This code is attributable to Larry Wall and the Perl Porters.
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Gisle Aas",
+        "James Duncan",
+        "Hugo van der Sanden",
+        "Robin Houston",
+        "Rafael Garcia-Suarez",
+        "Slaven Rezic",
+        "Tim Bunce",
+        "Larry Wall",
+        "the Perl Porters",
+    ] {
+        assert!(values.contains(&expected), "authors: {authors:?}");
+    }
+}
+
+#[test]
+fn test_pod_author_section_does_not_treat_generic_credit_objects_as_names() {
+    let input = r#"=head1 AUTHOR
+
+Documentation with contributions from examples.
+
+Research and Development Team
+
+=head1 NOTES
+"#;
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(!values.contains(&"Documentation"), "authors: {authors:?}");
+    assert!(!values.contains(&"examples"), "authors: {authors:?}");
+    assert!(
+        values.contains(&"Research and Development Team"),
         "authors: {authors:?}"
     );
 }

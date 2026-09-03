@@ -7,6 +7,12 @@ mod tests;
 
 mod cleanup;
 mod extraction;
+mod pod_sections;
 
 pub(super) use cleanup::*;
 pub(super) use extraction::*;
+pub(crate) use pod_sections::is_pod_author_heading;
+pub(super) use pod_sections::{
+    extract_pod_author_section_contact_authors, extract_pod_author_section_contactless_authors,
+    extract_pod_author_section_narrative_credit_authors,
+};

@@ -1952,6 +1952,56 @@ fn test_refine_author_normalizes_angle_bracket_email_comma_spacing() {
 fn test_refine_author_keeps_obfuscated_angle_contact_author() {
     let result = refine_author("Deepak M <m.deepak at intel.com>");
     assert_eq!(result, Some("Deepak M m.deepak at intel.com".to_string()));
+
+    let result = refine_author("Masaaki Goshima (goccy) <goccy(at)cpan.org>");
+    assert_eq!(
+        result,
+        Some("Masaaki Goshima (goccy) goccy at cpan.org".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_stops_at_lowercase_explanatory_clauses() {
+    assert_eq!(
+        refine_author("Paul Marquess, has been added. It is primarily used"),
+        Some("Paul Marquess".to_string())
+    );
+    assert_eq!(
+        refine_author(
+            "Larry Wall, gave rise to the free distribution policy. Perl is supported by users"
+        ),
+        Some("Larry Wall".to_string())
+    );
+    assert_eq!(
+        refine_author("Nicholas Clark make timestr recognise the style"),
+        Some("Nicholas Clark".to_string())
+    );
+    assert_eq!(
+        refine_author("Wall, Larry"),
+        Some("Wall, Larry".to_string())
+    );
+    assert_eq!(
+        refine_author("Warren Jasper, ds, Frank Hess"),
+        Some("Warren Jasper, ds, Frank Hess".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_normalizes_quoted_names_before_contacts() {
+    assert_eq!(
+        refine_author("Timur I. Bakeyev\" <bsdi@example.com>"),
+        Some("Timur I. Bakeyev <bsdi@example.com>".to_string())
+    );
+    assert_eq!(
+        refine_author("Sisyphus\" <bugs@example.com>"),
+        Some("Sisyphus <bugs@example.com>".to_string())
+    );
+}
+
+#[test]
+fn test_refine_author_drops_template_identity_placeholders() {
+    assert_eq!(refine_author("Your Name -email yourname@cpan.org"), None);
+    assert_eq!(refine_author("Author Name <author@example.com>"), None);
 }
 
 #[test]

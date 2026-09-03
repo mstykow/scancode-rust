@@ -16,6 +16,7 @@ use crate::models::LineNumber;
 
 use super::author_heuristics::{
     looks_like_structured_json_author_fallback, refine_author_with_optional_handle_suffix,
+    refine_particle_name,
 };
 use super::seen_text::SeenTextSets;
 use super::token_utils::{group_by, normalize_whitespace};
@@ -71,6 +72,7 @@ pub fn refine_final_authors(authors: &mut Vec<AuthorDetection>) {
             let author = if let Some(author) = refine_author(&a.author) {
                 author
             } else if refine_author_with_optional_handle_suffix(&a.author).is_some()
+                || refine_particle_name(&a.author).is_some()
                 || looks_like_structured_json_author_fallback(&a.author)
                 || looks_like_collective_institution_author(&a.author)
             {
@@ -110,9 +112,18 @@ fn looks_like_collective_institution_author(author: &str) -> bool {
                 .is_some_and(|ch| ch.is_uppercase())
         })
         .count();
+    let has_collective_noun = lower.split_whitespace().any(|word| {
+        matches!(
+            word.trim_matches(|ch: char| !ch.is_alphanumeric()),
+            "contributors" | "developers" | "group" | "porters" | "project" | "team"
+        )
+    });
 
     uppercase_word_count >= 2
-        && (lower.contains(" at the ") || lower.contains(" of the ") || trimmed.contains(". "))
+        && (has_collective_noun
+            || lower.contains(" at the ")
+            || lower.contains(" of the ")
+            || trimmed.contains(". "))
 }
 
 fn is_trademark_boilerplate_line(line: &str) -> bool {

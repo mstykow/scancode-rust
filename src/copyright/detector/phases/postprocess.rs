@@ -315,6 +315,10 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_out_of_scope_structured_credit_authors(raw_lines, authors);
     seen.rebuild_authors_from(authors);
 
+    let mut new_a = super::author_heuristics::extract_embedded_yaml_credit_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let mut new_a =
         super::postprocess_transforms::extract_following_authors_holders(raw_lines, prepared_cache);
     seen.dedup_new_authors(&mut new_a, 0);
@@ -346,11 +350,26 @@ fn run_author_extraction_and_repairs(
     super::author_heuristics::drop_markup_element_value_authors(raw_lines, authors);
     super::author_heuristics::drop_markup_declaration_authors(raw_lines, authors);
     super::author_heuristics::drop_authors_after_sentence_final_label(raw_lines, authors);
+    super::author_heuristics::drop_subject_role_object_authors(raw_lines, authors);
     super::author_heuristics::drop_weak_prose_authors(raw_lines, authors);
     super::author_heuristics::repair_complete_by_line_author_boundaries(raw_lines, authors);
     super::author_heuristics::repair_hyphenated_prose_tail_authors(raw_lines, authors);
     super::author_heuristics::drop_embedded_authors_title_phrases(raw_lines, authors);
     seen.rebuild_authors_from(authors);
+
+    let mut new_a = super::author_heuristics::extract_pod_author_section_contact_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
+    let mut new_a =
+        super::author_heuristics::extract_pod_author_section_contactless_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
+    let mut new_a =
+        super::author_heuristics::extract_pod_author_section_narrative_credit_authors(raw_lines);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
 }
 
 // Copyright postprocess phase fn; the long argument list threads the shared detection-pipeline state.

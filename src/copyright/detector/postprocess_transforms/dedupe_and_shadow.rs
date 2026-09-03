@@ -816,10 +816,21 @@ pub fn dedupe_exact_span_holders(holders: &mut Vec<HolderDetection>) {
     holders.retain(|h| seen.insert((h.start_line.get(), h.end_line.get(), h.holder.clone())));
 }
 
-pub fn dedupe_exact_span_authors(authors: &mut Vec<AuthorDetection>) {
+/// Collapse duplicate author values emitted for the same source occurrence,
+/// preferring the most precise nested span while preserving disjoint mentions.
+pub fn dedupe_overlapping_authors(authors: &mut Vec<AuthorDetection>) {
     if authors.len() < 2 {
         return;
     }
+    let originals = authors.clone();
+    authors.retain(|author| {
+        !originals.iter().any(|other| {
+            other.author == author.author
+                && other.start_line >= author.start_line
+                && other.end_line <= author.end_line
+                && (other.start_line > author.start_line || other.end_line < author.end_line)
+        })
+    });
     let mut seen: HashSet<(usize, usize, String)> = HashSet::new();
     authors.retain(|a| seen.insert((a.start_line.get(), a.end_line.get(), a.author.clone())));
 }

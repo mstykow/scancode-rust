@@ -512,6 +512,163 @@ fn test_contact_backed_change_attribution_wraps_onto_next_line() {
 }
 
 #[test]
+fn test_source_header_credit_variants_are_authors() {
+    let input = concat!(
+        "# Original by Neil Bowers <neil@example.net>; Tue Oct 4 1994\n",
+        "# XD88/10 platform hints by Kaveh Ghazi (ghazi@example.net) 2/11/92\n",
+        "# Merged with the distribution by\n",
+        "# Andy Dougherty <andy@example.net>\n",
+        "# First modified 6/30/96 by:\n",
+        "# Luther Huffman, Example Systems, Inc., luther@example.net\n",
+        "# Last modified May 2020 by:\n",
+        "# David Romano, david@example.net\n",
+        "# Original by first@example.net, modified by second@example.net\n",
+        "# Configured by: Config Author, config@example.net\n",
+        "# Improved by Jake Hamby <jake@example.net> to support both compilers\n",
+        "# Originally contributed by: Mark Kettenis <mark@example.net> Dec 1998\n",
+        "# DCL-ified by Peter Prymmer <peter@example.net> 22-DEC-1995\n",
+        "(contributed by Peter J. Holzer, peter@example.net)\n",
+        "DataBase Editor by Janick Bergeron [janick@example.net] for testing\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Neil Bowers <neil@example.net>",
+        "Kaveh Ghazi (ghazi@example.net)",
+        "Andy Dougherty <andy@example.net>",
+        "Luther Huffman, Example Systems, Inc., luther@example.net",
+        "David Romano, david@example.net",
+        "first@example.net",
+        "second@example.net",
+        "Config Author, config@example.net",
+        "Jake Hamby <jake@example.net>",
+        "Mark Kettenis <mark@example.net>",
+        "Peter Prymmer <peter@example.net>",
+        "Peter J. Holzer, peter@example.net",
+        "Janick Bergeron janick@example.net",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+}
+
+#[test]
+fn test_source_header_credit_words_without_people_are_not_authors() {
+    let input = concat!(
+        "The result is original by design.\n",
+        "The generated files are merged by the build tool.\n",
+        "Compiler hints by default improve diagnostics.\n",
+        "This file uses a compiler written by\n",
+        "Jean Example. Send mail to support@example.net for a copy.\n",
+        "Configured by root@localhost\n",
+        "* Configured by     : root@localhost\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_bounded_pod_author_action_credits_are_authors() {
+    let input = concat!(
+        "=head1 AUTHORS and MAINTENANCE\n",
+        "\n",
+        "Original math code by Mark Biggar, rewritten by Tels L<http://example.net/>\n",
+        "in late 2000.\n",
+        "\n",
+        "Separated from the original and shaped with the help of John Peacock.\n",
+        "\n",
+        "Further streamlining (api_version 1 etc.) by Tels 2004-2007.\n",
+        "\n",
+        "Currently maintained by the Perl Toolchain Gang.\n",
+        "\n",
+        "This program was introduced by Andy Dougherty, based on earlier work by ",
+        "Tom Christiansen. It is maintained by the Perl 5 Porters.\n",
+        "\n",
+        "Existing code by Graham Barr. Currently maintained by the Perl Porters. ",
+        "Please report bugs elsewhere.\n",
+        "\n",
+        "=head1 DESCRIPTION\n",
+        "\n",
+        "A component written by Build Generator <tool@example.net>.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    for expected in [
+        "Mark Biggar",
+        "Tels",
+        "John Peacock",
+        "the Perl Toolchain Gang",
+        "Andy Dougherty",
+        "Tom Christiansen",
+        "the Perl 5 Porters",
+        "Graham Barr",
+        "the Perl Porters",
+    ] {
+        assert!(values.contains(&expected), "missing {expected}: {values:?}");
+    }
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("Build Generator")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_pod_author_modification_history_recovers_embedded_action_credit() {
+    let input = concat!(
+        "=head1 Author and Modification History\n",
+        "\n",
+        "Modified by Damian Conway, 2001-09-10, v0.62.\n",
+        "\n",
+        "Modified implicit construction of nested objects.\n",
+        "\n",
+        "Modified by Casey West, 2000-11-08, v0.59.\n",
+        "\n",
+        "Added the ability for compile time class creation.\n",
+        "\n",
+        "Renamed to C<Class::Struct> and modified by Jim Miner, 1997-04-02.\n",
+        "\n",
+        "=cut\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Jim Miner"), "authors: {values:?}");
+}
+
+#[test]
+fn test_pod_author_section_keeps_leading_author_before_maintainer_credit() {
+    let input = concat!(
+        "=head1 AUTHOR\n",
+        "\n",
+        "Graham Barr. Currently maintained by the Perl Porters. Please report all ",
+        "bugs elsewhere.\n",
+        "\n",
+        "=cut\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Graham Barr"), "authors: {values:?}");
+    assert!(values.contains(&"the Perl Porters"), "authors: {values:?}");
+}
+
+#[test]
 fn test_contact_backed_non_author_by_phrases_are_not_authors() {
     let input = concat!(
         "This package is distributed by Example Support <support@example.net>.\n",
