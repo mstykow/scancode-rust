@@ -402,13 +402,13 @@ pub(super) fn build_reference_follow_snapshot(
     let package_manifest_dirs_by_uid = packages
         .iter()
         .map(|package| {
+            let mut seen_dirs = HashSet::new();
             let dirs = package
                 .datafile_paths
                 .iter()
                 .filter_map(|path| Path::new(path).parent())
                 .map(|path| path.to_string_lossy().replace('\\', "/"))
-                .collect::<HashSet<_>>()
-                .into_iter()
+                .filter(|path| seen_dirs.insert(path.clone()))
                 .collect::<Vec<_>>();
             (package.package_uid.clone(), dirs)
         })
@@ -1321,6 +1321,7 @@ fn strip_unknown_reference_matches_from_detection(
 }
 
 fn referenced_filenames_from_detection(detection: &LicenseDetection) -> Vec<String> {
+    let mut seen = HashSet::new();
     detection
         .matches
         .iter()
@@ -1335,8 +1336,7 @@ fn referenced_filenames_from_detection(detection: &LicenseDetection) -> Vec<Stri
             !name.is_empty()
                 && normalize_referenced_filename(name) != INHERIT_LICENSE_FROM_PACKAGE_REFERENCE
         })
-        .collect::<HashSet<_>>()
-        .into_iter()
+        .filter(|name| seen.insert(name.clone()))
         .collect()
 }
 
@@ -1874,10 +1874,65 @@ fn internal_match_to_public(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_package_reference_following, collect_top_level_license_detections};
+    use super::{
+        apply_package_reference_following, build_reference_follow_snapshot,
+        collect_top_level_license_detections, referenced_filenames_from_detection,
+    };
     use crate::license_detection::MatcherKind;
     use crate::models::{LineNumber, Match, MatchScore};
     use crate::post_processing::test_utils::{file, package};
+
+    #[test]
+    fn referenced_filenames_preserve_first_seen_order() {
+        let mut first = placeholder_reference_match(
+            "unknown-license-reference",
+            "unknown-license-reference-first.RULE",
+        );
+        first.referenced_filenames = Some(vec![
+            "zip.h".to_string(),
+            "LICENSE".to_string(),
+            "zip.h".to_string(),
+        ]);
+        let mut second = placeholder_reference_match(
+            "unknown-license-reference",
+            "unknown-license-reference-second.RULE",
+        );
+        second.referenced_filenames = Some(vec!["LICENSE".to_string(), "COPYING".to_string()]);
+        let detection = crate::models::LicenseDetection {
+            license_expression: "unknown-license-reference".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-unknown-license-reference".to_string(),
+            matches: vec![first, second],
+            detection_log: vec![],
+            identifier: "unknown-reference-id".to_string(),
+        };
+
+        assert_eq!(
+            referenced_filenames_from_detection(&detection),
+            vec!["zip.h", "LICENSE", "COPYING"]
+        );
+    }
+
+    #[test]
+    fn reference_snapshot_preserves_package_manifest_directory_order() {
+        let mut package = package("pkg:pypi/demo@1.0?uuid=1", "project/pyproject.toml");
+        package.datafile_paths = vec![
+            "project/pyproject.toml".to_string(),
+            "project/requirements/base.txt".to_string(),
+            "project/setup.py".to_string(),
+            "project/requirements/dev.txt".to_string(),
+        ];
+        let package_uid = package.package_uid.clone();
+
+        let snapshot = build_reference_follow_snapshot(&[], &[package]);
+
+        assert_eq!(
+            snapshot.package_manifest_dirs_by_uid.get(&package_uid),
+            Some(&vec![
+                "project".to_string(),
+                "project/requirements".to_string(),
+            ])
+        );
+    }
 
     #[test]
     fn collect_top_level_license_detections_prefers_later_logged_representative() {
