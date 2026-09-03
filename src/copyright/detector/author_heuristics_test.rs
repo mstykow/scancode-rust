@@ -479,6 +479,34 @@ fn test_contactless_narrative_attributions_require_person_names() {
 }
 
 #[test]
+fn test_subject_maintainer_attribution_keeps_named_collectives() {
+    let input = concat!(
+        "Filter::Simple is now maintained by the Perl5-Porters. Please submit bugs.\n",
+        "This package is currently maintained by the Perl Toolchain Gang.\n",
+        "This package is now maintained by the Safe Team. Thus, use the supported API.\n",
+        "The cache is maintained by the package manager.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"the Perl5-Porters"), "authors: {values:?}");
+    assert!(
+        values.contains(&"the Perl Toolchain Gang"),
+        "authors: {values:?}"
+    );
+    assert!(values.contains(&"the Safe Team"), "authors: {values:?}");
+    assert!(
+        values
+            .iter()
+            .all(|author| !author.contains("package manager")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
 fn test_contact_backed_change_attributions_cover_varied_actions() {
     let input = concat!(
         "- Updated backport to 5.6.1 by Steffen Mueller <smueller@cpan.org>.\n",

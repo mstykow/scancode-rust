@@ -276,7 +276,8 @@ fn trim_contact_attribution_suffix(who: &str) -> String {
 
 fn trim_following_sentence_clause(who: &str) -> String {
     static FOLLOWING_SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?is)^(?P<head>.+?)\.\s+(?:it|this|these|those|the|a|an|no)\b.*$").unwrap()
+        Regex::new(r"(?is)^(?P<head>.+?)\.\s+(?:it|this|these|those|the|a|an|no|please|thus)\b.*$")
+            .unwrap()
     });
 
     let trimmed = who.trim();
@@ -664,7 +665,7 @@ pub(in super::super) fn extract_subject_attribution_authors(
 ) -> Vec<AuthorDetection> {
     static SUBJECT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:originally\s+)?(?:written|rewritten|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
+            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:(?:currently|now|originally)\s+)?(?:written|rewritten|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
         )
         .unwrap()
     });
@@ -720,11 +721,19 @@ pub(in super::super) fn extract_subject_attribution_authors(
         {
             who = head.as_str().to_string();
         }
-        let who = trim_attribution_tail(&who);
-        let Some(author) = refine_author(&who) else {
+        let who = trim_attribution_tail(&trim_following_sentence_clause(&who));
+        let Some(author) = looks_like_contactless_named_collective(&who)
+            .then(|| who.to_string())
+            .or_else(|| refine_notice_collective_author(&who))
+            .or_else(|| refine_author(&who))
+        else {
             continue;
         };
-        if !has_contact && !in_pod_author_section && !looks_like_contactless_person_name(&author) {
+        if !has_contact
+            && !in_pod_author_section
+            && !looks_like_contactless_person_name(&author)
+            && !looks_like_contactless_named_collective(&author)
+        {
             continue;
         }
         authors.push(AuthorDetection {
@@ -1111,6 +1120,43 @@ fn looks_like_contactless_person_name(who: &str) -> bool {
     }
 
     uppercase_words >= 2
+}
+
+fn looks_like_contactless_named_collective(who: &str) -> bool {
+    const COLLECTIVE_WORDS: &[&str] = &[
+        "authors",
+        "committers",
+        "contributors",
+        "developers",
+        "foundation",
+        "gang",
+        "group",
+        "maintainers",
+        "porters",
+        "team",
+    ];
+    const GENERIC_WORDS: &[&str] = &["a", "an", "project", "the"];
+
+    if who.contains('@') || who.split_whitespace().count() > 8 {
+        return false;
+    }
+
+    let words: Vec<&str> = who
+        .split(|ch: char| !ch.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has_collective_word = words
+        .iter()
+        .any(|word| COLLECTIVE_WORDS.contains(&word.to_ascii_lowercase().as_str()));
+    let has_named_identity = words.iter().any(|word| {
+        let lower = word.to_ascii_lowercase();
+        !GENERIC_WORDS.contains(&lower.as_str())
+            && !COLLECTIVE_WORDS.contains(&lower.as_str())
+            && (word.chars().any(|ch| ch.is_uppercase())
+                || word.chars().any(|ch| ch.is_ascii_digit()))
+    });
+
+    has_collective_word && has_named_identity
 }
 
 fn looks_like_written_by_and_continuation(line: &str) -> bool {
