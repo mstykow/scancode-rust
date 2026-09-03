@@ -22,15 +22,16 @@
 //!    merely mentions the word mid-sentence (`at the Copyright Holders option
 //!    either a return of any price paid or`) does not, so the marker/year guard
 //!    keeps real notices that sit at the top of (or inside) a LICENSE file.
-//! 2. Holders and authors are bare entity names with no notice marker of their
-//!    own, so they cannot be classified directly. Instead they are anchored to
-//!    the copyrights that survived step 1: a holder/author whose span overlaps a
-//!    preserved copyright is a real attribution and is kept; one that falls in a
-//!    license region with no co-located preserved copyright is license prose
-//!    (`MAKE NO REPRESENTATIONS`, `...and its contributors`) and is dropped.
+//! 2. Holders and authors are normally anchored to the copyrights that survived
+//!    step 1. Contact-backed authors are also kept: an explicit email is bounded
+//!    authorship evidence and avoids dropping an `AUTHOR` section that happens to
+//!    sit inside a coarse license match. Unanchored bare fragments such as `MAKE
+//!    NO REPRESENTATIONS` or `...and its contributors` are still dropped.
 
 use crate::copyright::has_copyright_year;
 use crate::models::FileInfo;
+
+use super::copyright::has_author_contact_evidence;
 
 /// Minimum matched token count for a license match to count as a full
 /// license-text region. Substantial license bodies match well above this
@@ -86,12 +87,13 @@ pub(super) fn suppress_license_text_region_parties(file_info: &mut FileInfo) {
         )
     });
     file_info.authors.retain(|a| {
-        !is_unanchored_party_in_region(
-            &regions,
-            &preserved_copyright_ranges,
-            a.start_line.get(),
-            a.end_line.get(),
-        )
+        has_author_contact_evidence(&a.author)
+            || !is_unanchored_party_in_region(
+                &regions,
+                &preserved_copyright_ranges,
+                a.start_line.get(),
+                a.end_line.get(),
+            )
     });
 }
 

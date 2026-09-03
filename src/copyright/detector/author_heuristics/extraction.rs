@@ -471,6 +471,72 @@ pub(in super::super) fn extract_line_local_attribution_authors(
         .collect()
 }
 
+pub(in super::super) fn extract_subject_attribution_authors(
+    prepared_cache: &PreparedLines<'_>,
+) -> Vec<AuthorDetection> {
+    static SUBJECT_ATTRIBUTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)\b(?:was|were|is|are|has\s+been|have\s+been)\s+(?:originally\s+)?(?:written|created|authored|developed|maintained)\s+by\s+(?P<who>.+)$",
+        )
+        .unwrap()
+    });
+    static POD_AUTHOR_HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^=head\d+\s+authors?\s*$").unwrap());
+    static POD_HEADING_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^=head\d+\b").unwrap());
+    static NON_AUTHOR_CLAUSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\s+and\s+(?:on|upon|for)\s+(?:which|whom)\b.*$").unwrap()
+    });
+    static BARE_EMAIL_SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<head>.*\b[\w.+-]+@[\w.-]+\.[a-z]{2,})(?:\.\s+|;\s+).*$").unwrap()
+    });
+
+    let mut authors = Vec::new();
+    let mut in_pod_author_section = false;
+    for line in prepared_cache.iter_non_empty() {
+        let prepared = line.prepared.trim();
+        if POD_HEADING_RE.is_match(prepared) {
+            in_pod_author_section = POD_AUTHOR_HEADING_RE.is_match(prepared);
+            continue;
+        }
+        let Some(captures) = SUBJECT_ATTRIBUTION_RE.captures(prepared) else {
+            continue;
+        };
+        let Some(raw_who) = captures.name("who").map(|matched| matched.as_str().trim()) else {
+            continue;
+        };
+        let lower = raw_who.to_ascii_lowercase();
+        let has_contact = raw_who.contains('@')
+            || raw_who.contains('<')
+            || (lower.contains(" at ") && lower.contains(" dot "));
+        if !has_contact && !in_pod_author_section {
+            continue;
+        }
+
+        let mut who = NON_AUTHOR_CLAUSE_RE.replace(raw_who, "").into_owned();
+        if let Some(contact_end) = who.find('>') {
+            let tail = who[contact_end + 1..].trim_start();
+            if tail.starts_with('.') || tail.starts_with(';') {
+                who.truncate(contact_end + 1);
+            }
+        } else if let Some(captures) = BARE_EMAIL_SENTENCE_RE.captures(&who)
+            && let Some(head) = captures.name("head")
+        {
+            who = head.as_str().to_string();
+        }
+        let who = trim_attribution_tail(&who);
+        let Some(author) = refine_author(&who) else {
+            continue;
+        };
+        authors.push(AuthorDetection {
+            author,
+            start_line: line.line_number,
+            end_line: line.line_number,
+        });
+    }
+    authors
+}
+
 pub(in super::super) fn repair_chained_attribution_authors(
     prepared_cache: &PreparedLines<'_>,
     authors: &mut Vec<AuthorDetection>,

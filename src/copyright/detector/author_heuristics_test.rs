@@ -377,6 +377,64 @@ fn test_passive_creation_keeps_person_and_contact_backed_authors() {
 }
 
 #[test]
+fn test_subject_attribution_keeps_contact_backed_people() {
+    let input = concat!(
+        "under the same terms as Perl itself.\n",
+        "\n",
+        "This program is distributed in the hope that it will be useful, but\n",
+        "without any warranty; without even the implied warranty of\n",
+        "merchantability or fitness for a particular purpose.\n",
+        "\n",
+        "=head1 AUTHOR\n",
+        "\n",
+        "Pod::Simple was created by Sean M. Burke <sburke@cpan.org>.\n",
+        "But don't bother him, he's retired.\n",
+        "\n",
+        "Pod::Simple is maintained by:\n",
+        "\n",
+        "=over\n",
+        "\n",
+        "=item * Allison Randal C<allison@perl.org>\n",
+        "\n",
+        "=back\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(&"Sean M. Burke <sburke@cpan.org>"),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
+fn test_subject_attribution_uses_bounded_pod_author_section() {
+    let input = concat!(
+        "=head1 AUTHORS\n",
+        "\n",
+        "Test::Harness 2.64 is maintained by Andy Lester and on which this module is based.\n",
+        "\n",
+        "=head1 DESCRIPTION\n",
+        "\n",
+        "Archives were created by Release Tool 2.0.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(values.contains(&"Andy Lester"), "authors: {values:?}");
+    assert!(
+        values.iter().all(|author| !author.contains("Release Tool")),
+        "authors: {values:?}"
+    );
+}
+
+#[test]
 fn test_extract_comment_author_label_authors_detects_doxygen_author_tags() {
     let raw_lines = vec![
         "*> \\author Univ. of California Berkeley",
@@ -1485,6 +1543,35 @@ fn test_pod_contact_author_stops_at_following_sentence() {
         .collect();
 
     assert_eq!(values, vec!["Dan Kogai <dankogai@cpan.org>"]);
+}
+
+#[test]
+fn test_contribution_author_chain_drops_shadowed_prefix() {
+    let input = concat!(
+        "=head1 AUTHOR\n",
+        "\n",
+        "Pod::Simple::JustPod was developed by John SJ Anderson\n",
+        "C<genehack@genehack.org>, with contributions from Karl Williamson\n",
+        "C<khw@cpan.org>.\n",
+    );
+    let (_copyrights, _holders, authors) = super::super::detect_copyrights_from_text(input);
+    let values: Vec<&str> = authors
+        .iter()
+        .map(|author| author.author.as_str())
+        .collect();
+
+    assert!(
+        values.contains(
+            &"John SJ Anderson genehack@genehack.org, with contributions from Karl Williamson khw@cpan.org"
+        ),
+        "authors: {values:?}"
+    );
+    assert!(
+        values
+            .iter()
+            .all(|author| *author != "John SJ Anderson genehack@genehack.org"),
+        "authors: {values:?}"
+    );
 }
 
 #[test]

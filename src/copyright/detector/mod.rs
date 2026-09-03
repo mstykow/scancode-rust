@@ -485,6 +485,7 @@ pub fn detect_copyrights_from_text_with_deadline(
     authors.extend(final_line_local_authors);
     author_heuristics::repair_chained_attribution_authors(&prepared_lines, &mut authors);
     author_heuristics::drop_same_span_contact_sentence_overruns(&mut authors);
+    author_heuristics::drop_shadowed_contribution_author_prefixes(&mut authors);
 
     dedupe_exact_span_holders(&mut holders);
 

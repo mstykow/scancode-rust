@@ -153,6 +153,10 @@ fn run_author_extraction_and_repairs(
     seen.dedup_new_authors(&mut new_a, 0);
     authors.extend(new_a);
 
+    let mut new_a = super::author_heuristics::extract_subject_attribution_authors(prepared_cache);
+    seen.dedup_new_authors(&mut new_a, 0);
+    authors.extend(new_a);
+
     let a_before = authors.len();
     super::author_heuristics::extract_multiline_written_by_author_blocks(prepared_cache, authors);
     seen.dedup_new_authors(authors, a_before);

@@ -261,6 +261,14 @@ fn test_refine_author_keeps_conjoined_name_after_contact() {
 }
 
 #[test]
+fn test_refine_author_collapses_repeated_angle_contact() {
+    assert_eq!(
+        refine_author("David Sundstrom <sunds@example.com sunds@example.com>"),
+        Some("David Sundstrom <sunds@example.com>".to_string())
+    );
+}
+
+#[test]
 fn test_refine_author_truncates_prose_sentence_after_a_name() {
     assert_eq!(
         refine_author(

@@ -335,6 +335,35 @@ pub(in super::super) fn drop_same_span_contact_sentence_overruns(
     });
 }
 
+pub(in super::super) fn drop_shadowed_contribution_author_prefixes(
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if authors.len() < 2 {
+        return;
+    }
+    let originals = authors.clone();
+    authors.retain(|author| {
+        let candidate = author.author.trim();
+        !originals.iter().any(|other| {
+            if other.start_line != author.start_line
+                || other.end_line.get() < author.end_line.get()
+                || other.author.len() <= candidate.len()
+            {
+                return false;
+            }
+            let Some(tail) = other.author.trim().strip_prefix(candidate) else {
+                return false;
+            };
+            let tail = tail
+                .trim_start_matches([',', ';'])
+                .trim_start()
+                .to_ascii_lowercase();
+            tail.starts_with("with contributions from ")
+                || tail.starts_with("and contributions from ")
+        })
+    });
+}
+
 pub(in super::super) fn drop_shadowed_compound_email_authors(authors: &mut Vec<AuthorDetection>) {
     if authors.is_empty() {
         return;
