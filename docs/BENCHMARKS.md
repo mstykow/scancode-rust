@@ -12,7 +12,7 @@ The chart below uses a log-log scatter plot: file count on the x-axis, wall-cloc
 
 ![Scan duration vs. file count for Provenant and ScanCode](scan-duration-vs-files.svg)
 
-> Provenant is faster on 254 of 254 recorded runs, with a **19.7× median speedup** and **19.7× geometric-mean speedup** overall; the median gap grows from **9.1×** on sub-100-file targets to **37.2×** on 10k+ file targets.
+> Provenant is faster on 255 of 255 recorded runs, with a **19.6× median speedup** and **19.6× geometric-mean speedup** overall; the median gap grows from **9.1×** on sub-100-file targets to **37.2×** on 10k+ file targets.
 > Generated from the benchmark timing rows in this document via `cargo run --manifest-path xtask/Cargo.toml --bin generate-benchmark-chart`.
 
 ## Current benchmark examples
@@ -449,6 +449,13 @@ The quick index below links to benchmark sections. Each benchmark entry then rec
 - Run context: 2026-06-23 · macOS 26.5.1 · Apple M5 Pro · 64 GB · arm64 · 4 proc
 - Timing: Provenant `40.89s`; ScanCode `1763.40s`
 - Broader monorepo package and dependency extraction (`138` vs `1` packages, `7720` vs `1815` dependencies) from the root `package-lock.json`, many extension fixture manifests and lockfiles, and embedded Cargo/Docker metadata, plus richer named package identities where ScanCode emits generic lockfile and archive rows
+
+##### [MikeMcl/decimal.js-light @ b2b0c28](https://github.com/MikeMcl/decimal.js-light/tree/b2b0c28e04e4f96d21450d2075ea36064fc9e22d) — **10.08× faster**
+
+- Files: 46
+- Run context: 2026-09-09 · macOS 26.6.2 · Apple M5 Pro · 64 GB · arm64 · 4 proc
+- Timing: Provenant `4.67s`; ScanCode `47.09s`
+- Matched npm package, license, copyright, author, email, and file coverage, with richer assembled holder attribution from manifest author metadata and broader explicit URL capture for README image targets and API documentation links that ScanCode omits
 
 ##### [npm/cli @ 05dbba5](https://github.com/npm/cli/tree/05dbba5b8d727ddb2c098ce0553714eae791c5f2) — **40.20× faster**
 
