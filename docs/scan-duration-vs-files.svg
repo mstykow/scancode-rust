@@ -170,6 +170,9 @@ ScanCode: 57.03s</title></rect>
     <rect x="349.56" y="448.21" width="8" height="8" fill="#d97706" rx="1.5"><title>marshallpierce/rust-base64 @ 13f4fe8
 Files: 42
 ScanCode: 44.92s</title></rect>
+    <rect x="355.82" y="445.99" width="8" height="8" fill="#d97706" rx="1.5"><title>MikeMcl/decimal.js-light @ b2b0c28
+Files: 46
+ScanCode: 47.09s</title></rect>
     <rect x="357.31" y="446.42" width="8" height="8" fill="#d97706" rx="1.5"><title>UCBoulder/tardigrade_micromorphic_tools @ d03a8ca
 Files: 47
 ScanCode: 46.66s</title></rect>
@@ -934,6 +937,9 @@ Provenant: 5.12s</title></circle>
     <circle cx="353.56" cy="555.95" r="4.5" fill="#2563eb"><title>marshallpierce/rust-base64 @ 13f4fe8
 Files: 42
 Provenant: 5.00s</title></circle>
+    <circle cx="359.82" cy="559.18" r="4.5" fill="#2563eb"><title>MikeMcl/decimal.js-light @ b2b0c28
+Files: 46
+Provenant: 4.67s</title></circle>
     <circle cx="361.31" cy="546.87" r="4.5" fill="#2563eb"><title>UCBoulder/tardigrade_micromorphic_tools @ d03a8ca
 Files: 47
 Provenant: 6.06s</title></circle>
