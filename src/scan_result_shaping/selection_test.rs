@@ -273,6 +273,87 @@ fn resolve_paths_file_entries_normalizes_existing_entries_and_tracks_missing() {
 }
 
 #[test]
+fn resolve_paths_file_entries_preserves_case_distinct_frontier_entries() {
+    let temp_dir = tempfile::tempdir().expect("tempdir");
+    let scan_root = temp_dir.path().join("repo");
+    fs::create_dir_all(&scan_root).expect("create scan root");
+    fs::write(
+        scan_root.join("Example.js"),
+        "// SPDX-License-Identifier: MIT\n",
+    )
+    .expect("write mixed-case file");
+    fs::write(
+        scan_root.join("example.js"),
+        "// SPDX-License-Identifier: Apache-2.0\n",
+    )
+    .expect("write lowercase file");
+
+    let resolved = resolve_paths_file_entries(
+        &scan_root,
+        &[
+            "Example.js".to_string(),
+            "example.js".to_string(),
+            "./Example.js".to_string(),
+        ],
+    )
+    .expect("case-distinct paths file entries should resolve");
+
+    let case_distinct_files = fs::canonicalize(scan_root.join("Example.js"))
+        .expect("canonicalize mixed-case file")
+        != fs::canonicalize(scan_root.join("example.js")).expect("canonicalize lowercase file");
+    let expected_frontier = if case_distinct_files {
+        vec![
+            CollectionFrontier {
+                path: PathBuf::from("Example.js"),
+                recurse: false,
+            },
+            CollectionFrontier {
+                path: PathBuf::from("example.js"),
+                recurse: false,
+            },
+        ]
+    } else {
+        vec![CollectionFrontier {
+            path: PathBuf::from("Example.js"),
+            recurse: false,
+        }]
+    };
+
+    assert_eq!(
+        resolved.selections,
+        vec![SelectedPath::Exact("example.js".to_string())]
+    );
+    assert_eq!(resolved.frontier, expected_frontier);
+    assert!(resolved.missing_entries.is_empty());
+
+    let mut collected =
+        crate::scanner::collect_selected_paths(&scan_root, &resolved.frontier, 0, &[]);
+    assert!(collected.collection_errors.is_empty());
+    assert_eq!(
+        apply_user_path_filters_to_collected(
+            &mut collected,
+            &scan_root,
+            &resolved.selections,
+            &[],
+            &[],
+        ),
+        0
+    );
+    let mut collected_paths = collected
+        .files
+        .iter()
+        .map(|(path, _)| normalize_scan_relative_path(path, &scan_root))
+        .collect::<Vec<_>>();
+    collected_paths.sort();
+    let expected_paths = if case_distinct_files {
+        vec!["Example.js", "example.js"]
+    } else {
+        vec!["Example.js"]
+    };
+    assert_eq!(collected_paths, expected_paths);
+}
+
+#[test]
 fn resolve_paths_file_entries_rejects_entries_that_escape_root() {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let scan_root = temp_dir.path().join("repo");

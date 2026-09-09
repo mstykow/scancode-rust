@@ -91,7 +91,9 @@ pub(crate) fn resolve_paths_file_entries(
     let mut selections = Vec::new();
     let mut frontier = Vec::new();
     let mut missing_entries = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen_frontier_entries = HashSet::new();
+    let mut seen_selections = HashSet::new();
+    let mut seen_missing_entries = HashSet::new();
 
     for entry in entries {
         let Some(normalized) = normalize_paths_file_entry(entry)? else {
@@ -101,14 +103,18 @@ pub(crate) fn resolve_paths_file_entries(
         let absolute = scan_root.join(&normalized);
         if absolute.exists() {
             let selection = build_selected_path(&normalized, absolute.is_dir());
-            if seen.insert(selection_cache_key(&selection)) {
+            // Preserve real case variants while collapsing aliases on case-insensitive filesystems.
+            let frontier_key = fs::canonicalize(&absolute).unwrap_or_else(|_| absolute.clone());
+            if seen_frontier_entries.insert(frontier_key) {
                 frontier.push(CollectionFrontier {
                     path: PathBuf::from(&normalized),
                     recurse: absolute.is_dir(),
                 });
+            }
+            if seen_selections.insert(selection_cache_key(&selection)) {
                 selections.push(selection);
             }
-        } else if seen.insert(format!("missing:{normalized}")) {
+        } else if seen_missing_entries.insert(normalized.clone()) {
             missing_entries.push(normalized);
         }
     }
