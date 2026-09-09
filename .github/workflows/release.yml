@@ -385,7 +385,6 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          version="${TAG#v}"
           mkdir -p shas
           for arch in macos-aarch64 macos-x86_64 linux-aarch64 linux-x86_64; do
             gh release download "$TAG" --repo "${{ github.repository }}" \
@@ -395,7 +394,6 @@ jobs:
           # Render to a temp file (not into the tap checkout): the push step
           # re-syncs the tap on each attempt and re-applies this rendered formula.
           sed \
-            -e "s|@@VERSION@@|${version}|g" \
             -e "s|@@TAG@@|${TAG}|g" \
             -e "s|@@SHA_MACOS_ARM@@|$(sha macos-aarch64)|" \
             -e "s|@@SHA_MACOS_INTEL@@|$(sha macos-x86_64)|" \
@@ -428,7 +426,9 @@ jobs:
           for attempt in 1 2 3 4 5; do
             git fetch --quiet origin main
             git reset --quiet --hard origin/main
-            current="$(sed -nE 's/^  version "([^"]+)"/\1/p' "$formula" | head -1)"
+            # Homebrew infers the version from the GitHub release URL, so read
+            # the current version from that URL for the downgrade guard.
+            current="$(sed -nE 's|.*releases/download/v([^/]+)/.*|\1|p' "$formula" | head -1)"
             if [ -n "$current" ] && [ "$current" != "$version" ]; then
               newest="$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)"
               if [ "$newest" = "$current" ]; then
