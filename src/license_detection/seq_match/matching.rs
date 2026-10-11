@@ -21,19 +21,133 @@ use crate::license_detection::query::QueryRun;
 use crate::models::LineNumber;
 use crate::models::MatchScore;
 use bit_set::BitSet;
-use rustc_hash::FxHashMap;
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::MATCH_SEQ;
 use super::candidates::Candidate;
 
+type HighPostings<'a> = FxHashMap<TokenId, &'a [usize]>;
+type TokenOccurrences = FxHashMap<TokenId, Vec<usize>>;
+
+/// Sorted matchable legalese positions per query token, so a search can visit
+/// only the positions whose token occurs in the rule range being matched.
+fn token_occurrences(
+    query_tokens: &[TokenId],
+    matchables: &BitSet,
+    len_legalese: usize,
+) -> TokenOccurrences {
+    let mut occurrences = TokenOccurrences::default();
+    for (i, &token) in query_tokens.iter().enumerate() {
+        if token.as_usize() < len_legalese && matchables.contains(i) {
+            occurrences.entry(token).or_default().push(i);
+        }
+    }
+    occurrences
+}
+
+const MAX_SPARSE_RULE_TOKENS: usize = 8;
+
+/// Ascending merge of the occurrence lists of a few tokens.
+struct MergedPositions<'a> {
+    lists: Vec<&'a [usize]>,
+}
+
+impl Iterator for MergedPositions<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        let list = self
+            .lists
+            .iter_mut()
+            .filter(|list| !list.is_empty())
+            .min_by_key(|list| list[0])?;
+        let position = list[0];
+        *list = &list[1..];
+        Some(position)
+    }
+}
+
+/// The query positions in `query_lo..query_hi` that can contribute to a match
+/// against `rule_lo..rule_hi`, or `None` when a dense scan is cheaper. A dense
+/// scan visits every position; any other position leaves the rolling run map
+/// empty, which a gap between returned positions reproduces.
+fn sparse_positions<'a>(
+    context: &MatchSearchContext<'a>,
+    query_lo: usize,
+    query_hi: usize,
+    rule_lo: usize,
+    rule_hi: usize,
+) -> Option<MergedPositions<'a>> {
+    let mut rule_set: Vec<TokenId> = Vec::new();
+    for &token in &context.rule_tokens[rule_lo..rule_hi] {
+        if context.high_postings.contains_key(&token) && !rule_set.contains(&token) {
+            if rule_set.len() == MAX_SPARSE_RULE_TOKENS {
+                return None;
+            }
+            rule_set.push(token);
+        }
+    }
+
+    let budget = (query_hi - query_lo) / 4;
+    let mut total = 0;
+    let mut lists = Vec::with_capacity(rule_set.len());
+    for token in rule_set {
+        let Some(all) = context.occurrences.get(&token) else {
+            continue;
+        };
+        let start = all.partition_point(|&p| p < query_lo);
+        let end = all.partition_point(|&p| p < query_hi);
+        total += end - start;
+        if total > budget {
+            return None;
+        }
+        lists.push(&all[start..end]);
+    }
+    Some(MergedPositions { lists })
+}
+
 struct MatchSearchContext<'a> {
     query_tokens: &'a [TokenId],
     rule_tokens: &'a [TokenId],
-    high_postings: &'a HashMap<TokenId, Vec<usize>>,
+    high_postings: &'a HighPostings<'a>,
     len_legalese: usize,
     matchables: &'a BitSet,
+    run_potential: &'a [usize],
+    occurrences: &'a TokenOccurrences,
     cancel: Option<&'a CancelToken>,
+}
+
+/// `potential[i]` bounds the longest diagonal run that can end at or after `i`:
+/// each position must be matchable, legalese and in the rule's postings, and
+/// each adjacent query pair must also be adjacent somewhere in the rule.
+fn run_potential(
+    query_tokens: &[TokenId],
+    rule_tokens: &[TokenId],
+    matchables: &BitSet,
+    high_postings: &HighPostings<'_>,
+    len_legalese: usize,
+) -> Vec<usize> {
+    let rule_pairs: FxHashSet<(TokenId, TokenId)> =
+        rule_tokens.windows(2).map(|w| (w[0], w[1])).collect();
+    let mut potential = vec![0usize; query_tokens.len() + 1];
+    let mut run = 0usize;
+    for (i, &token) in query_tokens.iter().enumerate() {
+        let active = token.as_usize() < len_legalese
+            && matchables.contains(i)
+            && high_postings.contains_key(&token);
+        run = if !active {
+            0
+        } else if i > 0 && run > 0 && rule_pairs.contains(&(query_tokens[i - 1], token)) {
+            run + 1
+        } else {
+            1
+        };
+        potential[i] = run;
+    }
+    for i in (0..query_tokens.len()).rev() {
+        potential[i] = potential[i].max(potential[i + 1]);
+    }
+    potential
 }
 
 /// Find the longest matching block between query and rule token sequences.
@@ -78,9 +192,25 @@ fn find_longest_match_impl(
     let mut j2len: FxHashMap<usize, usize> = FxHashMap::default();
     let mut new_j2len: FxHashMap<usize, usize> = FxHashMap::default();
 
-    for (offset, i) in (query_lo..query_hi).enumerate() {
+    let visited: Box<dyn Iterator<Item = usize> + '_> =
+        match sparse_positions(context, query_lo, query_hi, rule_lo, rule_hi) {
+            Some(positions) => Box::new(positions),
+            None => Box::new(query_lo..query_hi),
+        };
+    let mut prev_i = None;
+
+    for (offset, i) in visited.enumerate() {
         if offset.is_multiple_of(256) {
             crate::license_detection::ensure_not_cancelled(context.cancel)?;
+        }
+
+        if prev_i.is_none_or(|prev| prev + 1 != i) {
+            j2len.clear();
+        }
+        prev_i = Some(i);
+
+        if best_size >= (rule_hi - rule_lo).min(context.run_potential[i]) {
+            break;
         }
 
         new_j2len.clear();
@@ -90,7 +220,7 @@ fn find_longest_match_impl(
             && context.matchables.contains(i)
             && let Some(positions) = context.high_postings.get(&cur_a)
         {
-            for &j in positions {
+            for &j in *positions {
                 if j < rule_lo {
                     continue;
                 }
@@ -267,6 +397,7 @@ pub(crate) fn seq_match_with_candidates_and_cancel(
     // `qstart <= max_matchable` is an O(1) equivalent of
     // `matchables.iter().any(|p| p >= qstart)`, avoiding an O(N) scan per round.
     let max_matchable = matchables.iter().max();
+    let occurrences = token_occurrences(query_tokens, &matchables, len_legalese);
 
     for (candidate_index, candidate) in candidates.iter().enumerate() {
         if candidate_index.is_multiple_of(8) {
@@ -275,24 +406,33 @@ pub(crate) fn seq_match_with_candidates_and_cancel(
 
         let rid = candidate.rid;
         let rule_tokens = index.rule_tokens(rid);
-        let high_postings: HashMap<TokenId, Vec<usize>> = index
+        let high_postings: HighPostings<'_> = index
             .high_postings_by_rid
             .get(&rid)
             .map(|hp| {
                 hp.iter()
                     .filter(|(tid, _)| candidate.high_set_intersection.contains(&tid.raw()))
-                    .map(|(&tid, postings)| (tid, postings.clone()))
+                    .map(|(&tid, postings)| (tid, postings.as_slice()))
                     .collect()
             })
             .unwrap_or_default();
 
         if let Some(rule_tokens) = rule_tokens {
+            let run_potential = run_potential(
+                query_tokens,
+                rule_tokens,
+                &matchables,
+                &high_postings,
+                len_legalese,
+            );
             let context = MatchSearchContext {
                 query_tokens,
                 rule_tokens,
                 high_postings: &high_postings,
                 len_legalese,
                 matchables: &matchables,
+                run_potential: &run_potential,
+                occurrences: &occurrences,
                 cancel,
             };
 
@@ -405,10 +545,18 @@ pub(crate) fn seq_match_with_candidates_and_cancel(
 mod tests {
     use super::*;
     use crate::license_detection::index::dictionary::{TokenId, tid};
+    use std::collections::HashMap;
     use std::ops::Range;
 
     fn tids(values: &[u16]) -> Vec<TokenId> {
         values.iter().copied().map(tid).collect()
+    }
+
+    fn borrowed_postings(postings: &HashMap<TokenId, Vec<usize>>) -> super::HighPostings<'_> {
+        postings
+            .iter()
+            .map(|(&tid, v)| (tid, v.as_slice()))
+            .collect()
     }
 
     fn find_longest_match_for_test(
@@ -420,12 +568,23 @@ mod tests {
         len_legalese: usize,
         matchables: &BitSet,
     ) -> (usize, usize, usize) {
+        let high_postings = borrowed_postings(high_postings);
+        let occurrences = token_occurrences(query_tokens, matchables, len_legalese);
+        let potential = run_potential(
+            query_tokens,
+            rule_tokens,
+            matchables,
+            &high_postings,
+            len_legalese,
+        );
         let context = MatchSearchContext {
             query_tokens,
             rule_tokens,
-            high_postings,
+            high_postings: &high_postings,
             len_legalese,
             matchables,
+            run_potential: &potential,
+            occurrences: &occurrences,
             cancel: None,
         };
         find_longest_match_impl(
@@ -446,16 +605,148 @@ mod tests {
         len_legalese: usize,
         matchables: &BitSet,
     ) -> Vec<(usize, usize, usize)> {
+        let high_postings = borrowed_postings(high_postings);
+        let occurrences = token_occurrences(query_tokens, matchables, len_legalese);
+        let potential = run_potential(
+            query_tokens,
+            rule_tokens,
+            matchables,
+            &high_postings,
+            len_legalese,
+        );
         let context = MatchSearchContext {
             query_tokens,
             rule_tokens,
-            high_postings,
+            high_postings: &high_postings,
             len_legalese,
             matchables,
+            run_potential: &potential,
+            occurrences: &occurrences,
             cancel: None,
         };
         match_blocks_impl(&context, query_range.start, query_range.end)
             .expect("Sequence block matching without cancel should not time out")
+    }
+
+    /// Exhaustive longest-match search with none of the production shortcuts.
+    fn reference_longest_match(
+        query: &[TokenId],
+        rule: &[TokenId],
+        query_range: Range<usize>,
+        rule_range: Range<usize>,
+        len_legalese: usize,
+        matchables: &BitSet,
+    ) -> (usize, usize, usize) {
+        let active = |i: usize, j: usize| {
+            query[i] == rule[j] && query[i].as_usize() < len_legalese && matchables.contains(i)
+        };
+        let mut run = vec![vec![0usize; rule.len()]; query.len()];
+        let (mut best_i, mut best_j, mut best_size) = (query_range.start, rule_range.start, 0);
+        for i in query_range.clone() {
+            for j in rule_range.clone() {
+                if !active(i, j) {
+                    continue;
+                }
+                let previous = if i > query_range.start && j > rule_range.start {
+                    run[i - 1][j - 1]
+                } else {
+                    0
+                };
+                run[i][j] = previous + 1;
+                if run[i][j] > best_size {
+                    best_size = run[i][j];
+                    (best_i, best_j) = (i + 1 - best_size, j + 1 - best_size);
+                }
+            }
+        }
+        if best_size > 0 {
+            while best_i > query_range.start
+                && best_j > rule_range.start
+                && query[best_i - 1] == rule[best_j - 1]
+                && matchables.contains(best_i - 1)
+            {
+                best_i -= 1;
+                best_j -= 1;
+                best_size += 1;
+            }
+            while best_i + best_size < query_range.end
+                && best_j + best_size < rule_range.end
+                && query[best_i + best_size] == rule[best_j + best_size]
+                && matchables.contains(best_i + best_size)
+            {
+                best_size += 1;
+            }
+        }
+        (best_i, best_j, best_size)
+    }
+
+    #[test]
+    fn test_sparse_and_dense_scans_match_an_exhaustive_search() {
+        // Appending more than `MAX_SPARSE_RULE_TOKENS` tokens that never occur in
+        // the query forces the dense scan without changing any match.
+        let len_legalese = 60;
+        let dummies: Vec<u16> = (50..51 + MAX_SPARSE_RULE_TOKENS as u16).collect();
+        let mut state = 0x2545_f491_4f6c_dd1d_u64;
+        let mut next = |bound: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % bound as u64) as usize
+        };
+
+        for _ in 0..300 {
+            let query: Vec<u16> = (0..300 + next(200)).map(|_| next(40) as u16).collect();
+            let rule: Vec<u16> = (0..4 + next(5)).map(|_| next(24) as u16).collect();
+            let mut dense_rule = rule.clone();
+            dense_rule.extend(&dummies);
+
+            let query_lo = next(query.len() / 2);
+            let query_range = query_lo..query_lo + 1 + next(query.len() - query_lo);
+            let rule_lo = next(rule.len() / 2);
+            let rule_range = rule_lo..rule_lo + 1 + next(rule.len() - rule_lo);
+
+            let query_tokens = tids(&query);
+            let matchables: BitSet = (0..query.len()).filter(|_| next(8) != 0).collect();
+            let search = |rule: &[u16], rule_range: Range<usize>| {
+                let rule_tokens = tids(rule);
+                let mut postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+                for (j, token) in rule_tokens.iter().enumerate() {
+                    if token.as_usize() < len_legalese {
+                        postings.entry(*token).or_default().push(j);
+                    }
+                }
+                find_longest_match_for_test(
+                    &query_tokens,
+                    &rule_tokens,
+                    query_range.clone(),
+                    rule_range,
+                    &postings,
+                    len_legalese,
+                    &matchables,
+                )
+            };
+            let reference = |rule_range: Range<usize>| {
+                reference_longest_match(
+                    &query_tokens,
+                    &tids(&rule),
+                    query_range.clone(),
+                    rule_range,
+                    len_legalese,
+                    &matchables,
+                )
+            };
+
+            assert_eq!(
+                search(&rule, rule_range.clone()),
+                reference(rule_range.clone()),
+                "sparse: query {query:?} {query_range:?} rule {rule:?} {rule_range:?}"
+            );
+            assert_eq!(
+                search(&dense_rule, 0..dense_rule.len()),
+                reference(0..rule.len()),
+                "dense: query {query:?} {query_range:?} rule {rule:?}"
+            );
+        }
     }
 
     #[test]
