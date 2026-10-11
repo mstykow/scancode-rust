@@ -22,7 +22,7 @@ brew install getprovenant/tap/provenant
 provenant scan --json-pp - --license --package /path/to/repo
 ```
 
-Not on Homebrew (or on Windows)? `cargo install provenant-cli`, grab a [prebuilt archive](https://github.com/getprovenant/provenant/releases), or run the [container image](#container-image).
+Not on Homebrew (or on Windows)? `cargo install --locked provenant-cli`, grab a [prebuilt archive](https://github.com/getprovenant/provenant/releases), or run the [container image](#container-image).
 
 ## Why Provenant?
 
@@ -75,8 +75,10 @@ Installs a prebuilt `provenant` binary from the [Provenant tap](https://github.c
 Install the crates.io package `provenant-cli`:
 
 ```sh
-cargo install provenant-cli
+cargo install --locked provenant-cli
 ```
+
+`--locked` builds against the dependency versions we tested, instead of re-resolving to the newest releases.
 
 This installs the `provenant` command-line binary.
 
