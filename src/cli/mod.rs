@@ -382,12 +382,15 @@ pub struct ScanArgs {
     #[arg(short, long, default_value = "0")]
     pub max_depth: usize,
 
+    /// Number of files scanned in parallel. 0 scans one file at a time; -1 also disables the per-file timeout.
     #[arg(short = 'n', long, default_value_t = ProcessMode::default_value(), value_parser = parse_processes, allow_hyphen_values = true)]
     pub processes: ProcessMode,
 
+    /// Per-file time budget in seconds; 0 disables it. A file that exceeds the budget is reported in scan_errors and the scan continues.
     #[arg(long, default_value_t = 120.0)]
     pub timeout: f64,
 
+    /// Suppress progress and logging. File errors remain in scan_errors; only some command errors and refusals are printed.
     #[arg(short, long, conflicts_with = "verbose")]
     pub quiet: bool,
 
