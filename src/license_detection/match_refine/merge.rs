@@ -91,6 +91,74 @@ fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
     merged
 }
 
+const NONE: usize = usize::MAX;
+
+/// Matches in merge order, with O(1) removal so merging a long run of
+/// matches for one rule stays linear instead of shifting the tail per removal.
+struct MatchList {
+    items: Vec<LicenseMatch>,
+    next: Vec<usize>,
+    prev: Vec<usize>,
+    head: usize,
+}
+
+impl MatchList {
+    fn new(items: Vec<LicenseMatch>) -> Self {
+        let len = items.len();
+        Self {
+            next: (0..len)
+                .map(|i| if i + 1 < len { i + 1 } else { NONE })
+                .collect(),
+            prev: (0..len)
+                .map(|i| if i == 0 { NONE } else { i - 1 })
+                .collect(),
+            items,
+            head: 0,
+        }
+    }
+
+    /// Unlinks `index` and returns its successor.
+    fn remove(&mut self, index: usize) -> usize {
+        let (prev, next) = (self.prev[index], self.next[index]);
+        if prev == NONE {
+            self.head = next;
+        } else {
+            self.next[prev] = next;
+        }
+        if next != NONE {
+            self.prev[next] = prev;
+        }
+        next
+    }
+
+    /// Removes the anchor at `index` and returns the next anchor. Removing the
+    /// first element also skips the new first element.
+    fn remove_anchor(&mut self, index: usize) -> Option<usize> {
+        let was_first = self.prev[index] == NONE;
+        let next = self.remove(index);
+        let anchor = if was_first && next != NONE {
+            self.next[next]
+        } else {
+            next
+        };
+        Some(anchor).filter(|&n| n != NONE)
+    }
+
+    fn into_ordered(self) -> Vec<LicenseMatch> {
+        let Self {
+            items, next, head, ..
+        } = self;
+        let mut slots: Vec<Option<LicenseMatch>> = items.into_iter().map(Some).collect();
+        let mut ordered = Vec::new();
+        let mut index = head;
+        while index != NONE {
+            ordered.extend(slots[index].take());
+            index = next[index];
+        }
+        ordered
+    }
+}
+
 /// Merge overlapping and adjacent matches for the same rule.
 ///
 /// Based on Python: `merge_matches()` (match.py:869-1068)
@@ -140,22 +208,23 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
         let rule_length = rule_matches[0].rule_length;
         let max_rule_side_dist = (rule_length / 2).clamp(1, MAX_DIST);
 
-        let mut rule_matches: Vec<LicenseMatch> =
-            rule_matches.iter().map(|m| (*m).clone()).collect();
-        let mut i = 0;
+        let mut list = MatchList::new(rule_matches.iter().map(|m| (*m).clone()).collect());
+        let mut anchor = Some(list.head);
 
-        while i < rule_matches.len().saturating_sub(1) {
-            let mut j = i + 1;
+        while let Some(i) = anchor
+            && list.next[i] != NONE
+        {
+            let mut j = list.next[i];
 
-            while j < rule_matches.len() {
-                let current = &rule_matches[i];
-                let next = &rule_matches[j];
+            while j != NONE {
+                let current = &list.items[i];
+                let next = &list.items[j];
                 let same_coordinate_kind =
                     current.has_rule_alignment() == next.has_rule_alignment();
                 let both_rule_aligned = current.has_rule_alignment() && next.has_rule_alignment();
 
                 if !same_coordinate_kind {
-                    j += 1;
+                    j = list.next[j];
                     continue;
                 }
 
@@ -163,7 +232,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     && current.matcher == MatcherKind::SpdxId
                     && next.matcher == MatcherKind::SpdxId
                 {
-                    j += 1;
+                    j = list.next[j];
                     continue;
                 }
 
@@ -178,7 +247,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                 if current.qspan_set() == next.qspan_set()
                     && (!both_rule_aligned || current.ispan_set() == next.ispan_set())
                 {
-                    rule_matches.remove(j);
+                    j = list.remove(j);
                     continue;
                 }
 
@@ -189,22 +258,20 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     let current_mag = current.qspan_magnitude();
                     let next_mag = next.qspan_magnitude();
                     if current_mag <= next_mag {
-                        rule_matches.remove(j);
+                        j = list.remove(j);
                         continue;
                     } else {
-                        rule_matches.remove(i);
-                        i = i.saturating_sub(1);
+                        anchor = list.remove_anchor(i);
                         break;
                     }
                 }
 
                 if current.qcontains(next) {
-                    rule_matches.remove(j);
+                    j = list.remove(j);
                     continue;
                 }
                 if next.qcontains(current) {
-                    rule_matches.remove(i);
-                    i = i.saturating_sub(1);
+                    anchor = list.remove_anchor(i);
                     break;
                 }
 
@@ -213,8 +280,8 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     if !both_rule_aligned
                         || combined.query_span().len() == combined.effective_ispan().len()
                     {
-                        rule_matches[i] = combined;
-                        rule_matches.remove(j);
+                        list.items[i] = combined;
+                        j = list.remove(j);
                         continue;
                     }
                 }
@@ -223,16 +290,15 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     if !both_rule_aligned
                         || combined.query_span().len() == combined.effective_ispan().len()
                     {
-                        rule_matches[j] = combined;
-                        rule_matches.remove(i);
-                        i = i.saturating_sub(1);
+                        list.items[j] = combined;
+                        anchor = list.remove_anchor(i);
                         break;
                     }
                 }
 
                 if next.is_after(current) {
-                    rule_matches[i] = combine_matches(current, next);
-                    rule_matches.remove(j);
+                    list.items[i] = combine_matches(current, next);
+                    j = list.remove(j);
                     continue;
                 }
 
@@ -251,19 +317,21 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                         if qoverlap > 0 {
                             let ioverlap = current.ispan_overlap(next);
                             if qoverlap == ioverlap {
-                                rule_matches[i] = combine_matches(current, next);
-                                rule_matches.remove(j);
+                                list.items[i] = combine_matches(current, next);
+                                j = list.remove(j);
                                 continue;
                             }
                         }
                     }
                 }
 
-                j += 1;
+                j = list.next[j];
             }
-            i += 1;
+            if anchor == Some(i) {
+                anchor = Some(list.next[i]).filter(|&n| n != NONE);
+            }
         }
-        merged.extend(rule_matches);
+        merged.extend(list.into_ordered());
     }
 
     merged
@@ -386,6 +454,41 @@ mod tests {
         } else {
             trimmed.parse().ok()
         }
+    }
+
+    fn list_of(len: usize) -> MatchList {
+        MatchList::new(
+            (1..=len)
+                .map(|line| create_test_match("#1", line, line, MatchScore::MAX, 100.0, 100))
+                .collect(),
+        )
+    }
+
+    fn ordered_lines(list: MatchList) -> Vec<usize> {
+        list.into_ordered().iter().map(|m| m.start_token).collect()
+    }
+
+    #[test]
+    fn test_match_list_removes_in_place_and_keeps_order() {
+        let mut list = list_of(5);
+        assert_eq!(list.remove(2), 3);
+        assert_eq!(list.remove(4), NONE);
+        assert_eq!(ordered_lines(list), vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn test_match_list_removing_the_first_anchor_skips_the_new_first() {
+        let mut list = list_of(4);
+        assert_eq!(list.remove_anchor(0), Some(2));
+        assert_eq!(ordered_lines(list), vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn test_match_list_removing_a_later_anchor_continues_with_its_successor() {
+        let mut list = list_of(4);
+        assert_eq!(list.remove_anchor(1), Some(2));
+        assert_eq!(list.remove_anchor(3), None);
+        assert_eq!(ordered_lines(list), vec![1, 3]);
     }
 
     fn create_test_match(

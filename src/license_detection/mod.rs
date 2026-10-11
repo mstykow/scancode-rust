@@ -304,9 +304,47 @@ fn filter_redundant_same_expression_seq_containers(
         .collect()
 }
 
+/// Fully-matched exact matches ordered by start position, so a wrapper only
+/// examines the exact matches near its own span.
+struct ExactMatchIndex {
+    entries: Vec<(usize, usize)>,
+    max_extent: usize,
+}
+
+impl ExactMatchIndex {
+    fn new(candidate_contained_matches: &[LicenseMatch]) -> Self {
+        let mut entries = Vec::new();
+        let mut max_extent = 0;
+        for (index, m) in candidate_contained_matches.iter().enumerate() {
+            if m.matcher == aho_match::MATCH_AHO && has_full_match_coverage(m) {
+                let (start, end) = m.qspan_bounds();
+                entries.push((start, index));
+                max_extent = max_extent.max(end - start);
+            }
+        }
+        entries.sort_unstable();
+        Self {
+            entries,
+            max_extent,
+        }
+    }
+
+    /// Indices, in original order, of the exact matches that may overlap `start..end`.
+    fn near(&self, start: usize, end: usize) -> Vec<usize> {
+        let first = self
+            .entries
+            .partition_point(|&(s, _)| s < start.saturating_sub(self.max_extent));
+        let last = self.entries.partition_point(|&(s, _)| s < end);
+        let mut indices: Vec<usize> = self.entries[first..last].iter().map(|&(_, i)| i).collect();
+        indices.sort_unstable();
+        indices
+    }
+}
+
 fn is_redundant_low_coverage_composite_seq_wrapper(
     container: &LicenseMatch,
     candidate_contained_matches: &[LicenseMatch],
+    exact_matches: &ExactMatchIndex,
 ) -> bool {
     // Provenant-specific tuning (no ScanCode equivalent): only very-low-coverage seq
     // wrappers are eligible for redundant-composite dropping. A seq match at or above
@@ -318,8 +356,11 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
 
     let container_qspan_set = container.qspan_set();
 
-    let children: Vec<&LicenseMatch> = candidate_contained_matches
-        .iter()
+    let (container_start, container_end) = container.qspan_bounds();
+    let children: Vec<&LicenseMatch> = exact_matches
+        .near(container_start, container_end)
+        .into_iter()
+        .map(|index| &candidate_contained_matches[index])
         .filter(|m| {
             m.matcher == aho_match::MATCH_AHO
                 && has_full_match_coverage(m)
@@ -374,10 +415,15 @@ fn filter_redundant_low_coverage_composite_seq_wrappers(
     seq_matches: Vec<LicenseMatch>,
     candidate_contained_matches: &[LicenseMatch],
 ) -> Vec<LicenseMatch> {
+    let exact_matches = ExactMatchIndex::new(candidate_contained_matches);
     seq_matches
         .into_iter()
         .filter(|m| {
-            !is_redundant_low_coverage_composite_seq_wrapper(m, candidate_contained_matches)
+            !is_redundant_low_coverage_composite_seq_wrapper(
+                m,
+                candidate_contained_matches,
+                &exact_matches,
+            )
         })
         .collect()
 }
