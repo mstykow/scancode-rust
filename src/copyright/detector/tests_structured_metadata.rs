@@ -569,7 +569,7 @@ fn test_lowercase_metadata_version_still_gates_the_field_name_filter() {
 
 #[test]
 fn test_the_copyright_deadline_is_honoured_end_to_end() {
-    // `--timeout` becomes this deadline; a spent budget must stop work rather
+    // `--timeout` becomes this cancel; a spent budget must stop work rather
     // than be ignored.
     let input = concat!(
         "Metadata-Version: 2.2\n",
@@ -577,17 +577,20 @@ fn test_the_copyright_deadline_is_honoured_end_to_end() {
         "Author-email: jane@example.com\n",
     );
 
-    let (_c, _h, with_budget) =
-        crate::copyright::detector::detect_copyrights_from_text_with_deadline(
-            input,
-            Some(std::time::Duration::from_secs(60)),
-        );
+    let (_c, _h, with_budget) = crate::copyright::detector::detect_copyrights_from_text_with_cancel(
+        input,
+        Some(&crate::cancel::CancelToken::with_timeout(
+            std::time::Duration::from_secs(60),
+        )),
+    );
     assert_eq!(with_budget.len(), 1);
     assert_eq!(with_budget[0].author, "Jane Smith");
 
-    let (_c, _h, expired) = crate::copyright::detector::detect_copyrights_from_text_with_deadline(
+    let (_c, _h, expired) = crate::copyright::detector::detect_copyrights_from_text_with_cancel(
         input,
-        Some(std::time::Duration::ZERO),
+        Some(&crate::cancel::CancelToken::with_timeout(
+            std::time::Duration::ZERO,
+        )),
     );
     assert!(expired.is_empty(), "got {expired:?}");
 }

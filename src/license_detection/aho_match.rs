@@ -13,6 +13,7 @@
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_aho.py
 
+use crate::cancel::CancelToken;
 use crate::license_detection::LicenseDetectionError;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{TokenId, TokenKind};
@@ -22,7 +23,6 @@ use crate::license_detection::position_set::PositionSet;
 use crate::license_detection::query::QueryRun;
 use crate::models::LineNumber;
 use crate::models::MatchScore;
-use std::time::Instant;
 
 pub const MATCH_AHO: MatcherKind = MatcherKind::Aho;
 
@@ -70,15 +70,15 @@ fn byte_pos_to_token_pos(byte_pos: usize) -> usize {
 /// Corresponds to Python: `exact_match()` (lines 84-138)
 pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch> {
     aho_match_with_extra_matchables(index, query_run, None, None)
-        .expect("Aho matching without deadline should not time out")
+        .expect("Aho matching without cancel should not time out")
 }
 
-pub(crate) fn aho_match_with_deadline(
+pub(crate) fn aho_match_with_cancel(
     index: &LicenseIndex,
     query_run: &QueryRun,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<LicenseMatch>, LicenseDetectionError> {
-    aho_match_with_extra_matchables(index, query_run, None, deadline)
+    aho_match_with_extra_matchables(index, query_run, None, cancel)
 }
 
 /// Perform Aho-Corasick exact matching with temporary extra matchable positions.
@@ -90,7 +90,7 @@ pub(crate) fn aho_match_with_extra_matchables(
     index: &LicenseIndex,
     query_run: &QueryRun,
     extra_matchable_positions: Option<&PositionSet>,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<LicenseMatch>, LicenseDetectionError> {
     let mut matches = Vec::new();
 
@@ -108,7 +108,7 @@ pub(crate) fn aho_match_with_extra_matchables(
 
     for (match_index, ac_match) in automaton.find_overlapping_iter(&encoded_query).enumerate() {
         if match_index.is_multiple_of(1024) {
-            crate::license_detection::ensure_within_deadline(deadline)?;
+            crate::license_detection::ensure_not_cancelled(cancel)?;
         }
 
         let byte_start = ac_match.start;
@@ -208,7 +208,7 @@ pub(crate) fn aho_match_with_extra_matchables(
     }
 
     if let Some(extra_matchables) = extra_matchable_positions {
-        crate::license_detection::ensure_within_deadline(deadline)?;
+        crate::license_detection::ensure_not_cancelled(cancel)?;
         let live_matchables = query_run.matchables(true);
         matches = matches
             .iter()

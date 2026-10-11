@@ -11,6 +11,7 @@
 //! Foundation and others) via ScanCode's `seq.py`, retained per Apache-2.0
 //! section 4(c). The header above covers the ScanCode/nexB derivation.
 
+use crate::cancel::CancelToken;
 use crate::license_detection::LicenseDetectionError;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenId;
@@ -22,7 +23,6 @@ use crate::models::MatchScore;
 use bit_set::BitSet;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
-use std::time::Instant;
 
 use super::MATCH_SEQ;
 use super::candidates::Candidate;
@@ -33,7 +33,7 @@ struct MatchSearchContext<'a> {
     high_postings: &'a HashMap<TokenId, Vec<usize>>,
     len_legalese: usize,
     matchables: &'a BitSet,
-    deadline: Option<Instant>,
+    cancel: Option<&'a CancelToken>,
 }
 
 /// Find the longest matching block between query and rule token sequences.
@@ -80,7 +80,7 @@ fn find_longest_match_impl(
 
     for (offset, i) in (query_lo..query_hi).enumerate() {
         if offset.is_multiple_of(256) {
-            crate::license_detection::ensure_within_deadline(context.deadline)?;
+            crate::license_detection::ensure_not_cancelled(context.cancel)?;
         }
 
         new_j2len.clear();
@@ -177,7 +177,7 @@ fn match_blocks_impl(
     let mut loop_count = 0usize;
     while let Some((alo, ahi, blo, bhi)) = queue.pop() {
         if loop_count.is_multiple_of(32) {
-            crate::license_detection::ensure_within_deadline(context.deadline)?;
+            crate::license_detection::ensure_not_cancelled(context.cancel)?;
         }
         loop_count += 1;
 
@@ -241,15 +241,15 @@ pub(crate) fn seq_match_with_candidates(
     query_run: &QueryRun,
     candidates: &[Candidate<'_>],
 ) -> Vec<LicenseMatch> {
-    seq_match_with_candidates_and_deadline(index, query_run, candidates, None)
-        .expect("Sequence matching without deadline should not time out")
+    seq_match_with_candidates_and_cancel(index, query_run, candidates, None)
+        .expect("Sequence matching without cancel should not time out")
 }
 
-pub(crate) fn seq_match_with_candidates_and_deadline(
+pub(crate) fn seq_match_with_candidates_and_cancel(
     index: &LicenseIndex,
     query_run: &QueryRun,
     candidates: &[Candidate<'_>],
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<LicenseMatch>, LicenseDetectionError> {
     let mut matches = Vec::new();
 
@@ -270,7 +270,7 @@ pub(crate) fn seq_match_with_candidates_and_deadline(
 
     for (candidate_index, candidate) in candidates.iter().enumerate() {
         if candidate_index.is_multiple_of(8) {
-            crate::license_detection::ensure_within_deadline(deadline)?;
+            crate::license_detection::ensure_not_cancelled(cancel)?;
         }
 
         let rid = candidate.rid;
@@ -293,7 +293,7 @@ pub(crate) fn seq_match_with_candidates_and_deadline(
                 high_postings: &high_postings,
                 len_legalese,
                 matchables: &matchables,
-                deadline,
+                cancel,
             };
 
             let mut qstart = 0usize;
@@ -301,7 +301,7 @@ pub(crate) fn seq_match_with_candidates_and_deadline(
 
             while qstart <= qfinish {
                 if loop_count.is_multiple_of(32) {
-                    crate::license_detection::ensure_within_deadline(deadline)?;
+                    crate::license_detection::ensure_not_cancelled(cancel)?;
                 }
                 loop_count += 1;
 
@@ -426,7 +426,7 @@ mod tests {
             high_postings,
             len_legalese,
             matchables,
-            deadline: None,
+            cancel: None,
         };
         find_longest_match_impl(
             &context,
@@ -435,7 +435,7 @@ mod tests {
             rule_range.start,
             rule_range.end,
         )
-        .expect("Sequence matching without deadline should not time out")
+        .expect("Sequence matching without cancel should not time out")
     }
 
     fn match_blocks_for_test(
@@ -452,10 +452,10 @@ mod tests {
             high_postings,
             len_legalese,
             matchables,
-            deadline: None,
+            cancel: None,
         };
         match_blocks_impl(&context, query_range.start, query_range.end)
-            .expect("Sequence block matching without deadline should not time out")
+            .expect("Sequence block matching without cancel should not time out")
     }
 
     #[test]

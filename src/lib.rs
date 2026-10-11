@@ -34,6 +34,7 @@ extern crate self as provenance;
 pub(crate) mod app;
 pub mod assembly;
 pub mod cache;
+pub mod cancel;
 pub mod cli;
 #[doc(hidden)]
 pub mod compare;

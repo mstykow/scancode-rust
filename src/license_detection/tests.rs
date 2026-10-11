@@ -188,19 +188,19 @@ fn test_engine_detect_spdx_identifier() {
 }
 
 #[test]
-fn test_engine_detect_with_deadline_times_out_when_already_expired() {
+fn test_engine_detect_with_cancel_times_out_when_already_expired() {
     let engine = LicenseDetectionEngine::from_test_index(create_test_index_default());
 
     let error = engine
-        .detect_with_kind_with_score_and_deadline_with_options(
+        .detect_with_kind_with_score_and_cancel_with_options(
             "Permission is hereby granted, free of charge, to any person obtaining a copy",
             false,
             false,
             true,
             0.0,
-            Some(Instant::now() - Duration::from_millis(1)),
+            Some(&crate::cancel::CancelToken::with_timeout(Duration::ZERO)),
         )
-        .expect_err("expired deadline should abort license detection");
+        .expect_err("expired cancel should abort license detection");
 
     assert_eq!(
         error.to_string(),
@@ -1798,7 +1798,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software."#;
 
     let detections = engine
-        .detect_with_kind_with_score_and_deadline_with_options(
+        .detect_with_kind_with_score_and_cancel_with_options(
             partial_mit,
             false,
             false,

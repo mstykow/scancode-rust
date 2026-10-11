@@ -3,7 +3,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
-use std::time::Instant;
 
 use regex::Regex;
 
@@ -133,10 +132,6 @@ fn is_trademark_boilerplate_line(line: &str) -> bool {
         || lower.contains(" the apache logo")
         || lower.contains(" logo and the ")
         || lower.contains("registered trademarks or trademarks")
-}
-
-pub fn deadline_exceeded(deadline: Option<Instant>) -> bool {
-    deadline.is_some_and(|d| Instant::now() >= d)
 }
 
 pub fn add_found_at_short_variants(

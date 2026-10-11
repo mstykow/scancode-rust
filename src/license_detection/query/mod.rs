@@ -6,6 +6,7 @@
 
 //! Query processing - tokenized input for license matching.
 
+use crate::cancel::CancelToken;
 use crate::license_detection::LicenseDetectionError;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
@@ -18,7 +19,6 @@ use regex::Regex;
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::sync::LazyLock;
-use std::time::Instant;
 
 static QUERY_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("valid query regex"));
@@ -519,14 +519,14 @@ impl<'a> Query<'a> {
         index: &'a LicenseIndex,
         binary_derived: bool,
     ) -> Result<Self, LicenseDetectionError> {
-        Self::from_extracted_text_with_deadline(text, index, binary_derived, None)
+        Self::from_extracted_text_with_cancel(text, index, binary_derived, None)
     }
 
-    pub(crate) fn from_extracted_text_with_deadline(
+    pub(crate) fn from_extracted_text_with_cancel(
         text: &str,
         index: &'a LicenseIndex,
         binary_derived: bool,
-        deadline: Option<Instant>,
+        cancel: Option<&CancelToken>,
     ) -> Result<Self, LicenseDetectionError> {
         let line_threshold = if binary_derived {
             Self::BINARY_LINE_THRESHOLD
@@ -534,7 +534,7 @@ impl<'a> Query<'a> {
             Self::TEXT_LINE_THRESHOLD
         };
 
-        Self::with_source_options(text, index, line_threshold, Some(binary_derived), deadline)
+        Self::with_source_options(text, index, line_threshold, Some(binary_derived), cancel)
     }
 
     /// Iterate over query runs.
@@ -552,9 +552,9 @@ impl<'a> Query<'a> {
         index: &'a LicenseIndex,
         line_threshold: usize,
         binary_derived: Option<bool>,
-        deadline: Option<Instant>,
+        cancel: Option<&CancelToken>,
     ) -> Result<Self, LicenseDetectionError> {
-        crate::license_detection::ensure_within_deadline(deadline)?;
+        crate::license_detection::ensure_not_cancelled(cancel)?;
         let is_binary = match binary_derived {
             Some(is_binary) => is_binary,
             None => Self::detect_binary(text),
@@ -574,7 +574,7 @@ impl<'a> Query<'a> {
 
         for (current_line, (line_index, line)) in (1usize..).zip(text.lines().enumerate()) {
             if line_index.is_multiple_of(128) {
-                crate::license_detection::ensure_within_deadline(deadline)?;
+                crate::license_detection::ensure_not_cancelled(cancel)?;
             }
 
             let line_trimmed = line.trim();
@@ -638,7 +638,7 @@ impl<'a> Query<'a> {
             tokens_by_line.push(line_tokens);
         }
 
-        crate::license_detection::ensure_within_deadline(deadline)?;
+        crate::license_detection::ensure_not_cancelled(cancel)?;
 
         let high_matchables: PositionSet = tokens
             .iter()

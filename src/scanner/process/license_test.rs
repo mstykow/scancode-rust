@@ -19,12 +19,11 @@ use crate::license_detection::models::{
 use crate::license_detection::query::Query;
 use crate::models::{
     FileInfoBuilder, LicenseDetection as PublicLicenseDetection, LineNumber, Match, MatchScore,
-    ScanDiagnostic,
 };
 use crate::scanner::LicenseScanOptions;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 static TEST_ENGINE: LazyLock<Arc<LicenseDetectionEngine>> = LazyLock::new(|| {
     Arc::new(LicenseDetectionEngine::from_test_index(create_test_index(
@@ -1113,11 +1112,9 @@ fn test_compute_percentage_of_license_text_counts_unknown_tokens() {
 #[test]
 fn test_extract_license_information_maps_timeout_to_stage_error() {
     let mut file_info_builder = FileInfoBuilder::default();
-    let mut scan_diagnostics: Vec<ScanDiagnostic> = Vec::new();
-
+    let expired = crate::cancel::CancelToken::with_timeout(Duration::ZERO);
     let error = extract_license_information(
         &mut file_info_builder,
-        &mut scan_diagnostics,
         LicenseExtractionInput {
             path: std::path::Path::new("timeout.txt"),
             text_content:
@@ -1127,12 +1124,11 @@ fn test_extract_license_information_maps_timeout_to_stage_error() {
             license_options: LicenseScanOptions::default(),
             from_binary_strings: false,
             timeout_seconds: 1.0,
-            deadline: Some(Instant::now() - Duration::from_millis(1)),
+            cancel: Some(&expired),
         },
     )
     .expect_err("expired deadline should map to stage-specific timeout");
 
-    assert!(scan_diagnostics.is_empty());
     assert_eq!(error.to_string(), "Timeout during license scan (> 1.00s)");
 }
 

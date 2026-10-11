@@ -242,6 +242,17 @@ The scanner uses `rayon` to process files in parallel. At a high level, each wor
 3. runs enabled text-detection stages
 4. records scan errors and progress for that file
 
+**Per-file time budget:** when `--timeout` is positive, each file's detection runs on a long-lived
+worker thread supervised by the scan thread, which owns the deadline. Detectors poll one shared
+`CancelToken` (`src/cancel.rs`) so a worker normally stops at the deadline and returns its partial
+result. A worker that has not returned shortly after the deadline is abandoned: the scan thread
+records the phase-specific timeout in `scan_errors`, never merges anything that worker produces
+later, and continues. A Rust thread cannot be killed, so abandoned workers keep running until they
+next poll the token. Their number is capped (the larger of 4 and the CPU count); past the cap further
+files are skipped with an explicit error instead of spawning more threads. Bounded here means the
+scan finishes on time, not that the CPU is reclaimed instantly. `--timeout 0` or `--processes -1`
+(sequential without timeouts) runs detection inline with no supervision.
+
 **Benefits:**
 
 - Utilizes all CPU cores
