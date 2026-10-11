@@ -14,7 +14,8 @@ use crate::copyright::{
 };
 use crate::models::{Author, Copyright, FileInfoBuilder, Holder, LineNumber};
 use regex::Regex;
-use std::collections::HashSet;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -74,35 +75,39 @@ pub(super) fn extract_copyright_information(
     // raw-span rendering, instead of re-splitting the whole file per copyright,
     // holder, and author.
     let raw_lines: Vec<&str> = text_content.lines().collect();
+    let mut spans = SpanCache::new(&raw_lines);
 
     // Two distinct detections (e.g. `(c) 2012. Natural Earth` and the
     // stray-space variant `(c) 2012 . Natural Earth`) can render to the same
     // native value at the same span; collapse those exact duplicates so the file
     // does not report the same notice twice.
     let mut seen_copyrights = HashSet::new();
+    let rendered_copyrights = copyrights
+        .into_iter()
+        .map(|c| Copyright {
+            normalized_copyright: Some(c.copyright.clone()),
+            copyright: render_raw_copyright_from_text(
+                &mut spans,
+                c.start_line,
+                c.end_line,
+                c.copyright.as_str(),
+            ),
+            start_line: c.start_line,
+            end_line: c.end_line,
+        })
+        .collect::<Vec<_>>();
     file_info_builder.copyrights(
-        copyrights
+        rendered_copyrights
             .into_iter()
-            .map(|c| Copyright {
-                normalized_copyright: Some(c.copyright.clone()),
-                copyright: render_raw_copyright_from_text(
-                    text_content,
-                    c.start_line,
-                    c.end_line,
-                    c.copyright.as_str(),
-                ),
-                start_line: c.start_line,
-                end_line: c.end_line,
-            })
             // The font-metadata-label check is applied to every copyright, not only
             // font paths: `License Description:` / `License Info URL:` are OpenType
             // name-table field labels and are never a legitimate copyright prefix in
             // real source, so rejecting them universally is safe and path-independent.
             .filter(|c| {
-                let raw_span = render_raw_span(&raw_lines, c.start_line, c.end_line);
+                let raw_span = spans.raw(c.start_line, c.end_line);
                 !is_binary_garbage_party_value(&c.copyright)
                     && !is_font_metadata_label_copyright(&c.copyright)
-                    && !detection_is_source_code(&c.copyright, &raw_span)
+                    && !detection_is_source_code(&c.copyright, raw_span)
                     && !c
                         .normalized_copyright
                         .as_deref()
@@ -119,8 +124,8 @@ pub(super) fn extract_copyright_information(
         holders
             .into_iter()
             .filter(|h| {
-                let raw_span = render_raw_span(&raw_lines, h.start_line, h.end_line);
-                !detection_is_source_code(&h.holder, &raw_span)
+                let raw_span = spans.raw(h.start_line, h.end_line);
+                !detection_is_source_code(&h.holder, raw_span)
             })
             .map(|h| Holder {
                 holder: h.holder,
@@ -134,14 +139,15 @@ pub(super) fn extract_copyright_information(
     authors.extend(extract_comment_author_supplements(text_content));
     let mut seen_authors = HashSet::new();
     authors.retain(|author| {
-        let raw_span = render_raw_span(&raw_lines, author.start_line, author.end_line);
+        let raw_span = spans.raw(author.start_line, author.end_line);
+        let raw_span_text = raw_span.text.as_str();
         !is_binary_garbage_party_value(&author.author)
             && !looks_like_source_code(&author.author)
-            && (!looks_like_source_code(&raw_span)
+            && (!raw_span.looks_like_source_code()
                 || (has_author_contact_evidence(&author.author)
-                    && raw_span_has_author_attribution(&raw_span))
-                || raw_span_has_explicit_contactless_author_attribution(&raw_span)
-                || (raw_span_has_author_attribution(&raw_span)
+                    && raw_span_has_author_attribution(raw_span_text))
+                || raw_span_has_explicit_contactless_author_attribution(raw_span_text)
+                || (raw_span_has_author_attribution(raw_span_text)
                     && span_is_in_pod_author_section(&raw_lines, author.start_line)))
             && seen_authors.insert((author.author.clone(), author.start_line, author.end_line))
     });
@@ -159,17 +165,51 @@ pub(super) fn extract_copyright_information(
 }
 
 fn render_raw_copyright_from_text(
-    text_content: &str,
+    spans: &mut SpanCache<'_>,
     start_line: LineNumber,
     end_line: LineNumber,
     fallback: &str,
 ) -> String {
-    let raw_lines: Vec<&str> = text_content.lines().collect();
-    let start_index = start_line.get().saturating_sub(1);
-    let end_index = end_line.get();
-    let Some(span) = raw_lines.get(start_index..end_index) else {
+    let Some(RenderedSpan {
+        text: rendered,
+        wrapper_value,
+        refined,
+    }) = spans.rendered(start_line, end_line)
+    else {
         return fallback.to_string();
     };
+
+    if rendered.is_empty() {
+        fallback.to_string()
+    } else if let Some(projected) =
+        project_wrapped_copyright_value(rendered, wrapper_value.as_deref(), fallback)
+    {
+        projected
+    } else if let Some(projected) = project_suspicious_native_copyright_value(rendered) {
+        projected
+    } else {
+        project_native_copyright_value(rendered, refined, fallback)
+    }
+}
+
+/// A span rendered for projection, with the fallback-independent results that
+/// every detection on the span would otherwise recompute.
+struct RenderedSpan {
+    text: String,
+    wrapper_value: Option<String>,
+    refined: OnceCell<Option<String>>,
+}
+
+/// Render the raw lines of a span into one normalized string; `None` when the
+/// span lies outside the file.
+fn render_span_text(
+    raw_lines: &[&str],
+    start_line: LineNumber,
+    end_line: LineNumber,
+) -> Option<String> {
+    let start_index = start_line.get().saturating_sub(1);
+    let end_index = end_line.get();
+    let span = raw_lines.get(start_index..end_index)?;
 
     let rendered = span
         .iter()
@@ -196,17 +236,7 @@ fn render_raw_copyright_from_text(
     // `<florian.loitsch at inria dot fr>`, matching the unspaced `<email>` form
     // real notices normally use. Only balanced pairs are touched, so stray `<`
     // and `>` comparison operators are left alone.
-    let rendered = collapse_angle_bracket_padding(&rendered);
-
-    if rendered.is_empty() {
-        fallback.to_string()
-    } else if let Some(projected) = project_wrapped_copyright_value(&rendered, fallback) {
-        projected
-    } else if let Some(projected) = project_suspicious_native_copyright_value(&rendered) {
-        projected
-    } else {
-        project_native_copyright_value(&rendered, fallback)
-    }
+    Some(collapse_angle_bracket_padding(&rendered))
 }
 
 /// Replace an anchor with an absolute attribution URL and its visible text.
@@ -403,8 +433,74 @@ fn render_raw_span(raw_lines: &[&str], start_line: LineNumber, end_line: LineNum
 
 /// Return true when a detection's refined value or its backing source span is
 /// obviously source code, so it should be dropped from output.
-fn detection_is_source_code(value: &str, raw_span: &str) -> bool {
-    looks_like_source_code(value) || looks_like_source_code(raw_span)
+fn detection_is_source_code(value: &str, raw_span: &RawSpan) -> bool {
+    looks_like_source_code(value) || raw_span.looks_like_source_code()
+}
+
+/// A rendered raw span with its source-code verdict computed at most once.
+struct RawSpan {
+    text: String,
+    source_code: OnceCell<bool>,
+}
+
+impl RawSpan {
+    fn looks_like_source_code(&self) -> bool {
+        *self
+            .source_code
+            .get_or_init(|| looks_like_source_code(&self.text))
+    }
+}
+
+/// The views of one line range, each computed on first use.
+#[derive(Default)]
+struct SpanViews {
+    raw: OnceCell<RawSpan>,
+    rendered: OnceCell<Option<RenderedSpan>>,
+}
+
+/// Per-range cache of span views. Detections on one very long line (a source
+/// map, minified bundle) share a span, and rescanning it per detection is
+/// quadratic.
+struct SpanCache<'a> {
+    raw_lines: &'a [&'a str],
+    views: HashMap<(LineNumber, LineNumber), SpanViews>,
+}
+
+impl<'a> SpanCache<'a> {
+    fn new(raw_lines: &'a [&'a str]) -> Self {
+        Self {
+            raw_lines,
+            views: HashMap::new(),
+        }
+    }
+
+    fn raw(&mut self, start_line: LineNumber, end_line: LineNumber) -> &RawSpan {
+        let raw_lines = self.raw_lines;
+        self.views
+            .entry((start_line, end_line))
+            .or_default()
+            .raw
+            .get_or_init(|| RawSpan {
+                text: render_raw_span(raw_lines, start_line, end_line),
+                source_code: OnceCell::new(),
+            })
+    }
+
+    fn rendered(&mut self, start_line: LineNumber, end_line: LineNumber) -> Option<&RenderedSpan> {
+        let raw_lines = self.raw_lines;
+        self.views
+            .entry((start_line, end_line))
+            .or_default()
+            .rendered
+            .get_or_init(|| {
+                render_span_text(raw_lines, start_line, end_line).map(|text| RenderedSpan {
+                    wrapper_value: extract_wrapped_copyright_value(&text),
+                    refined: OnceCell::new(),
+                    text,
+                })
+            })
+            .as_ref()
+    }
 }
 
 pub(super) fn has_author_contact_evidence(author: &str) -> bool {
@@ -451,7 +547,7 @@ fn span_is_in_pod_author_section(raw_lines: &[&str], start_line: LineNumber) -> 
         == Some(true)
 }
 
-fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<String> {
+fn extract_wrapped_copyright_value(rendered: &str) -> Option<String> {
     static VALUE_LEGALCOPYRIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r#"(?ix)
@@ -499,7 +595,7 @@ fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<Str
         .expect("valid assembly copyright attribute wrapper regex")
     });
 
-    let extracted = if let Some(captures) = VALUE_LEGALCOPYRIGHT_RE.captures(rendered) {
+    if let Some(captures) = VALUE_LEGALCOPYRIGHT_RE.captures(rendered) {
         captures
             .name("value")
             .map(|m| m.as_str().trim().to_string())
@@ -525,8 +621,19 @@ fn project_wrapped_copyright_value(rendered: &str, fallback: &str) -> Option<Str
             .name("value")
             .map(|m| m.as_str().trim().to_string())
     } else {
-        project_static_notice_literal(rendered, fallback)
-    }?;
+        None
+    }
+}
+
+fn project_wrapped_copyright_value(
+    rendered: &str,
+    wrapper_value: Option<&str>,
+    fallback: &str,
+) -> Option<String> {
+    let extracted = match wrapper_value {
+        Some(value) => value.to_string(),
+        None => project_static_notice_literal(rendered, fallback)?,
+    };
 
     let projected = prepare_text_line(&extracted)
         .split_whitespace()
@@ -574,7 +681,11 @@ fn project_static_notice_literal(rendered: &str, fallback: &str) -> Option<Strin
     same_notice.then(|| literal.to_string())
 }
 
-fn project_native_copyright_value(rendered: &str, fallback: &str) -> String {
+fn project_native_copyright_value(
+    rendered: &str,
+    refined: &OnceCell<Option<String>>,
+    fallback: &str,
+) -> String {
     let rendered = rendered.trim();
     let fallback = fallback.trim();
     if rendered.is_empty() || fallback.is_empty() {
@@ -595,7 +706,11 @@ fn project_native_copyright_value(rendered: &str, fallback: &str) -> String {
             let native_suffix = rendered[s + len..].trim();
             return join_native_suffix(&base, native_suffix);
         }
-        if refine_copyright(rendered).as_deref() == Some(fallback) {
+        if refined
+            .get_or_init(|| refine_copyright(rendered))
+            .as_deref()
+            == Some(fallback)
+        {
             return preserve_native_suffix_for_semantic_match(rendered, fallback);
         }
         // The normalized notice was not found verbatim (e.g. punctuation differs)
