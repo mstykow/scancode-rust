@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    collapse_angle_bracket_padding, extract_comment_author_supplements,
+    SpanCache, collapse_angle_bracket_padding, extract_comment_author_supplements,
     extract_copyright_information, extract_patch_header_author_supplements, inline_anchor_hrefs,
     is_binary_garbage_party_value, is_binary_string_copyright_candidate,
     is_font_metadata_label_copyright, strip_common_comment_wrappers,
 };
 use crate::copyright;
-use crate::models::{FileInfoBuilder, FileType};
+use crate::models::{FileInfoBuilder, FileType, LineNumber};
 use std::path::Path;
 use std::time::Duration;
 
@@ -2028,4 +2028,64 @@ fn test_extract_copyright_information_keeps_banner_on_a_line_shared_with_code() 
             .map(|c| &c.copyright)
             .collect::<Vec<_>>()
     );
+}
+
+// Detections on one very long line share its span; the span must be rendered
+// once, not per detection, or the scan is quadratic in detections.
+#[test]
+fn test_span_cache_renders_each_distinct_span_once() {
+    let lines = ["Copyright 2020 Acme Inc.", "second line"];
+    let mut spans = SpanCache::new(&lines);
+    let one = LineNumber::new(1).expect("line 1");
+    let two = LineNumber::new(2).expect("line 2");
+
+    let first = std::ptr::from_ref(spans.raw(one, one));
+    let again = std::ptr::from_ref(spans.raw(one, one));
+    let other = std::ptr::from_ref(spans.raw(two, two));
+
+    assert_eq!(first, again);
+    assert_ne!(first, other);
+}
+
+// A source map packs many embedded notices onto one line; each must still be
+// reported with its own value.
+#[test]
+fn test_extract_copyright_information_reports_every_notice_on_one_long_line() {
+    let notices = (0..40)
+        .map(|i| format!("Copyright 20{:02} Holder{i} Inc.", i % 25))
+        .collect::<Vec<_>>()
+        .join("\\n\\n");
+    let content = format!("{{\"version\":3,\"sourcesContent\":[\"{notices}\"]}}");
+
+    let mut builder = FileInfoBuilder::default();
+    extract_copyright_information(
+        &mut builder,
+        Path::new("lib.js.map"),
+        &content,
+        120.0,
+        false,
+    );
+    let file = build_single_file(builder);
+
+    for i in 0..40 {
+        let expected = format!("Copyright 20{:02} Holder{i} Inc.", i % 25);
+        assert!(
+            file.copyrights.iter().any(|c| c.copyright == expected),
+            "missing {expected:?}: {:?}",
+            file.copyrights
+                .iter()
+                .map(|c| c.copyright.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            file.holders
+                .iter()
+                .any(|h| h.holder == format!("Holder{i} Inc.")),
+            "missing Holder{i}: {:?}",
+            file.holders
+                .iter()
+                .map(|h| h.holder.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
 }

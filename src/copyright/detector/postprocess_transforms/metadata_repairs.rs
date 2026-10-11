@@ -13,70 +13,54 @@ pub fn drop_json_description_metadata_copyrights_and_holders(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    // A window that declares a copyright field is attributing, not describing.
-    static JSON_COPYRIGHT_KEY_RE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r#"(?i)"copyrights?(?:_?text|_?notice)?"\s*:"#).unwrap());
-
+    // Detections on one very long line share a span; judging it once per
+    // distinct span keeps this linear in detections.
+    let mut keeps_by_span: HashMap<(usize, usize), bool> = HashMap::new();
     let mut retained_spans: HashSet<(usize, usize)> = HashSet::new();
     copyrights.retain(|copyright| {
-        if span_is_versioned_project_banner(
-            raw_lines,
-            copyright.start_line.get(),
-            copyright.end_line.get(),
-        ) {
-            retained_spans.insert((copyright.start_line.get(), copyright.end_line.get()));
-            return true;
-        }
-        let Some(window) = json_window_for_span(
-            raw_lines,
-            copyright.start_line.get(),
-            copyright.end_line.get(),
-        ) else {
-            retained_spans.insert((copyright.start_line.get(), copyright.end_line.get()));
-            return true;
-        };
-
-        let lower = window.to_ascii_lowercase();
-        let description_like = lower.contains("\"description\"")
-            || lower.contains("\"disambiguatingdescription\"")
-            || lower.contains("\"sponsor\"")
-            || lower.contains("\"logo\"")
-            || lower.contains("\"url\"");
+        let span = (copyright.start_line.get(), copyright.end_line.get());
         let explicit_attribution = copyright.copyright.starts_with("(c) ")
             && (copyright.copyright.contains("http://")
                 || copyright.copyright.contains("https://"));
-        let keep =
-            !description_like || JSON_COPYRIGHT_KEY_RE.is_match(&window) || explicit_attribution;
+        let keep = *keeps_by_span
+            .entry(span)
+            .or_insert_with(|| json_span_keeps_detections(raw_lines, span))
+            || explicit_attribution;
         if keep {
-            retained_spans.insert((copyright.start_line.get(), copyright.end_line.get()));
+            retained_spans.insert(span);
         }
         keep
     });
 
     holders.retain(|holder| {
-        if retained_spans.contains(&(holder.start_line.get(), holder.end_line.get())) {
-            return true;
-        }
-        if span_is_versioned_project_banner(
-            raw_lines,
-            holder.start_line.get(),
-            holder.end_line.get(),
-        ) {
-            return true;
-        }
-        let Some(window) =
-            json_window_for_span(raw_lines, holder.start_line.get(), holder.end_line.get())
-        else {
-            return true;
-        };
-        let lower = window.to_ascii_lowercase();
-        let description_like = lower.contains("\"description\"")
-            || lower.contains("\"disambiguatingdescription\"")
-            || lower.contains("\"sponsor\"")
-            || lower.contains("\"logo\"")
-            || lower.contains("\"url\"");
-        !description_like || JSON_COPYRIGHT_KEY_RE.is_match(&window)
+        let span = (holder.start_line.get(), holder.end_line.get());
+        retained_spans.contains(&span)
+            || *keeps_by_span
+                .entry(span)
+                .or_insert_with(|| json_span_keeps_detections(raw_lines, span))
     });
+}
+
+/// A versioned project banner, a span without a JSON window, or a window that
+/// declares a copyright field is attribution; a window that only describes a
+/// project (description, sponsor, logo, url) is metadata.
+fn json_span_keeps_detections(raw_lines: &[&str], span: (usize, usize)) -> bool {
+    static JSON_COPYRIGHT_KEY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"(?i)"copyrights?(?:_?text|_?notice)?"\s*:"#).unwrap());
+
+    if span_is_versioned_project_banner(raw_lines, span.0, span.1) {
+        return true;
+    }
+    let Some(window) = json_window_for_span(raw_lines, span.0, span.1) else {
+        return true;
+    };
+    let lower = window.to_ascii_lowercase();
+    let description_like = lower.contains("\"description\"")
+        || lower.contains("\"disambiguatingdescription\"")
+        || lower.contains("\"sponsor\"")
+        || lower.contains("\"logo\"")
+        || lower.contains("\"url\"");
+    !description_like || JSON_COPYRIGHT_KEY_RE.is_match(&window)
 }
 
 fn span_is_versioned_project_banner(
@@ -118,15 +102,15 @@ pub fn drop_markup_declaration_and_versioninfo_copyrights_and_holders(
         return;
     }
 
+    let mut markup_by_span: HashMap<(usize, usize), bool> = HashMap::new();
     let mut retained_spans: HashSet<(usize, usize)> = HashSet::new();
     copyrights.retain(|copyright| {
-        let keep = !span_has_markup_declaration_or_versioninfo(
-            raw_lines,
-            copyright.start_line.get(),
-            copyright.end_line.get(),
-        );
+        let span = (copyright.start_line.get(), copyright.end_line.get());
+        let keep = !*markup_by_span.entry(span).or_insert_with(|| {
+            span_has_markup_declaration_or_versioninfo(raw_lines, span.0, span.1)
+        });
         if keep {
-            retained_spans.insert((copyright.start_line.get(), copyright.end_line.get()));
+            retained_spans.insert(span);
         }
         keep
     });
@@ -136,11 +120,10 @@ pub fn drop_markup_declaration_and_versioninfo_copyrights_and_holders(
             return true;
         }
 
-        !span_has_markup_declaration_or_versioninfo(
-            raw_lines,
-            holder.start_line.get(),
-            holder.end_line.get(),
-        )
+        let span = (holder.start_line.get(), holder.end_line.get());
+        !*markup_by_span.entry(span).or_insert_with(|| {
+            span_has_markup_declaration_or_versioninfo(raw_lines, span.0, span.1)
+        })
     });
 }
 

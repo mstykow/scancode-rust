@@ -946,22 +946,22 @@ pub fn extend_bare_c_year_detections_to_line_end_for_multi_c_lines(
             if tail.len() <= short.len() {
                 continue;
             }
+            // Refining the whole line tail is costly, so only do it when a
+            // detection actually needs the extension.
+            let is_target = |det: &CopyrightDetection| {
+                det.start_line == prepared_line.line_number
+                    && det.end_line == prepared_line.line_number
+                    && det.copyright == short
+            };
+            if !copyrights.iter().any(is_target) {
+                continue;
+            }
             let Some(extended) = refine_copyright(tail) else {
                 continue;
             };
 
-            let mut did_replace = false;
-            for det in copyrights.iter_mut() {
-                if det.start_line == prepared_line.line_number
-                    && det.end_line == prepared_line.line_number
-                    && det.copyright == short
-                {
-                    det.copyright = extended.clone();
-                    did_replace = true;
-                }
-            }
-            if !did_replace {
-                continue;
+            for det in copyrights.iter_mut().filter(|det| is_target(det)) {
+                det.copyright = extended.clone();
             }
 
             if let Some(holder) = derive_holder_from_simple_copyright_string(&extended)
