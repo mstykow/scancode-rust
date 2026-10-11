@@ -11,6 +11,7 @@ mod orchestrator;
 mod pipeline;
 mod special_cases;
 mod spill;
+mod supervisor;
 
 pub use orchestrator::{
     process_collected, process_collected_sequential, process_collected_with_memory_limit,

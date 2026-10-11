@@ -4,13 +4,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from ScanCode Toolkit (Apache-2.0); modified. See NOTICE.
 
+use crate::cancel::CancelToken;
 use crate::copyright::line_tracking::PreparedLines;
 use crate::copyright::refiner::has_copyright_year;
 use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetection};
 use crate::models::LineNumber;
 use regex::Regex;
 use std::sync::LazyLock;
-use std::time::Instant;
 
 use super::super::seen_text::SeenTextSets;
 
@@ -22,6 +22,7 @@ fn run_initial_detection_repairs(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
     seen: &mut SeenTextSets,
+    cancel: Option<&CancelToken>,
 ) {
     let (mut new_c, mut new_h) =
         super::postprocess_transforms::extract_question_mark_year_copyrights(prepared_cache);
@@ -38,6 +39,10 @@ fn run_initial_detection_repairs(
     super::pattern_extract::drop_batman_adv_contributors_copyright(content, copyrights, holders);
     seen.rebuild_copyrights_from(copyrights);
     seen.rebuild_holders_from(holders);
+
+    if crate::cancel::is_cancelled(cancel) {
+        return;
+    }
 
     super::postprocess_transforms::split_embedded_copyright_detections(copyrights, holders);
     let new_h = super::postprocess_transforms::add_missing_holders_from_email_bearing_copyrights(
@@ -1033,16 +1038,14 @@ fn run_final_variant_and_cleanup_repairs(
 
 // Copyright postprocess phase entry point; the long argument list threads the shared detection-pipeline state.
 #[allow(clippy::too_many_arguments)]
-/// Runs the postprocess repairs, skipping the extraction steps once `deadline`
+/// Runs the postprocess repairs, skipping the extraction steps once `cancel`
 /// has passed.
 ///
 /// The final cleanup runs either way. It is what removes the false positives the
 /// earlier steps emit, so skipping it would leave output dirtier than a complete
 /// run rather than merely smaller.
 ///
-/// Bounds accumulated work between steps only. A single step that never returns
-/// stays unbounded — a cooperative deadline cannot preempt one — so this is not
-/// protection against a hang.
+/// Polls `cancel` only between steps; the scan supervisor bounds a single step that never returns.
 pub(in super::super) fn run_phase_postprocess(
     content: &str,
     raw_lines: &[&str],
@@ -1052,11 +1055,11 @@ pub(in super::super) fn run_phase_postprocess(
     holders: &mut Vec<HolderDetection>,
     authors: &mut Vec<AuthorDetection>,
     seen: &mut SeenTextSets,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) {
-    run_initial_detection_repairs(content, prepared_cache, copyrights, holders, seen);
+    run_initial_detection_repairs(content, prepared_cache, copyrights, holders, seen, cancel);
 
-    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+    if !crate::cancel::is_cancelled(cancel) {
         run_author_extraction_and_repairs(
             content,
             raw_lines,
@@ -1068,7 +1071,7 @@ pub(in super::super) fn run_phase_postprocess(
         );
     }
 
-    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+    if !crate::cancel::is_cancelled(cancel) {
         run_mid_pipeline_repairs(
             content,
             raw_lines,
@@ -1081,7 +1084,7 @@ pub(in super::super) fn run_phase_postprocess(
         );
     }
 
-    if !super::postprocess_transforms::deadline_exceeded(deadline) {
+    if !crate::cancel::is_cancelled(cancel) {
         run_late_pattern_extractions(content, prepared_cache, copyrights, holders, seen);
     }
 

@@ -37,6 +37,7 @@ pub(crate) mod test_utils;
 pub mod tokenize;
 pub mod unknown_match;
 
+use crate::cancel::CancelToken;
 use bit_set::BitSet;
 use std::collections::HashSet;
 use std::fs;
@@ -112,8 +113,8 @@ pub use token_set::{HighBitset, TokenSet};
 pub use unknown_match::unknown_match;
 
 use self::seq_match::{
-    MAX_NEAR_DUPE_CANDIDATES, select_seq_candidates_with_deadline,
-    seq_match_with_candidates_and_deadline,
+    MAX_NEAR_DUPE_CANDIDATES, select_seq_candidates_with_cancel,
+    seq_match_with_candidates_and_cancel,
 };
 
 /// License detection engine that orchestrates the detection pipeline.
@@ -155,14 +156,10 @@ const MAX_SEQ_QUERY_RUN_TOKENS: usize = 50_000;
 const MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP: usize = 8;
 const MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP: usize = 2;
 
-pub(crate) fn deadline_exceeded(deadline: Option<Instant>) -> bool {
-    deadline.is_some_and(|deadline| Instant::now() >= deadline)
-}
-
-pub(crate) fn ensure_within_deadline(
-    deadline: Option<Instant>,
+pub(crate) fn ensure_not_cancelled(
+    cancel: Option<&CancelToken>,
 ) -> Result<(), LicenseDetectionError> {
-    if deadline_exceeded(deadline) {
+    if crate::cancel::is_cancelled(cancel) {
         Err(LicenseDetectionError::Timeout)
     } else {
         Ok(())
@@ -441,7 +438,7 @@ fn collect_whole_query_exact_followup_matches(
     matched_qspans: &mut Vec<models::PositionSpan>,
     whole_run: &query::QueryRun<'_>,
     enable_sequence_matching: bool,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<LicenseMatch>, LicenseDetectionError> {
     if !enable_sequence_matching {
         return Ok(Vec::new());
@@ -456,25 +453,25 @@ fn collect_whole_query_exact_followup_matches(
     }
 
     if whole_run.is_matchable(false, matched_qspans) {
-        let near_dupe_candidates = if deadline.is_some() {
-            select_seq_candidates_with_deadline(
+        let near_dupe_candidates = if cancel.is_some() {
+            select_seq_candidates_with_cancel(
                 index,
                 whole_run,
                 true,
                 MAX_NEAR_DUPE_CANDIDATES,
-                deadline,
+                cancel,
             )?
         } else {
             self::seq_match::select_seq_candidates(index, whole_run, true, MAX_NEAR_DUPE_CANDIDATES)
         };
 
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = if deadline.is_some() {
-                seq_match_with_candidates_and_deadline(
+            let near_dupe_matches = if cancel.is_some() {
+                seq_match_with_candidates_and_cancel(
                     index,
                     whole_run,
                     &near_dupe_candidates,
-                    deadline,
+                    cancel,
                 )?
             } else {
                 self::seq_match::seq_match_with_candidates(index, whole_run, &near_dupe_candidates)
@@ -500,13 +497,13 @@ fn collect_regular_seq_matches(
     query: &Query<'_>,
     matched_qspans: &[models::PositionSpan],
     candidate_contained_matches: &[LicenseMatch],
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<LicenseMatch>, LicenseDetectionError> {
     let mut seq_all_matches = Vec::new();
 
     for (query_run_index, query_run) in query.query_runs().into_iter().enumerate() {
         if query_run_index % 8 == 0 {
-            ensure_within_deadline(deadline)?;
+            ensure_not_cancelled(cancel)?;
         }
 
         if !query_run.is_matchable(false, matched_qspans) {
@@ -519,13 +516,13 @@ fn collect_regular_seq_matches(
             continue;
         }
 
-        let candidates = if deadline.is_some() {
-            select_seq_candidates_with_deadline(
+        let candidates = if cancel.is_some() {
+            select_seq_candidates_with_cancel(
                 index,
                 &query_run,
                 false,
                 MAX_REGULAR_SEQ_CANDIDATES,
-                deadline,
+                cancel,
             )?
         } else {
             self::seq_match::select_seq_candidates(
@@ -536,8 +533,8 @@ fn collect_regular_seq_matches(
             )
         };
         if !candidates.is_empty() {
-            let matches = if deadline.is_some() {
-                seq_match_with_candidates_and_deadline(index, &query_run, &candidates, deadline)?
+            let matches = if cancel.is_some() {
+                seq_match_with_candidates_and_cancel(index, &query_run, &candidates, cancel)?
             } else {
                 self::seq_match::seq_match_with_candidates(index, &query_run, &candidates)
             };
@@ -815,7 +812,7 @@ impl LicenseDetectionEngine {
         unknown_licenses: bool,
         binary_derived: bool,
     ) -> Result<Vec<LicenseDetection>> {
-        self.detect_with_kind_with_score_and_deadline_with_options(
+        self.detect_with_kind_with_score_and_cancel_with_options(
             text,
             unknown_licenses,
             binary_derived,
@@ -833,7 +830,7 @@ impl LicenseDetectionEngine {
         binary_derived: bool,
         min_score: f32,
     ) -> Result<Vec<LicenseDetection>> {
-        self.detect_with_kind_with_score_and_deadline_with_options(
+        self.detect_with_kind_with_score_and_cancel_with_options(
             text,
             unknown_licenses,
             binary_derived,
@@ -844,28 +841,23 @@ impl LicenseDetectionEngine {
         .map_err(Into::into)
     }
 
-    pub(crate) fn detect_with_kind_with_score_and_deadline_with_options(
+    pub(crate) fn detect_with_kind_with_score_and_cancel_with_options(
         &self,
         text: &str,
         unknown_licenses: bool,
         binary_derived: bool,
         enable_sequence_matching: bool,
         min_score: f32,
-        deadline: Option<Instant>,
+        cancel: Option<&CancelToken>,
     ) -> Result<Vec<LicenseDetection>, LicenseDetectionError> {
-        ensure_within_deadline(deadline)?;
+        ensure_not_cancelled(cancel)?;
         let clean_text = strip_utf8_bom_str(text);
 
         let content = truncate_detection_text(clean_text);
 
-        ensure_within_deadline(deadline)?;
-        let mut query = if deadline.is_some() {
-            Query::from_extracted_text_with_deadline(
-                content,
-                &self.index,
-                binary_derived,
-                deadline,
-            )?
+        ensure_not_cancelled(cancel)?;
+        let mut query = if cancel.is_some() {
+            Query::from_extracted_text_with_cancel(content, &self.index, binary_derived, cancel)?
         } else {
             Query::from_extracted_text(content, &self.index, binary_derived)?
         };
@@ -879,7 +871,7 @@ impl LicenseDetectionEngine {
         // Phase 1a: Hash matching
         // Python returns immediately if hash matches found (index.py:987-991)
         {
-            ensure_within_deadline(deadline)?;
+            ensure_not_cancelled(cancel)?;
             let hash_matches = hash_match(&self.index, &whole_query_run);
 
             if !hash_matches.is_empty() {
@@ -910,7 +902,7 @@ impl LicenseDetectionEngine {
 
         // Phase 1b: SPDX-LID matching
         {
-            ensure_within_deadline(deadline)?;
+            ensure_not_cancelled(cancel)?;
             let spdx_matches = spdx_lid_match(&self.index, &query);
             subtract_spdx_match_qspans(
                 &mut query,
@@ -923,20 +915,20 @@ impl LicenseDetectionEngine {
 
         // Phase 1c: Aho-Corasick matching
         {
-            ensure_within_deadline(deadline)?;
+            ensure_not_cancelled(cancel)?;
             let aho_matches = if aho_extra_matchables.is_empty() {
-                if deadline.is_some() {
-                    aho_match::aho_match_with_deadline(&self.index, &whole_query_run, deadline)?
+                if cancel.is_some() {
+                    aho_match::aho_match_with_cancel(&self.index, &whole_query_run, cancel)?
                 } else {
                     aho_match(&self.index, &whole_query_run)
                 }
             } else {
-                if deadline.is_some() {
+                if cancel.is_some() {
                     aho_match::aho_match_with_extra_matchables(
                         &self.index,
                         &whole_query_run,
                         Some(&aho_extra_matchables),
-                        deadline,
+                        cancel,
                     )?
                 } else {
                     aho_match::aho_match_with_extra_matchables(
@@ -966,7 +958,7 @@ impl LicenseDetectionEngine {
                 &mut matched_qspans,
                 &whole_query_run,
                 enable_sequence_matching,
-                deadline,
+                cancel,
             )?;
             all_matches.extend(whole_query_followup);
 
@@ -976,7 +968,7 @@ impl LicenseDetectionEngine {
                     &query,
                     &matched_qspans,
                     &candidate_contained_matches,
-                    deadline,
+                    cancel,
                 )?;
                 all_matches.extend(merged_seq);
             }
@@ -984,7 +976,7 @@ impl LicenseDetectionEngine {
 
         // Step 1: Initial refine WITHOUT false positive filtering
         // Python: refine_matches with filter_false_positive=False (index.py:1073-1080)
-        ensure_within_deadline(deadline)?;
+        ensure_not_cancelled(cancel)?;
         let merged_matches =
             refine_matches_without_false_positive_filter(&self.index, all_matches, &query);
 
@@ -1010,7 +1002,7 @@ impl LicenseDetectionEngine {
         };
 
         // Step 5: Final refine WITH false positive filtering - Python: index.py:1130-1145
-        ensure_within_deadline(deadline)?;
+        ensure_not_cancelled(cancel)?;
         let refined = refine_matches(&self.index, refined_matches, &query);
 
         let mut sorted = refined;
@@ -1037,7 +1029,7 @@ impl LicenseDetectionEngine {
 
         let detections = post_process_detections(detections, min_score);
 
-        ensure_within_deadline(deadline)?;
+        ensure_not_cancelled(cancel)?;
         Ok(detections)
     }
 
@@ -1048,7 +1040,7 @@ impl LicenseDetectionEngine {
         binary_derived: bool,
         source_path: &str,
     ) -> Result<Vec<LicenseDetection>> {
-        self.detect_with_kind_and_source_with_deadline_and_options(
+        self.detect_with_kind_and_source_with_cancel_and_options(
             text,
             unknown_licenses,
             binary_derived,
@@ -1059,22 +1051,22 @@ impl LicenseDetectionEngine {
         .map_err(Into::into)
     }
 
-    pub(crate) fn detect_with_kind_and_source_with_deadline_and_options(
+    pub(crate) fn detect_with_kind_and_source_with_cancel_and_options(
         &self,
         text: &str,
         unknown_licenses: bool,
         binary_derived: bool,
         source_path: &str,
         enable_sequence_matching: bool,
-        deadline: Option<Instant>,
+        cancel: Option<&CancelToken>,
     ) -> Result<Vec<LicenseDetection>, LicenseDetectionError> {
-        let mut detections = self.detect_with_kind_with_score_and_deadline_with_options(
+        let mut detections = self.detect_with_kind_with_score_and_cancel_with_options(
             text,
             unknown_licenses,
             binary_derived,
             enable_sequence_matching,
             0.0,
-            deadline,
+            cancel,
         )?;
         attach_source_path_to_detections(&mut detections, source_path);
         Ok(detections)
@@ -1125,7 +1117,7 @@ impl LicenseDetectionEngine {
         enable_sequence_matching: bool,
         min_score: f32,
     ) -> Result<Vec<LicenseDetection>> {
-        let mut detections = self.detect_with_kind_with_score_and_deadline_with_options(
+        let mut detections = self.detect_with_kind_with_score_and_cancel_with_options(
             text,
             unknown_licenses,
             binary_derived,

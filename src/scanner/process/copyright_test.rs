@@ -72,7 +72,7 @@ fn test_extract_copyright_information_drops_font_name_table_glyph_run() {
     let text = "Copyright 2013 Google Inc. All Rights Reserved.\n\
         (c) ordfeminine guillemotleft danish ae oe period comma";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("font.ttf"), text, 120.0, true);
+    extract_copyright_information(&mut builder, Path::new("font.ttf"), text, None, true);
 
     let file = build_single_file(builder);
     let copyrights: Vec<&str> = file
@@ -99,7 +99,7 @@ fn test_extract_copyright_information_drops_oversized_rendered_blob_copyright() 
     // into the full blob, which must be dropped rather than emitted as a copyright.
     let blob = format!("Copyright 2020 Acme Inc. {}", "word ".repeat(500));
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("photo.jpg"), &blob, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("photo.jpg"), &blob, None, false);
 
     let file = build_single_file(builder);
     assert!(
@@ -144,7 +144,7 @@ fn test_extract_copyright_information_drops_binary_string_gibberish_notice() {
         &mut builder,
         Path::new("fixture.blb"),
         "(c) K0\n b$L",
-        120.0,
+        None,
         true,
     );
 
@@ -169,7 +169,7 @@ fn test_extract_copyright_information_preserves_raw_text_and_normalized_shadow()
     let text = "/* Copyright 2024 Example Corp. All rights reserved. */\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fixture.c"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fixture.c"), text, None, false);
 
     let file = builder
         .name("fixture.c".to_string())
@@ -201,7 +201,7 @@ fn test_extract_copyright_information_keeps_raw_notice_and_holder_for_no_year_c_
         &mut builder,
         Path::new("RNBackgroundTimer.h"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -238,7 +238,7 @@ fn test_extract_copyright_projects_source_faithful_slice_without_prose_bleed() {
     let text = "The TRE implementation (src/regex/tre.c) is Copyright \u{00a9} 2001-2008 Ville Laurikari and licensed under a 2-clause BSD license.\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("COPYRIGHT"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("COPYRIGHT"), text, None, false);
 
     let file = builder
         .name("COPYRIGHT".to_string())
@@ -271,7 +271,7 @@ fn test_extract_copyright_skips_c_variable_control_flow_as_holder() {
     let text = "\tif (c) goto ilseq;\n\tif (c) return 0;\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("mbrtowc.c"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("mbrtowc.c"), text, None, false);
 
     let file = builder
         .name("mbrtowc.c".to_string())
@@ -300,7 +300,7 @@ fn test_extract_copyright_information_uses_embedded_sourcemap_sources_for_partie
     let text = r#"{"version":3,"comment":"Copyright 1999 Wrong Corp.","sourcesContent":["/* Copyright 2024 Example Corp. */\n"]}"#;
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("bundle.js.map"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("bundle.js.map"), text, None, false);
 
     let file = builder
         .name("bundle.js.map".to_string())
@@ -338,7 +338,7 @@ fn test_extract_copyright_information_multiline_native_projection_avoids_comment
     let text = "/*\n * Copyright 2024 Example Corp.\n * All rights reserved.\n */\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fixture.c"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fixture.c"), text, None, false);
 
     let file = builder
         .name("fixture.c".to_string())
@@ -366,7 +366,7 @@ fn test_extract_copyright_information_xml_comment_projection_avoids_comment_wrap
     let text = "<!-- (c) Example Corp. and affiliates. Confidential and proprietary. -->\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fixture.xml"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fixture.xml"), text, None, false);
 
     let file = builder
         .name("fixture.xml".to_string())
@@ -401,7 +401,7 @@ fn test_extract_copyright_information_js_block_comment_lowercase_c_header() {
     let text = "/**\n * (c) foo platforms, inc. and affiliates. confidential and proprietary.\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fixture.js"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fixture.js"), text, None, false);
 
     let file = builder
         .name("fixture.js".to_string())
@@ -436,7 +436,7 @@ fn test_extract_copyright_information_xml_comment_projection_preserves_native_sy
     let text = "<!-- Copyright © 2024 Example Corp. All rights reserved. -->\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fixture.xml"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fixture.xml"), text, None, false);
 
     let file = builder
         .name("fixture.xml".to_string())
@@ -506,7 +506,7 @@ public class BloomFilter {}
         &mut builder,
         Path::new("BloomFilter.java"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -546,7 +546,7 @@ fn test_extract_copyright_information_strips_flutter_wrapper_assignments() {
         &mut builder,
         Path::new("AppInfo.xcconfig"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -581,7 +581,7 @@ fn test_extract_copyright_information_strips_flutter_application_legalese_wrappe
     let text = "applicationLegalese: '© 2014 The Flutter Authors',\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("about.dart"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("about.dart"), text, None, false);
 
     let file = builder
         .name("about.dart".to_string())
@@ -615,7 +615,7 @@ fn test_extract_copyright_information_strips_flutter_storyboard_text_wrapper() {
         &mut builder,
         Path::new("LaunchScreen.storyboard"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -650,7 +650,7 @@ fn test_extract_copyright_information_drops_flutter_generated_doc_false_positive
     let text = r#"<i class="material-icons-sharp md-36">copyright</i> &#x2014; material icon named "copyright" (sharp).\n"#;
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("icons.dart"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("icons.dart"), text, None, false);
 
     let file = builder
         .name("icons.dart".to_string())
@@ -675,7 +675,7 @@ fn test_extract_copyright_information_strips_trailing_or_notice_bleed() {
     let text = "Copyright © 1993,2004 Sun Microsystems or\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("NOTICE"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("NOTICE"), text, None, false);
 
     let file = builder
         .name("NOTICE".to_string())
@@ -708,7 +708,7 @@ fn test_extract_copyright_information_strips_locale_timestamp_from_raw_projectio
         &mut builder,
         Path::new("action_aat_product.hh"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -741,7 +741,7 @@ fn test_extract_copyright_information_projects_clean_python_assignment_metadata(
     );
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("docs/conf.py"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("docs/conf.py"), text, None, false);
 
     let file = builder
         .name("conf.py".to_string())
@@ -909,7 +909,7 @@ fn test_extract_copyright_information_ignores_pnpm_markdown_link_prose() {
     );
 
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("README.md"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("README.md"), text, None, false);
 
     let file = builder
         .name("README.md".to_string())
@@ -937,7 +937,7 @@ fn test_extract_copyright_information_ignores_flutter_issue_hygiene_markdown_lin
         &mut builder,
         Path::new("docs/contributing/issue_hygiene/README.md"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -966,7 +966,7 @@ fn test_extract_copyright_information_ignores_flutter_api_sentence_fragment() {
         &mut builder,
         Path::new("docs/infra/Packages-Gardener-Rotation.md"),
         text,
-        120.0,
+        None,
         false,
     );
 
@@ -1009,11 +1009,13 @@ fn test_extract_copyright_information_ignores_pnpm_changelog_markdown_link_on_la
     let text = repeated.repeat(4000);
 
     let mut builder = FileInfoBuilder::default();
+    let expired = crate::cancel::CancelToken::new(None);
+    expired.cancel();
     extract_copyright_information(
         &mut builder,
         Path::new("pnpm/CHANGELOG.md"),
         &text,
-        0.000001,
+        Some(&expired),
         false,
     );
 
@@ -1047,7 +1049,7 @@ fn test_extract_copyright_information_ipynb_code_cell_no_false_positive() {
         &mut builder,
         Path::new("01. Data.ipynb"),
         notebook,
-        120.0,
+        None,
         false,
     );
 
@@ -1091,7 +1093,7 @@ fn test_extract_copyright_information_ipynb_detects_notice_in_output() {
         &mut builder,
         Path::new("09. Optimization.ipynb"),
         notebook,
-        120.0,
+        None,
         false,
     );
 
@@ -1121,7 +1123,7 @@ fn test_extract_copyright_information_drops_cpp_copy_call_source_line() {
     // value is the full source line. Both must be dropped as source code.
     let text = "vk::CmdCopyImage(m_command_buffer, srcImage, srcLayout, dstImage, dstLayout, 1, &copyRegion);";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("copy.cpp"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("copy.cpp"), text, None, false);
 
     let file = build_single_file(builder);
     assert!(
@@ -1143,7 +1145,7 @@ fn test_extract_copyright_information_drops_cpp_copy_call_source_line() {
 fn test_extract_copyright_information_keeps_real_notice_and_name_with_email() {
     let text = "Copyright (c) 2020 Acme, Inc.\nAuthor: Jane Doe <jane@example.org>";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("LICENSE"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("LICENSE"), text, None, false);
 
     let file = build_single_file(builder);
     assert!(
@@ -1167,7 +1169,7 @@ fn test_extract_copyright_information_keeps_real_notice_and_name_with_email() {
 fn test_extract_copyright_information_keeps_attributed_author_after_namespace() {
     let text = "Pod::Simple was created by Sean M. Burke <sburke@cpan.org>.\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("Simple.pm"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("Simple.pm"), text, None, false);
 
     let file = build_single_file(builder);
     assert_eq!(file.authors.len(), 1, "authors: {:?}", file.authors);
@@ -1178,7 +1180,7 @@ fn test_extract_copyright_information_keeps_attributed_author_after_namespace() 
 fn test_extract_copyright_information_rejects_author_in_source_container() {
     let text = "$is_list->( authors => [ q{Michael G Schwern <schwern@pobox.com>} ] );\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("basic.t"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("basic.t"), text, None, false);
 
     let file = build_single_file(builder);
     assert!(file.authors.is_empty(), "authors: {:?}", file.authors);
@@ -1194,7 +1196,7 @@ fn test_extract_copyright_information_keeps_attributed_author_in_pod_code_span()
         "=cut\n",
     );
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("Struct.pm"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("Struct.pm"), text, None, false);
 
     let file = build_single_file(builder);
     assert_eq!(file.authors.len(), 1, "authors: {:?}", file.authors);
@@ -1210,7 +1212,7 @@ fn test_extract_copyright_information_keeps_explicit_contactless_code_attributio
         "Filter::Simple is now maintained by the Perl5-Porters. Please submit bugs.\n",
     );
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("Credits.pm"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("Credits.pm"), text, None, false);
 
     let file = build_single_file(builder);
     let values: Vec<&str> = file
@@ -1231,7 +1233,7 @@ fn test_extract_copyright_information_drops_code_line_with_embedded_email_litera
     // contact-looking substring in the raw span.
     let text = "ns::registerHandler(\"admin@example.com\", &copyResult);\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("handler.cpp"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("handler.cpp"), text, None, false);
 
     let file = build_single_file(builder);
     assert!(
@@ -1277,7 +1279,7 @@ fn test_msbuild_xml_copyright_element_strips_tags_and_keeps_holder() {
     // must survive.
     let text = "<Project>\n  <PropertyGroup>\n    <Copyright>MaxRev © 2026</Copyright>\n  </PropertyGroup>\n</Project>\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("a.csproj"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("a.csproj"), text, None, false);
     let file = build_named_file(builder, "a.csproj", ".csproj");
 
     assert_eq!(
@@ -1302,7 +1304,7 @@ fn test_html_small_wrapper_tags_stripped_from_native_copyright() {
     // without the markup, while the literal `©` glyph is preserved natively.
     let text = "<small>Copyright \u{00A9} 1999 ImageMagick Studio LLC</small>\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("index.html"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("index.html"), text, None, false);
     let file = build_named_file(builder, "index.html", ".html");
 
     assert_eq!(
@@ -1328,7 +1330,7 @@ fn test_nested_html_wrapper_tags_fully_stripped_from_native_copyright() {
     // `<small>Copyright © 1999 <b>Acme</b></small>` renders with no `<`/`>`.
     let text = "<small>Copyright \u{00A9} 1999 <b>ImageMagick Studio LLC</b></small>\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("index.html"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("index.html"), text, None, false);
     let file = build_named_file(builder, "index.html", ".html");
 
     assert_eq!(
@@ -1356,7 +1358,7 @@ fn test_attributed_html_wrappers_project_visible_notice_text() {
         "</p></div>\n",
     );
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("index.html"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("index.html"), text, None, false);
     let file = build_named_file(builder, "index.html", ".html");
 
     assert_eq!(
@@ -1377,7 +1379,7 @@ fn test_attributed_html_wrappers_project_visible_notice_text() {
 fn test_static_notice_literal_projects_without_code_container() {
     let text = "char _copyright[] = \"(c) Info-ZIP Group\";\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("qdos.c"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("qdos.c"), text, None, false);
     let file = build_named_file(builder, "qdos.c", ".c");
 
     assert_eq!(
@@ -1405,7 +1407,7 @@ fn test_csharp_assembly_copyright_attribute_unwraps_to_notice() {
         &mut builder,
         Path::new("AssemblyInfo.cs"),
         text,
-        120.0,
+        None,
         false,
     );
     let file = build_named_file(builder, "AssemblyInfo.cs", ".cs");
@@ -1426,7 +1428,7 @@ fn test_html_copyright_entity_is_detected_not_treated_as_source_code() {
     // normalized to `(c)` rather than leaking the raw `&copy;` text.
     let text = "\t\t&copy; 2012. Natural Earth. All rights reserved.\n";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("README.html"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("README.html"), text, None, false);
     let file = build_named_file(builder, "README.html", ".html");
 
     assert_eq!(
@@ -1484,7 +1486,7 @@ fn test_extract_copyright_obfuscated_email_in_spaced_angle_brackets() {
     let text = "/*\n * Copyright (c) 2009, Florian Loitsch < florian.loitsch at inria dot fr >\n * All rights reserved.\n */\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("fpconv.c"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("fpconv.c"), text, None, false);
 
     let file = builder
         .name("fpconv.c".to_string())
@@ -1529,7 +1531,7 @@ fn test_extract_copyright_information_punctuation_comment_markers_stripped_from_
         );
         let mut builder = FileInfoBuilder::default();
 
-        extract_copyright_information(&mut builder, Path::new(file_name), &text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(file_name), &text, None, false);
 
         let file = builder
             .name(file_name.to_string())
@@ -1708,7 +1710,7 @@ fn test_extract_copyright_information_html_anchor_notice_carries_no_markup() {
     let text = "<p>Copyright \u{a9} 1994-2002 <a href=\"http://www.w3.org/\">World Wide Web Consortium</a>,\n(<a href=\"http://www.lcs.mit.edu/\">Massachusetts Institute of Technology</a>). All Rights Reserved.</p>\n";
     let mut builder = FileInfoBuilder::default();
 
-    extract_copyright_information(&mut builder, Path::new("notice.html"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("notice.html"), text, None, false);
 
     let file = builder
         .name("notice.html".to_string())
@@ -1770,7 +1772,7 @@ fn test_extract_copyright_information_drops_code_and_template_notice_values() {
         ),
     ] {
         let mut builder = FileInfoBuilder::default();
-        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(name), text, None, false);
         let file = build_single_file(builder);
         assert!(
             file.copyrights.is_empty(),
@@ -1798,7 +1800,7 @@ fn test_extract_copyright_information_keeps_notices_with_code_like_punctuation()
         "%% Copyright Ericsson AB 2011-2025. All Rights Reserved.\n",
     );
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("NOTICE"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("NOTICE"), text, None, false);
 
     let file = build_single_file(builder);
     let values: Vec<&String> = file.copyrights.iter().map(|c| &c.copyright).collect();
@@ -1850,7 +1852,7 @@ fn test_extract_copyright_information_drops_fill_in_year_notice_templates() {
         ("NOTICE", "Copyright ${year} Acme Corp."),
     ] {
         let mut builder = FileInfoBuilder::default();
-        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(name), text, None, false);
         let file = build_single_file(builder);
         assert!(
             file.copyrights.is_empty(),
@@ -1921,7 +1923,7 @@ fn test_extract_copyright_information_keeps_notices_beside_fill_in_templates() {
         ),
     ] {
         let mut builder = FileInfoBuilder::default();
-        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(name), text, None, false);
         let file = build_single_file(builder);
         assert!(
             file.holders
@@ -1966,7 +1968,7 @@ fn test_extract_copyright_information_drops_schema_fields_and_data_rows() {
         ),
     ] {
         let mut builder = FileInfoBuilder::default();
-        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(name), text, None, false);
         let file = build_single_file(builder);
         assert!(
             file.copyrights.is_empty(),
@@ -2001,7 +2003,7 @@ fn test_extract_copyright_information_keeps_semicolon_dense_notices() {
         ),
     ] {
         let mut builder = FileInfoBuilder::default();
-        extract_copyright_information(&mut builder, Path::new(name), text, 120.0, false);
+        extract_copyright_information(&mut builder, Path::new(name), text, None, false);
         let file = build_single_file(builder);
         assert!(
             file.holders.iter().any(|h| h.holder.contains("Acme Inc")),
@@ -2015,7 +2017,7 @@ fn test_extract_copyright_information_keeps_semicolon_dense_notices() {
 fn test_extract_copyright_information_keeps_banner_on_a_line_shared_with_code() {
     let text = "/*! Copyright (c) 2020 Acme Inc. All rights reserved. */ if (a || b) { c(); }";
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(&mut builder, Path::new("bundle.js"), text, 120.0, false);
+    extract_copyright_information(&mut builder, Path::new("bundle.js"), text, None, false);
 
     let file = build_single_file(builder);
     assert!(
@@ -2058,13 +2060,7 @@ fn test_extract_copyright_information_reports_every_notice_on_one_long_line() {
     let content = format!("{{\"version\":3,\"sourcesContent\":[\"{notices}\"]}}");
 
     let mut builder = FileInfoBuilder::default();
-    extract_copyright_information(
-        &mut builder,
-        Path::new("lib.js.map"),
-        &content,
-        120.0,
-        false,
-    );
+    extract_copyright_information(&mut builder, Path::new("lib.js.map"), &content, None, false);
     let file = build_single_file(builder);
 
     for i in 0..40 {

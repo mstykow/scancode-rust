@@ -13,9 +13,9 @@
 //! - Otherwise, scan the flat node sequence for COPY/AUTH tokens and
 //!   collect spans heuristically.
 
+use crate::cancel::CancelToken;
 use std::borrow::Cow;
 use std::sync::LazyLock;
-use std::time::{Duration, Instant};
 
 use regex::Regex;
 
@@ -25,7 +25,9 @@ use super::detector_input_normalization::{
 };
 use super::lexer::get_tokens;
 use super::line_tracking::{LineNumberIndex, PreparedLineCache};
-use super::parser::{parse, parse_with_deadline};
+#[cfg(test)]
+use super::parser::parse;
+use super::parser::parse_with_cancel;
 #[cfg(test)]
 use super::refiner::refine_copyright;
 use super::refiner::{hf_tokenizer_merges_line_span, looks_like_bpe_merges_table};
@@ -131,6 +133,7 @@ fn analyze_tree(nodes: &[ParseNode]) -> TreeAnalysis {
 }
 
 /// Returns a tuple of (copyrights, holders, authors).
+#[cfg(test)]
 pub fn detect_copyrights_from_text(
     content: &str,
 ) -> (
@@ -161,7 +164,7 @@ fn is_ruler_line(line: &str) -> bool {
 fn segment_yields_copyright_with_holder(
     segment: &[(usize, String)],
     raw_lines: &[&str],
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> bool {
     let text = segment
         .iter()
@@ -173,11 +176,7 @@ fn segment_yields_copyright_with_holder(
     }
     // No nested ruler splitting: re-entering it per segment multiplies
     // detector runs exponentially on ruler-heavy input such as ASCII art.
-    let (copyrights, holders, _) = detect_copyrights_impl(
-        &text,
-        deadline.map(|d| d.saturating_duration_since(Instant::now())),
-        false,
-    );
+    let (copyrights, holders, _) = detect_copyrights_impl(&text, cancel, false);
     !copyrights.is_empty() && !holders.is_empty()
 }
 
@@ -188,7 +187,7 @@ fn segment_yields_copyright_with_holder(
 fn split_groups_at_rulers(
     groups: Vec<Vec<(usize, String)>>,
     raw_lines: &[&str],
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Vec<Vec<(usize, String)>> {
     // The grouping look-ahead blanks a ruler's text but keeps its entry, so
     // match it by raw line number rather than the (empty) group text.
@@ -206,13 +205,9 @@ fn split_groups_at_rulers(
         let mut segment_start = 0;
         for i in 0..group.len() {
             if i > segment_start
-                && !deadline_exceeded(deadline)
+                && !crate::cancel::is_cancelled(cancel)
                 && is_ruler_at(group[i].0)
-                && segment_yields_copyright_with_holder(
-                    &group[segment_start..i],
-                    raw_lines,
-                    deadline,
-                )
+                && segment_yields_copyright_with_holder(&group[segment_start..i], raw_lines, cancel)
             {
                 out.push(group[segment_start..i].to_vec());
                 segment_start = i + 1;
@@ -227,20 +222,20 @@ fn split_groups_at_rulers(
     out
 }
 
-pub fn detect_copyrights_from_text_with_deadline(
+pub fn detect_copyrights_from_text_with_cancel(
     content: &str,
-    max_runtime: Option<Duration>,
+    cancel: Option<&CancelToken>,
 ) -> (
     Vec<CopyrightDetection>,
     Vec<HolderDetection>,
     Vec<AuthorDetection>,
 ) {
-    detect_copyrights_impl(content, max_runtime, true)
+    detect_copyrights_impl(content, cancel, true)
 }
 
 fn detect_copyrights_impl(
     content: &str,
-    max_runtime: Option<Duration>,
+    cancel: Option<&CancelToken>,
     split_at_rulers: bool,
 ) -> (
     Vec<CopyrightDetection>,
@@ -250,7 +245,6 @@ fn detect_copyrights_impl(
     let mut copyrights = Vec::new();
     let mut holders = Vec::new();
     let mut authors = Vec::new();
-    let deadline = max_runtime.and_then(|d| Instant::now().checked_add(d));
 
     if content.is_empty() {
         return (copyrights, holders, authors);
@@ -282,7 +276,7 @@ fn detect_copyrights_impl(
     let groups =
         collect_candidate_lines(raw_lines.iter().enumerate().map(|(i, line)| (i + 1, *line)));
     let groups = if split_at_rulers {
-        split_groups_at_rulers(groups, &raw_lines, deadline)
+        split_groups_at_rulers(groups, &raw_lines, cancel)
     } else {
         groups
     };
@@ -290,7 +284,7 @@ fn detect_copyrights_impl(
     let mut seen = seen_text::SeenTextSets::from_existing(&copyrights, &holders, &authors);
 
     for group in &groups {
-        if deadline_exceeded(deadline) {
+        if crate::cancel::is_cancelled(cancel) {
             break;
         }
 
@@ -303,11 +297,7 @@ fn detect_copyrights_impl(
             continue;
         }
 
-        let tree = if deadline.is_some() {
-            parse_with_deadline(tokens, deadline)
-        } else {
-            parse(tokens)
-        };
+        let tree = parse_with_cancel(tokens, cancel);
 
         let has_top_level_nodes = tree.iter().any(|n| {
             matches!(
@@ -428,7 +418,7 @@ fn detect_copyrights_impl(
     });
     copyrights.extend(fallback);
 
-    if deadline_exceeded(deadline) {
+    if crate::cancel::is_cancelled(cancel) {
         refine_final_copyrights(&mut copyrights);
         postprocess_transforms::refine_final_authors(&mut authors);
         author_heuristics::repair_contact_author_before_new_attribution(&raw_lines, &mut authors);
@@ -462,7 +452,7 @@ fn detect_copyrights_impl(
         &mut holders,
         &mut authors,
         &mut seen,
-        deadline,
+        cancel,
     );
 
     refine_final_copyrights(&mut copyrights);
@@ -753,10 +743,10 @@ use pattern_extract::{
     extend_software_in_the_public_interest_holder, fallback_year_only_copyrights,
 };
 use postprocess_transforms::{
-    add_missing_holders_for_bare_c_name_year_suffixes, deadline_exceeded,
-    dedupe_exact_span_copyrights, dedupe_exact_span_holders, dedupe_overlapping_authors,
-    extend_authors_see_url_copyrights, extend_dash_obfuscated_email_suffixes,
-    extend_leading_dash_suffixes, extend_multiline_copyright_c_no_year_names,
+    add_missing_holders_for_bare_c_name_year_suffixes, dedupe_exact_span_copyrights,
+    dedupe_exact_span_holders, dedupe_overlapping_authors, extend_authors_see_url_copyrights,
+    extend_dash_obfuscated_email_suffixes, extend_leading_dash_suffixes,
+    extend_multiline_copyright_c_no_year_names,
     extend_multiline_copyright_c_year_holder_continuations, extend_trailing_copy_year_suffixes,
     extend_trailing_lowercase_holder_suffixes, extend_w3c_registered_org_list_suffixes,
     refine_final_copyrights, restore_linux_foundation_copyrights_from_raw_lines,

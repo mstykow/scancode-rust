@@ -448,7 +448,12 @@ fn test_ruler_heavy_ascii_art_finishes_quickly() {
 fn test_ruler_splitting_honours_an_expired_deadline() {
     let input = include_str!("../../../testdata/copyright/ascii-art-rulers/art.txt");
     let start = std::time::Instant::now();
-    let _ = detect_copyrights_from_text_with_deadline(input, Some(std::time::Duration::ZERO));
+    let _ = detect_copyrights_from_text_with_cancel(
+        input,
+        Some(&crate::cancel::CancelToken::with_timeout(
+            std::time::Duration::ZERO,
+        )),
+    );
     assert!(
         start.elapsed() < std::time::Duration::from_secs(1),
         "took {:?}",

@@ -3,10 +3,12 @@
 
 use super::contacts::extract_email_url_information;
 use super::copyright::extract_copyright_information;
-use super::file_scan_error::{FileScanError, FileScanTimeout, TimeoutPhase};
+use super::file_scan_error::{FileScanError, FileScanTimeout, PhaseCell, TimeoutPhase};
 use super::license::{LicenseExtractionInput, extract_license_information};
 use super::license_region_filter;
 use super::special_cases::{is_go_non_production_source, should_skip_text_detection};
+use super::supervisor::{Supervised, WorkerPool};
+use crate::cancel::{self, CancelToken};
 use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{
     DatasourceId, FileInfo, FileInfoBuilder, FileType, PackageData, ScanDiagnostic,
@@ -19,6 +21,10 @@ use crate::parsers::{
     ParsePackagesResult, path_looks_like_rpm_archive, try_parse_file,
     try_parse_file_with_license_engine, try_parse_rpm_archive,
     try_parse_rpm_archive_with_license_engine,
+};
+use crate::parsers::{
+    active_parser_license_engine, active_parser_scan_root, with_parser_license_engine,
+    with_parser_scan_root,
 };
 use crate::progress::ScanProgress;
 use crate::scanner::{LicenseScanOptions, TextDetectionOptions};
@@ -34,7 +40,7 @@ use crate::utils::text::{
 use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 
 const LARGE_NON_SOURCE_JSON_LICENSE_TEXT_BYTES: usize = 128 * 1024;
@@ -62,23 +68,25 @@ pub(super) fn process_file(
     license_options: LicenseScanOptions,
     text_options: &TextDetectionOptions,
 ) -> FileInfo {
-    let mut scan_diagnostics: Vec<ScanDiagnostic> = vec![];
-    let mut file_info_builder = FileInfoBuilder::default();
     let license_enabled = license_engine.is_some();
 
     let started = Instant::now();
 
+    let (
+        ContentExtraction {
+            builder: mut file_info_builder,
+            diagnostics: mut scan_diagnostics,
+            timings,
+        },
+        outcome,
+    ) = extract_supervised(path, license_engine, license_options, text_options);
+    for (name, seconds) in timings {
+        progress.record_detail_timing(name, seconds);
+    }
+
     let mut generated_flag = None;
     let mut is_source_file = false;
-    match extract_information_from_content(
-        &mut file_info_builder,
-        &mut scan_diagnostics,
-        path,
-        progress,
-        license_engine,
-        license_options,
-        text_options,
-    ) {
+    match outcome {
         Ok((is_generated, is_source)) => {
             generated_flag = is_generated;
             is_source_file = is_source;
@@ -146,20 +154,159 @@ pub(super) fn process_file(
     file_info
 }
 
-fn extract_information_from_content(
-    file_info_builder: &mut FileInfoBuilder,
-    scan_diagnostics: &mut Vec<ScanDiagnostic>,
+/// What a content-extraction worker produces for one file. It reaches the scan
+/// thread only through the supervisor, so an abandoned worker can never
+/// contribute to the output.
+#[derive(Default)]
+struct ContentExtraction {
+    builder: FileInfoBuilder,
+    diagnostics: Vec<ScanDiagnostic>,
+    timings: Vec<(&'static str, f64)>,
+}
+
+type ExtractionResult = (
+    ContentExtraction,
+    Result<(Option<bool>, bool), FileScanError>,
+);
+
+fn worker_pool() -> &'static WorkerPool {
+    // Abandoned workers keep running until they next poll their token, so more
+    // than this many at once means detection is wedged.
+    static POOL: LazyLock<WorkerPool> = LazyLock::new(|| {
+        let cpus = std::thread::available_parallelism().map_or(4, usize::from);
+        WorkerPool::new(cpus.max(4))
+    });
+    &POOL
+}
+
+/// Grace between the budget and abandoning a worker, so a cooperative worker
+/// that stops at the deadline still returns its partial result.
+const ABANDON_GRACE: Duration = Duration::from_millis(250);
+
+fn extract_supervised(
     path: &Path,
-    progress: &ScanProgress,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     license_options: LicenseScanOptions,
     text_options: &TextDetectionOptions,
+) -> ExtractionResult {
+    let timeout = text_options
+        .timeout_seconds
+        .is_finite()
+        .then_some(text_options.timeout_seconds)
+        .filter(|seconds| *seconds > 0.0)
+        .and_then(|seconds| Duration::try_from_secs_f64(seconds).ok());
+    let Some(timeout) = timeout else {
+        return run_extraction(ExtractionInput {
+            path,
+            license_engine,
+            license_options,
+            text_options,
+            cancel: None,
+            phase: &PhaseCell::new(),
+        });
+    };
+
+    let token = CancelToken::with_timeout(timeout);
+    let phase = Arc::new(PhaseCell::new());
+    let scan_root = active_parser_scan_root();
+    let parser_engine = active_parser_license_engine();
+    let job_path = path.to_path_buf();
+    let job_options = text_options.clone();
+    let job_token = token.clone();
+    let job_phase = Arc::clone(&phase);
+
+    let supervised = worker_pool().run(&token, timeout.saturating_add(ABANDON_GRACE), move || {
+        with_parser_scan_root(scan_root.as_deref(), || {
+            with_parser_license_engine(parser_engine, || {
+                run_extraction(ExtractionInput {
+                    path: &job_path,
+                    license_engine,
+                    license_options,
+                    text_options: &job_options,
+                    cancel: Some(&job_token),
+                    phase: &job_phase,
+                })
+            })
+        })
+    });
+
+    match supervised {
+        Supervised::Completed(result) => result,
+        Supervised::TimedOut => (
+            ContentExtraction::default(),
+            Err(FileScanError::Timeout(FileScanTimeout {
+                phase: phase.get(),
+                seconds: text_options.timeout_seconds,
+            })),
+        ),
+        Supervised::Refused(reason) => {
+            log::error!(
+                "Skipping {}: {reason}; raise --timeout headroom or investigate the stuck input",
+                path.display()
+            );
+            (
+                ContentExtraction::default(),
+                Err(FileScanError::Skipped(reason)),
+            )
+        }
+    }
+}
+
+struct ExtractionInput<'a> {
+    path: &'a Path,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    license_options: LicenseScanOptions,
+    text_options: &'a TextDetectionOptions,
+    cancel: Option<&'a CancelToken>,
+    phase: &'a PhaseCell,
+}
+
+fn run_extraction(input: ExtractionInput<'_>) -> ExtractionResult {
+    let mut extraction = ContentExtraction::default();
+    let outcome = extract_information_from_content(&mut extraction, input);
+    (extraction, outcome)
+}
+
+fn ensure_within_budget(
+    cancel: Option<&CancelToken>,
+    phase: TimeoutPhase,
+    seconds: f64,
+) -> Result<(), FileScanError> {
+    if cancel::is_cancelled(cancel) {
+        return Err(FileScanError::Timeout(FileScanTimeout { phase, seconds }));
+    }
+    Ok(())
+}
+
+fn enter_phase(phase: &PhaseCell, next: TimeoutPhase, _path: &Path) {
+    phase.set(next);
+    #[cfg(test)]
+    test_hooks::stall_if_registered(_path, next);
+}
+
+fn extract_information_from_content(
+    extraction: &mut ContentExtraction,
+    input: ExtractionInput<'_>,
 ) -> Result<(Option<bool>, bool), FileScanError> {
-    let started = Instant::now();
+    let ContentExtraction {
+        builder: file_info_builder,
+        diagnostics: scan_diagnostics,
+        timings,
+    } = extraction;
+    let ExtractionInput {
+        path,
+        license_engine,
+        license_options,
+        text_options,
+        cancel,
+        phase,
+    } = input;
+
     let filesystem_path = absolute_filesystem_path(path);
     let license_enabled = license_engine.is_some();
     let mut rpm_fast_path_parse_result = None;
     let mut rpm_fast_path_timing_seconds = 0.0;
+    enter_phase(phase, TimeoutPhase::ReadingContent, path);
     let oversized_rpm_fast_path = is_oversized_rpm_archive_candidate(&filesystem_path)?;
 
     if should_try_rpm_package_fast_path(&filesystem_path, text_options) {
@@ -187,19 +334,18 @@ fn extract_information_from_content(
             if oversized_rpm_fast_path {
                 populate_oversized_rpm_info(file_info_builder, &filesystem_path, text_options)?;
             }
-            progress.record_detail_timing("scan:packages", rpm_fast_path_timing_seconds);
+            timings.push(("scan:packages", rpm_fast_path_timing_seconds));
             return Ok((None, false));
         }
     }
 
     let buffer = fs::read(&filesystem_path)?;
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::ReadingContent,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::ReadingContent,
+        text_options.timeout_seconds,
+    )?;
 
     let is_generated = text_options
         .detect_generated
@@ -226,7 +372,7 @@ fn extract_information_from_content(
             .files_count(Some(0))
             .dirs_count(Some(0))
             .size_count(Some(0));
-        progress.record_detail_timing("scan:info", info_started.elapsed().as_secs_f64());
+        timings.push(("scan:info", info_started.elapsed().as_secs_f64()));
     }
 
     if should_skip_text_detection(&filesystem_path, &buffer) {
@@ -234,6 +380,7 @@ fn extract_information_from_content(
     }
 
     if text_options.detect_packages {
+        enter_phase(phase, TimeoutPhase::ExtractingMetadata, path);
         let started = Instant::now();
         let parse_result = if let Some(rpm_result) = rpm_fast_path_parse_result.take() {
             Some(rpm_result)
@@ -275,19 +422,19 @@ fn extract_information_from_content(
                 text_options,
             );
         }
-        progress.record_detail_timing(
+        timings.push((
             "scan:packages",
             rpm_fast_path_timing_seconds + started.elapsed().as_secs_f64(),
-        );
+        ));
     }
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::ExtractingMetadata,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::ExtractingMetadata,
+        text_options.timeout_seconds,
+    )?;
 
+    enter_phase(phase, TimeoutPhase::ExtractingText, path);
     let (text_content, text_kind, text_diagnostic) =
         extract_text_for_detection_with_diagnostics(&filesystem_path, &buffer);
     if let Some(text_diagnostic) = text_diagnostic {
@@ -302,12 +449,11 @@ fn extract_information_from_content(
     let prune_copyright_binary_strings =
         from_binary_strings || matches!(text_kind, ExtractedTextKind::FontMetadata);
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::ExtractingText,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::ExtractingText,
+        text_options.timeout_seconds,
+    )?;
 
     if text_content.is_empty() {
         return Ok((is_generated, classification.is_source));
@@ -316,19 +462,21 @@ fn extract_information_from_content(
     let text_content = cap_content_detection_text(scan_diagnostics, text_content);
 
     if text_options.detect_copyrights {
+        enter_phase(phase, TimeoutPhase::DuringCopyrightScan, path);
         let copyrights_started = Instant::now();
         extract_copyright_information(
             file_info_builder,
             path,
             &text_content,
-            text_options.timeout_seconds,
+            cancel,
             prune_copyright_binary_strings,
         );
-        progress.record_detail_timing(
+        timings.push((
             "scan:copyrights",
             copyrights_started.elapsed().as_secs_f64(),
-        );
+        ));
     }
+    enter_phase(phase, TimeoutPhase::DuringContactScan, path);
     let contact_timings = extract_email_url_information(
         file_info_builder,
         path,
@@ -337,36 +485,33 @@ fn extract_information_from_content(
         from_binary_strings,
     );
     if let Some(seconds) = contact_timings.emails_seconds {
-        progress.record_detail_timing("scan:emails", seconds);
+        timings.push(("scan:emails", seconds));
     }
     if let Some(seconds) = contact_timings.urls_seconds {
-        progress.record_detail_timing("scan:urls", seconds);
+        timings.push(("scan:urls", seconds));
     }
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::BeforeLicenseScan,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::BeforeLicenseScan,
+        text_options.timeout_seconds,
+    )?;
 
+    enter_phase(phase, TimeoutPhase::BeforeLicenseScan, path);
     let text_content_for_license_detection =
         prepare_license_detection_text(path, &classification, text_content);
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::DuringLicenseScan,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::DuringLicenseScan,
+        text_options.timeout_seconds,
+    )?;
 
-    let license_deadline = deadline_from_start(started, text_options.timeout_seconds);
-
+    enter_phase(phase, TimeoutPhase::DuringLicenseScan, path);
     if license_enabled {
         let started = Instant::now();
         extract_license_information(
             file_info_builder,
-            scan_diagnostics,
             LicenseExtractionInput {
                 // Relative scan path (matches the resource `path`) so match `from_file`
                 // is repo-relative, not an absolute host path (better parity + SARIF).
@@ -376,14 +521,13 @@ fn extract_information_from_content(
                 license_options,
                 from_binary_strings,
                 timeout_seconds: text_options.timeout_seconds,
-                deadline: license_deadline,
+                cancel,
             },
         )?;
-        progress.record_detail_timing("scan:licenses", started.elapsed().as_secs_f64());
+        timings.push(("scan:licenses", started.elapsed().as_secs_f64()));
     } else {
         extract_license_information(
             file_info_builder,
-            scan_diagnostics,
             LicenseExtractionInput {
                 // Relative scan path (matches the resource `path`) so match `from_file`
                 // is repo-relative, not an absolute host path (better parity + SARIF).
@@ -393,17 +537,16 @@ fn extract_information_from_content(
                 license_options,
                 from_binary_strings,
                 timeout_seconds: text_options.timeout_seconds,
-                deadline: license_deadline,
+                cancel,
             },
         )?;
     }
 
-    if is_timeout_exceeded(started, text_options.timeout_seconds) {
-        return Err(FileScanError::Timeout(FileScanTimeout {
-            phase: TimeoutPhase::DuringLicenseScan,
-            seconds: text_options.timeout_seconds,
-        }));
-    }
+    ensure_within_budget(
+        cancel,
+        TimeoutPhase::DuringLicenseScan,
+        text_options.timeout_seconds,
+    )?;
 
     Ok((is_generated, classification.is_source))
 }
@@ -576,15 +719,6 @@ fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
     timeout_seconds.is_finite()
         && timeout_seconds > 0.0
         && started.elapsed().as_secs_f64() > timeout_seconds
-}
-
-fn deadline_from_start(started: Instant, timeout_seconds: f64) -> Option<Instant> {
-    if !timeout_seconds.is_finite() || timeout_seconds <= 0.0 {
-        return None;
-    }
-
-    let remaining_seconds = (timeout_seconds - started.elapsed().as_secs_f64()).max(0.0);
-    Instant::now().checked_add(Duration::from_secs_f64(remaining_seconds))
 }
 
 fn maybe_record_processing_timeout(
@@ -760,6 +894,37 @@ fn is_compiled_datasource(datasource_id: &DatasourceId) -> bool {
         datasource_id,
         DatasourceId::GoBinary | DatasourceId::RustBinary
     )
+}
+
+/// Test-only hook that makes a chosen file's worker stall without ever polling
+/// its cancellation token, standing in for a detector with no checks of its own.
+#[cfg(test)]
+mod test_hooks {
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+    use std::sync::{LazyLock, Mutex};
+    use std::time::Duration;
+
+    use super::TimeoutPhase;
+
+    static STALLS: LazyLock<Mutex<HashMap<(PathBuf, TimeoutPhase), Duration>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    pub(super) fn stall_file(path: &Path, phase: TimeoutPhase, duration: Duration) {
+        if let Ok(mut stalls) = STALLS.lock() {
+            stalls.insert((path.to_path_buf(), phase), duration);
+        }
+    }
+
+    pub(super) fn stall_if_registered(path: &Path, phase: TimeoutPhase) {
+        let duration = STALLS
+            .lock()
+            .ok()
+            .and_then(|stalls| stalls.get(&(path.to_path_buf(), phase)).copied());
+        if let Some(duration) = duration {
+            std::thread::sleep(duration);
+        }
+    }
 }
 
 #[cfg(test)]

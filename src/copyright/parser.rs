@@ -7,7 +7,7 @@
 //! a parse tree by replacing matched token/node spans with tree nodes.
 //! Uses a single-pass approach matching Python's pygmars `loop=1` behavior.
 
-use std::time::Instant;
+use crate::cancel::CancelToken;
 
 use super::grammar::{GRAMMAR_RULES, GrammarRule, TagMatcher};
 use super::types::{ParseNode, PosTag, Token, TreeLabel};
@@ -23,6 +23,8 @@ use crate::models::LineNumber;
 /// more than a quarter of it, so real notices are unaffected. A run longer than
 /// this leaves the anchor out of reach and the rule simply does not fire.
 const MAX_REPETITION: usize = 256;
+
+const RULE_SCAN_POLL_INTERVAL: usize = 16;
 
 fn first_line(node: &ParseNode) -> Option<LineNumber> {
     match node {
@@ -46,11 +48,12 @@ fn last_line(node: &ParseNode) -> Option<LineNumber> {
 ///
 /// Returns the final sequence of `ParseNode` (mix of leaf tokens and
 /// tree nodes).
+#[cfg(test)]
 pub fn parse(tokens: Vec<Token>) -> Vec<ParseNode> {
-    parse_with_deadline(tokens, None)
+    parse_with_cancel(tokens, None)
 }
 
-pub fn parse_with_deadline(tokens: Vec<Token>, deadline: Option<Instant>) -> Vec<ParseNode> {
+pub fn parse_with_cancel(tokens: Vec<Token>, cancel: Option<&CancelToken>) -> Vec<ParseNode> {
     if tokens.is_empty() {
         return Vec::new();
     }
@@ -61,14 +64,14 @@ pub fn parse_with_deadline(tokens: Vec<Token>, deadline: Option<Instant>) -> Vec
     // Safety bound to prevent infinite loops.
     let max_iterations = 50;
     for _ in 0..max_iterations {
-        if deadline.is_some_and(|d| Instant::now() >= d) {
+        if crate::cancel::is_cancelled(cancel) {
             break;
         }
 
         let mut changed = false;
 
         for rule in GRAMMAR_RULES.iter() {
-            if let Some(new_nodes) = try_apply_rule(rule, &nodes) {
+            if let Some(new_nodes) = try_apply_rule(rule, &nodes, cancel) {
                 nodes = new_nodes;
                 changed = true;
                 break;
@@ -85,7 +88,11 @@ pub fn parse_with_deadline(tokens: Vec<Token>, deadline: Option<Instant>) -> Vec
 
 /// Try to apply a single grammar rule to the node sequence.
 /// Returns `Some(new_nodes)` if the rule matched somewhere, `None` otherwise.
-fn try_apply_rule(rule: &GrammarRule, nodes: &[ParseNode]) -> Option<Vec<ParseNode>> {
+fn try_apply_rule(
+    rule: &GrammarRule,
+    nodes: &[ParseNode],
+    cancel: Option<&CancelToken>,
+) -> Option<Vec<ParseNode>> {
     // Every matcher consumes at least one node, so the pattern length is a
     // lower bound on the span a match can cover.
     let min_len = rule.pattern.len();
@@ -95,6 +102,10 @@ fn try_apply_rule(rule: &GrammarRule, nodes: &[ParseNode]) -> Option<Vec<ParseNo
 
     // Scan for the first position where the pattern matches.
     for start in 0..=(nodes.len() - min_len) {
+        if start.is_multiple_of(RULE_SCAN_POLL_INTERVAL) && crate::cancel::is_cancelled(cancel) {
+            return None;
+        }
+
         if let Some(matched_len) = matches_at(rule, nodes, start) {
             // Build the replacement tree node.
             let matched: Vec<ParseNode> = nodes[start..start + matched_len].to_vec();

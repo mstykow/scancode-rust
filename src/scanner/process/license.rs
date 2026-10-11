@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from ScanCode Toolkit (Apache-2.0); modified. See NOTICE.
 
+use crate::cancel::CancelToken;
 use crate::license_detection::LicenseDetection as InternalLicenseDetection;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::license_detection::LicenseDetectionError;
@@ -14,7 +15,7 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch as InternalLicenseMatch;
 use crate::license_detection::query::Query;
 use crate::models::{
-    FileInfoBuilder, LicenseDetection as PublicLicenseDetection, LineNumber, Match, ScanDiagnostic,
+    FileInfoBuilder, LicenseDetection as PublicLicenseDetection, LineNumber, Match,
 };
 use crate::parsers::license_normalization::{
     DeclaredLicenseMatchMetadata, build_declared_license_data, normalize_spdx_expression,
@@ -24,7 +25,6 @@ use crate::scanner::process::file_scan_error::FileScanError;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Maximum source-line length for which the contextual short-reference prune
 /// applies its prose heuristics. Lines longer than this are treated as
@@ -44,12 +44,11 @@ pub(super) struct LicenseExtractionInput<'a> {
     pub(super) license_options: LicenseScanOptions,
     pub(super) from_binary_strings: bool,
     pub(super) timeout_seconds: f64,
-    pub(super) deadline: Option<Instant>,
+    pub(super) cancel: Option<&'a CancelToken>,
 }
 
 pub(super) fn extract_license_information(
     file_info_builder: &mut FileInfoBuilder,
-    scan_diagnostics: &mut Vec<ScanDiagnostic>,
     input: LicenseExtractionInput<'_>,
 ) -> Result<(), FileScanError> {
     let LicenseExtractionInput {
@@ -59,113 +58,68 @@ pub(super) fn extract_license_information(
         license_options,
         from_binary_strings,
         timeout_seconds,
-        deadline,
+        cancel,
     } = input;
 
     let Some(engine) = license_engine else {
         return Ok(());
     };
 
-    if deadline.is_some() {
-        let detection_result = if license_options.min_score == 0 {
-            engine.detect_with_kind_and_source_with_deadline_and_options(
-                &text_content,
-                license_options.unknown_licenses,
-                from_binary_strings,
-                &crate::utils::path::to_posix_string(path),
-                license_options.enable_sequence_matching,
-                deadline,
-            )
-        } else {
-            engine
-                .detect_with_kind_with_score_and_deadline_with_options(
-                    &text_content,
-                    license_options.unknown_licenses,
-                    from_binary_strings,
-                    license_options.enable_sequence_matching,
-                    f32::from(license_options.min_score),
-                    deadline,
-                )
-                .map(|mut detections| {
-                    attach_source_path_to_detections(
-                        &mut detections,
-                        &crate::utils::path::to_posix_string(path),
-                    );
-                    detections
-                })
-        };
-
-        match detection_result {
-            Ok(detections) => {
-                let query = match Query::from_extracted_text_with_deadline(
-                    &text_content,
-                    engine.index(),
-                    from_binary_strings,
-                    deadline,
-                ) {
-                    Ok(query) => Some(query),
-                    Err(LicenseDetectionError::Timeout) => {
-                        return Err(license_detection_timeout(timeout_seconds));
-                    }
-                };
-                process_successful_detections(
-                    file_info_builder,
-                    &detections,
-                    query.as_ref(),
-                    &text_content,
-                    path,
-                    license_options,
-                    engine.index(),
-                );
-            }
-            Err(LicenseDetectionError::Timeout) => {
-                return Err(license_detection_timeout(timeout_seconds));
-            }
-        }
+    let detection_result = if license_options.min_score == 0 {
+        engine.detect_with_kind_and_source_with_cancel_and_options(
+            &text_content,
+            license_options.unknown_licenses,
+            from_binary_strings,
+            &crate::utils::path::to_posix_string(path),
+            license_options.enable_sequence_matching,
+            cancel,
+        )
     } else {
-        let detection_result = if license_options.min_score == 0 {
-            engine.detect_with_kind_and_source_with_options(
+        engine
+            .detect_with_kind_with_score_and_cancel_with_options(
                 &text_content,
                 license_options.unknown_licenses,
                 from_binary_strings,
-                &crate::utils::path::to_posix_string(path),
-                license_options.enable_sequence_matching,
-            )
-        } else {
-            engine.detect_with_kind_and_source_with_score_options(
-                &text_content,
-                license_options.unknown_licenses,
-                from_binary_strings,
-                &crate::utils::path::to_posix_string(path),
                 license_options.enable_sequence_matching,
                 f32::from(license_options.min_score),
+                cancel,
             )
-        };
-
-        match detection_result {
-            Ok(detections) => {
-                let query =
-                    Query::from_extracted_text(&text_content, engine.index(), from_binary_strings)
-                        .ok();
-                process_successful_detections(
-                    file_info_builder,
-                    &detections,
-                    query.as_ref(),
-                    &text_content,
-                    path,
-                    license_options,
-                    engine.index(),
+            .map(|mut detections| {
+                attach_source_path_to_detections(
+                    &mut detections,
+                    &crate::utils::path::to_posix_string(path),
                 );
-            }
-            Err(e) => {
-                scan_diagnostics.push(ScanDiagnostic::error(format!(
-                    "License detection failed: {}",
-                    e
-                )));
-            }
+                detections
+            })
+    };
+
+    match detection_result {
+        Ok(detections) => {
+            let query = match Query::from_extracted_text_with_cancel(
+                &text_content,
+                engine.index(),
+                from_binary_strings,
+                cancel,
+            ) {
+                Ok(query) => Some(query),
+                Err(LicenseDetectionError::Timeout) => {
+                    return Err(license_detection_timeout(timeout_seconds));
+                }
+            };
+            process_successful_detections(
+                file_info_builder,
+                &detections,
+                query.as_ref(),
+                &text_content,
+                path,
+                license_options,
+                engine.index(),
+            );
+        }
+        Err(LicenseDetectionError::Timeout) => {
+            return Err(license_detection_timeout(timeout_seconds));
         }
     }
-
     Ok(())
 }
 

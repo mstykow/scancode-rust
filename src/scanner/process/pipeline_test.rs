@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    LARGE_NON_SOURCE_JSON_LICENSE_TEXT_BYTES, MAX_CONTENT_DETECTION_BYTES,
+    LARGE_NON_SOURCE_JSON_LICENSE_TEXT_BYTES, MAX_CONTENT_DETECTION_BYTES, TimeoutPhase,
     cap_content_detection_text, cap_non_source_json_license_text,
     cap_non_source_text_dump_license_text, has_line_rich_json_prefix,
-    maybe_record_processing_timeout, merge_parse_results, process_file,
+    maybe_record_processing_timeout, merge_parse_results, process_file, test_hooks,
 };
 use crate::models::DatasourceId;
 use crate::models::{DiagnosticSeverity, PackageData, PackageType, ScanDiagnostic};
@@ -599,4 +599,128 @@ fn test_process_file_keeps_contact_backed_author_inside_license_region() {
         "contact-backed author dropped: {:?}",
         file_info.authors,
     );
+}
+
+fn timeout_options(seconds: f64) -> TextDetectionOptions {
+    TextDetectionOptions {
+        detect_copyrights: true,
+        timeout_seconds: seconds,
+        ..TextDetectionOptions::default()
+    }
+}
+
+#[test]
+fn test_non_polling_detector_is_reported_as_timeout_within_margin() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("stuck-copyright.txt");
+    fs::write(&path, "Copyright 2020 Example Corp\n").expect("write input");
+    let metadata = fs::metadata(&path).expect("metadata");
+    let progress = ScanProgress::new(ProgressMode::Quiet);
+    test_hooks::stall_file(
+        &path,
+        TimeoutPhase::DuringCopyrightScan,
+        Duration::from_secs(5),
+    );
+
+    let started = Instant::now();
+    let file_info = process_file(
+        &path,
+        &metadata,
+        &progress,
+        None,
+        LicenseScanOptions::default(),
+        &timeout_options(0.5),
+    );
+    let elapsed = started.elapsed();
+
+    assert!(
+        elapsed < Duration::from_millis(1500),
+        "supervision must bound the file near --timeout, took {elapsed:?}"
+    );
+    let timeouts: Vec<_> = file_info
+        .scan_diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.is_timeout())
+        .collect();
+    assert_eq!(timeouts.len(), 1, "{:?}", file_info.scan_diagnostics);
+    assert_eq!(
+        timeouts[0].message,
+        "Timeout during copyright scan (> 0.50s)"
+    );
+}
+
+#[test]
+fn test_abandoned_worker_output_never_reaches_the_file_result() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("stuck-license.txt");
+    fs::write(
+        &path,
+        "Copyright 2020 Example Corp\nContact: dev@example.com\n",
+    )
+    .expect("write input");
+    let metadata = fs::metadata(&path).expect("metadata");
+    let progress = ScanProgress::new(ProgressMode::Quiet);
+    test_hooks::stall_file(
+        &path,
+        TimeoutPhase::DuringLicenseScan,
+        Duration::from_secs(5),
+    );
+    let options = TextDetectionOptions {
+        detect_emails: true,
+        max_emails: 10,
+        ..timeout_options(3.0)
+    };
+
+    let file_info = process_file(
+        &path,
+        &metadata,
+        &progress,
+        None,
+        LicenseScanOptions::default(),
+        &options,
+    );
+
+    assert!(file_info.copyrights.is_empty());
+    assert!(file_info.emails.is_empty());
+    assert!(
+        file_info
+            .scan_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message == "Timeout during license scan (> 3.00s)"),
+        "{:?}",
+        file_info.scan_diagnostics
+    );
+}
+
+#[test]
+fn test_file_finishing_within_budget_is_unchanged_by_supervision() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("fine.txt");
+    fs::write(&path, "Copyright 2020 Example Corp\n").expect("write input");
+    let metadata = fs::metadata(&path).expect("metadata");
+    let progress = ScanProgress::new(ProgressMode::Quiet);
+
+    let supervised = process_file(
+        &path,
+        &metadata,
+        &progress,
+        None,
+        LicenseScanOptions::default(),
+        &timeout_options(30.0),
+    );
+    let inline = process_file(
+        &path,
+        &metadata,
+        &progress,
+        None,
+        LicenseScanOptions::default(),
+        &timeout_options(0.0),
+    );
+
+    assert!(!supervised.copyrights.is_empty());
+    assert_eq!(
+        serde_json::to_value(&supervised.copyrights).expect("serialize"),
+        serde_json::to_value(&inline.copyrights).expect("serialize"),
+    );
+    assert!(supervised.scan_diagnostics.is_empty());
 }

@@ -71,7 +71,8 @@ fn test_parse_with_expired_deadline_returns_without_reducing() {
         make_token("2024", PosTag::Yr, 1),
     ];
 
-    let result = parse_with_deadline(tokens, Some(Instant::now()));
+    let expired = crate::cancel::CancelToken::with_timeout(std::time::Duration::ZERO);
+    let result = parse_with_cancel(tokens, Some(&expired));
     assert_eq!(result.len(), 3);
     assert!(result.iter().all(|n| n.tag().is_some()));
 }
@@ -166,7 +167,7 @@ fn reduce_nodes(mut nodes: Vec<ParseNode>) -> Vec<ParseNode> {
     for _ in 0..50 {
         let mut changed = false;
         for rule in GRAMMAR_RULES.iter() {
-            if let Some(next) = try_apply_rule(rule, &nodes) {
+            if let Some(next) = try_apply_rule(rule, &nodes, None) {
                 nodes = next;
                 changed = true;
                 break;
@@ -194,7 +195,7 @@ fn reduce_with(rules: &[GrammarRule], mut nodes: Vec<ParseNode>) -> Vec<ParseNod
     for _ in 0..50 {
         let mut changed = false;
         for rule in rules {
-            if let Some(next) = try_apply_rule(rule, &nodes) {
+            if let Some(next) = try_apply_rule(rule, &nodes, None) {
                 nodes = next;
                 changed = true;
                 break;
@@ -326,4 +327,27 @@ fn test_all_rights_reserved_anchor_is_reachable_past_the_fixed_width() {
             "{middles} middle elements before the anchor must still reduce to one node, got: {reduced:?}"
         );
     }
+}
+
+#[test]
+fn test_rule_scan_stops_when_cancelled() {
+    use crate::copyright::grammar::GRAMMAR_RULES;
+
+    let nodes: Vec<ParseNode> = [
+        make_token("2020", PosTag::Yr, 1),
+        make_token("-", PosTag::Dash, 1),
+        make_token("2024", PosTag::Yr, 1),
+    ]
+    .into_iter()
+    .map(ParseNode::Leaf)
+    .collect();
+    let cancelled = crate::cancel::CancelToken::new(None);
+    cancelled.cancel();
+
+    let firing_rule = GRAMMAR_RULES
+        .iter()
+        .find(|rule| try_apply_rule(rule, &nodes, None).is_some())
+        .expect("a year range should match some grammar rule");
+
+    assert!(try_apply_rule(firing_rule, &nodes, Some(&cancelled)).is_none());
 }

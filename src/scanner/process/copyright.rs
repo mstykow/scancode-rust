@@ -8,6 +8,7 @@ use super::binary_text::{
     extract_named_author_from_binary_line, has_binary_name_like_shape, has_excessive_at_noise,
     has_sufficient_alphabetic_content, is_binary_string_author_candidate, is_company_like_suffix,
 };
+use crate::cancel::CancelToken;
 use crate::copyright::{
     self, AuthorDetection, CopyrightDetection, HolderDetection, looks_like_source_code,
     prepare_text_line, refine_author, refine_copyright,
@@ -18,13 +19,12 @@ use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::LazyLock;
-use std::time::Duration;
 
 pub(super) fn extract_copyright_information(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
     text_content: &str,
-    timeout_seconds: f64,
+    cancel: Option<&CancelToken>,
     from_binary_strings: bool,
 ) {
     let text_content = crate::utils::sourcemap::detection_text(path, text_content);
@@ -47,13 +47,8 @@ pub(super) fn extract_copyright_information(
         }
     }
 
-    let max_runtime = if timeout_seconds.is_finite() && timeout_seconds > 0.0 {
-        Some(Duration::from_secs_f64(timeout_seconds))
-    } else {
-        None
-    };
-
-    let (copyrights, holders, authors) = copyright::detect_copyrights(text_content, max_runtime);
+    let (copyrights, holders, authors) =
+        copyright::detect_copyrights_with_cancel(text_content, cancel);
     let (copyrights, holders, authors) = if from_binary_strings {
         prune_binary_string_detections(text_content, copyrights, holders, authors)
     } else {

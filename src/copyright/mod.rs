@@ -10,6 +10,7 @@
 //! 3. Lexing (POS tagging) and parsing (grammar rules)
 //! 4. Refinement and junk filtering
 
+use crate::cancel::CancelToken;
 use std::time::Duration;
 
 mod candidates;
@@ -44,9 +45,18 @@ pub fn detect_copyrights(
     Vec<HolderDetection>,
     Vec<AuthorDetection>,
 ) {
-    if let Some(max_runtime) = max_runtime {
-        detector::detect_copyrights_from_text_with_deadline(content, Some(max_runtime))
-    } else {
-        detector::detect_copyrights_from_text(content)
-    }
+    let token = max_runtime.map(CancelToken::with_timeout);
+    detect_copyrights_with_cancel(content, token.as_ref())
+}
+
+/// Like [`detect_copyrights`], but stops early once `cancel` trips.
+pub fn detect_copyrights_with_cancel(
+    content: &str,
+    cancel: Option<&CancelToken>,
+) -> (
+    Vec<CopyrightDetection>,
+    Vec<HolderDetection>,
+    Vec<AuthorDetection>,
+) {
+    detector::detect_copyrights_from_text_with_cancel(content, cancel)
 }

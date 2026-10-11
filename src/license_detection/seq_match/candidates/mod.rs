@@ -6,6 +6,7 @@
 
 //! Candidate selection using set and multiset similarity.
 
+use crate::cancel::CancelToken;
 use crate::license_detection::HighBitset;
 use crate::license_detection::LicenseDetectionError;
 use crate::license_detection::TokenMultiset;
@@ -16,7 +17,6 @@ use crate::license_detection::models::Rule;
 use crate::license_detection::models::RuleId;
 use crate::license_detection::query::QueryRun;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::time::Instant;
 
 use super::HIGH_RESEMBLANCE_THRESHOLD_TENTHS;
 
@@ -369,7 +369,7 @@ fn find_set_candidates<'a>(
     index: &'a LicenseIndex,
     query_data: &QueryData,
     high_resemblance: bool,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Vec<Candidate<'a>> {
     let candidate_rid_set: FxHashSet<RuleId> = query_data
         .query_high_set
@@ -378,7 +378,7 @@ fn find_set_candidates<'a>(
         .flat_map(|rids| rids.iter().copied())
         .collect();
 
-    // Sort so a deadline-truncated run returns a deterministic prefix rather
+    // Sort so a cancel-truncated run returns a deterministic prefix rather
     // than an arbitrary hash-ordered subset (issue #1017). The hasher only
     // affects intermediate slot placement; this total sort fully determines
     // the visited order, so swapping SipHash for FxHash cannot change output.
@@ -388,7 +388,7 @@ fn find_set_candidates<'a>(
     let mut candidates = Vec::new();
 
     for (rid_index, rid) in candidate_rids.into_iter().enumerate() {
-        if rid_index.is_multiple_of(128) && crate::license_detection::deadline_exceeded(deadline) {
+        if rid_index.is_multiple_of(128) && crate::cancel::is_cancelled(cancel) {
             return candidates;
         }
 
@@ -457,14 +457,12 @@ fn rescore_candidates_with_multisets<'a>(
     query_data: &QueryData,
     shortlisted: Vec<Candidate<'a>>,
     high_resemblance: bool,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Vec<Candidate<'a>> {
     let mut candidates = Vec::new();
 
     for (candidate_index, candidate) in shortlisted.into_iter().enumerate() {
-        if candidate_index.is_multiple_of(64)
-            && crate::license_detection::deadline_exceeded(deadline)
-        {
+        if candidate_index.is_multiple_of(64) && crate::cancel::is_cancelled(cancel) {
             return candidates;
         }
 
@@ -582,29 +580,29 @@ pub(crate) fn select_seq_candidates<'a>(
     high_resemblance: bool,
     top_n: usize,
 ) -> Vec<Candidate<'a>> {
-    select_seq_candidates_with_deadline(index, query_run, high_resemblance, top_n, None)
-        .expect("Sequence candidate selection without deadline should not time out")
+    select_seq_candidates_with_cancel(index, query_run, high_resemblance, top_n, None)
+        .expect("Sequence candidate selection without cancel should not time out")
 }
 
-pub(crate) fn select_seq_candidates_with_deadline<'a>(
+pub(crate) fn select_seq_candidates_with_cancel<'a>(
     index: &'a LicenseIndex,
     query_run: &QueryRun,
     high_resemblance: bool,
     top_n: usize,
-    deadline: Option<Instant>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Vec<Candidate<'a>>, LicenseDetectionError> {
-    crate::license_detection::ensure_within_deadline(deadline)?;
+    crate::license_detection::ensure_not_cancelled(cancel)?;
     let Some(query_data) = QueryData::new(index, query_run) else {
         return Ok(Vec::new());
     };
 
-    let mut candidates = find_set_candidates(index, &query_data, high_resemblance, deadline);
+    let mut candidates = find_set_candidates(index, &query_data, high_resemblance, cancel);
 
     if candidates.is_empty() {
         return Ok(Vec::new());
     }
 
-    crate::license_detection::ensure_within_deadline(deadline)?;
+    crate::license_detection::ensure_not_cancelled(cancel)?;
     candidates.sort_by(|a, b| {
         compare_candidate_rank(
             &b.score_vec_rounded,
@@ -618,15 +616,10 @@ pub(crate) fn select_seq_candidates_with_deadline<'a>(
 
     candidates.truncate(top_n * 10);
 
-    let mut candidates = rescore_candidates_with_multisets(
-        index,
-        &query_data,
-        candidates,
-        high_resemblance,
-        deadline,
-    );
+    let mut candidates =
+        rescore_candidates_with_multisets(index, &query_data, candidates, high_resemblance, cancel);
 
-    crate::license_detection::ensure_within_deadline(deadline)?;
+    crate::license_detection::ensure_not_cancelled(cancel)?;
     candidates = filter_dupes(candidates);
 
     candidates.sort_by(|a, b| b.cmp(a));
@@ -1092,10 +1085,10 @@ mod tests {
 
     /// Regression test for issue #1017: candidate selection must be
     /// deterministic. `find_set_candidates` previously iterated a `HashSet`
-    /// (randomized order per process run), so a deadline-truncated run collected
+    /// (randomized order per process run), so a cancel-truncated run collected
     /// a different arbitrary subset each run. The candidate rule IDs are now
-    /// sorted before the deadline-bounded loop, so the visited order is stable
-    /// and ascending by `RuleId`; any prefix the deadline truncates is therefore
+    /// sorted before the cancel-bounded loop, so the visited order is stable
+    /// and ascending by `RuleId`; any prefix the cancel truncates is therefore
     /// itself deterministic.
     #[test]
     fn test_find_set_candidates_iterates_rids_in_deterministic_sorted_order() {
@@ -1113,7 +1106,7 @@ mod tests {
             5,
         );
 
-        // Enough rules sharing the "license" high token that the deadline-bounded
+        // Enough rules sharing the "license" high token that the cancel-bounded
         // loop spans more than one checkpoint (checked at rid_index % 128 == 0),
         // so a real mid-loop truncation would return a non-trivial prefix.
         const RULE_COUNT: usize = 200;
@@ -1136,14 +1129,14 @@ mod tests {
             candidates.iter().map(|c| c.rid).collect()
         };
 
-        // The full (non-deadline) run must visit candidate rids in ascending
+        // The full (non-cancel) run must visit candidate rids in ascending
         // RuleId order, and that order must be byte-identical across repeated
         // calls within the same process. With the old HashSet iteration this
         // ordering was randomized.
         let baseline = rid_sequence(&find_set_candidates(&index, &query_data, false, None));
         assert!(
             baseline.len() > 128,
-            "expected enough candidates to span more than one deadline checkpoint, got {}",
+            "expected enough candidates to span more than one cancel checkpoint, got {}",
             baseline.len()
         );
 
@@ -1164,18 +1157,19 @@ mod tests {
 
         // The loop truncates the already-sorted sequence at a checkpoint, so any
         // prefix it returns is a deterministic prefix of `baseline`. This is the
-        // invariant that makes a deadline-truncated run reproducible regardless of
-        // when the deadline fires; with the old HashSet ordering it would not hold.
+        // invariant that makes a cancel-truncated run reproducible regardless of
+        // when the cancel fires; with the old HashSet ordering it would not hold.
+        let expired = CancelToken::with_timeout(std::time::Duration::ZERO);
         let truncated = rid_sequence(&find_set_candidates(
             &index,
             &query_data,
             false,
-            Some(Instant::now()),
+            Some(&expired),
         ));
         assert_eq!(
             truncated,
             baseline[..truncated.len()].to_vec(),
-            "a deadline-truncated run must return a deterministic prefix of the full ordering"
+            "a cancel-truncated run must return a deterministic prefix of the full ordering"
         );
     }
 }

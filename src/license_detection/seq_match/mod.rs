@@ -28,8 +28,8 @@ mod matching;
 #[cfg(test)]
 mod gfdl_debug_test;
 
-pub(crate) use candidates::{select_seq_candidates, select_seq_candidates_with_deadline};
-pub(crate) use matching::{seq_match_with_candidates, seq_match_with_candidates_and_deadline};
+pub(crate) use candidates::{select_seq_candidates, select_seq_candidates_with_cancel};
+pub(crate) use matching::{seq_match_with_candidates, seq_match_with_candidates_and_cancel};
 
 use crate::license_detection::models::MatcherKind;
 
