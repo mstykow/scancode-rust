@@ -1,0 +1,24 @@
+{
+    "version": "@@VERSION@@",
+    "description": "Fast Rust code scanner for licenses, copyrights, and package provenance",
+    "homepage": "https://github.com/getprovenant/provenant",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/getprovenant/provenant/releases/download/v@@VERSION@@/provenant-windows-x86_64.zip",
+            "hash": "@@SHA_WINDOWS@@"
+        }
+    },
+    "bin": "provenant.exe",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/getprovenant/provenant/releases/download/v$version/provenant-windows-x86_64.zip"
+            }
+        },
+        "hash": {
+            "url": "$url.sha256"
+        }
+    }
+}

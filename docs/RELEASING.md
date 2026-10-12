@@ -83,12 +83,15 @@ That workflow:
 - Publishes `provenant-cli` to crates.io via trusted publishing
 - Publishes a multi-arch container image to `ghcr.io/getprovenant/provenant`, with its own SLSA build-provenance attestation
 - On a stable (non-prerelease) tag, bumps the Homebrew formula in [`getprovenant/homebrew-tap`](https://github.com/getprovenant/homebrew-tap) to the new version and checksums
+- On a stable tag, also bumps the Scoop manifest in [`getprovenant/scoop-bucket`](https://github.com/getprovenant/scoop-bucket)
 
 The GitHub Release (binaries + attestation) is produced independently of the crates.io and GHCR publishes: those jobs run in parallel and depend only on the build, so a crates.io or GHCR outage does not fail or skip the Release.
 
 If the tag contains `-`, GitHub marks the release as a prerelease.
 
 The Homebrew bump renders [`.github/homebrew/provenant.rb.tmpl`](../.github/homebrew/provenant.rb.tmpl) with the release version and per-arch checksums, validates it, and commits it directly to the tap. It authenticates with the `provenant-release-bot` GitHub App (via the `RELEASE_BOT_APP_ID` and `RELEASE_BOT_PRIVATE_KEY` repository secrets); the app is installed on the tap repo with only `contents: write`.
+
+The Scoop bump works the same way: it renders [`.github/scoop/provenant.json.tmpl`](../.github/scoop/provenant.json.tmpl) with the release version and the Windows archive checksum, validates it, and commits it to `bucket/provenant.json` in the bucket. The same app must also be installed on `getprovenant/scoop-bucket` with only `contents: write`.
 
 ## After Starting the Release
 
