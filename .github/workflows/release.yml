@@ -452,3 +452,95 @@ jobs:
           done
           echo "Failed to push formula bump after retries." >&2
           exit 1
+
+  bump-scoop:
+    name: Bump Scoop manifest
+    # Same gating as the Homebrew bump: stable tags only, after the release
+    # assets exist, skipped on forks.
+    needs: create-release
+    if: github.repository == 'getprovenant/provenant' && !contains(github.ref, '-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out provenant (for the manifest template)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          submodules: false
+          lfs: false
+
+      # Requires the provenant-release-bot GitHub App to be installed on
+      # getprovenant/scoop-bucket.
+      - name: Mint a token for the bucket repository
+        id: bucket_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          owner: getprovenant
+          repositories: scoop-bucket
+
+      - name: Check out the bucket
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: getprovenant/scoop-bucket
+          token: ${{ steps.bucket_token.outputs.token }}
+          path: bucket
+
+      - name: Render the manifest for this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p shas
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "provenant-windows-x86_64.zip.sha256" --dir shas
+          sha="$(awk '{print $1}' shas/provenant-windows-x86_64.zip.sha256)"
+          sed \
+            -e "s|@@VERSION@@|${TAG#v}|g" \
+            -e "s|@@SHA_WINDOWS@@|${sha}|" \
+            .github/scoop/provenant.json.tmpl > "${RUNNER_TEMP}/provenant.json"
+          jq empty "${RUNNER_TEMP}/provenant.json"
+          if grep -q '@@' "${RUNNER_TEMP}/provenant.json"; then
+            echo "Unresolved placeholder in rendered manifest:" >&2
+            grep -n '@@' "${RUNNER_TEMP}/provenant.json" >&2
+            exit 1
+          fi
+
+      - name: Commit and push to the bucket
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          cd bucket
+          git config user.name "provenant-release-bot[bot]"
+          git config user.email "provenant-release-bot[bot]@users.noreply.github.com"
+          manifest="bucket/provenant.json"
+          # Re-sync and retry on a rejected push, and never downgrade the manifest.
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            current="$(jq -r '.version // empty' "$manifest" 2>/dev/null || true)"
+            if [ -n "$current" ] && [ "$current" != "$version" ]; then
+              newest="$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)"
+              if [ "$newest" = "$current" ]; then
+                echo "Bucket already at $current (newer than $version); leaving it."
+                exit 0
+              fi
+            fi
+            cp "${RUNNER_TEMP}/provenant.json" "$manifest"
+            if git diff --quiet -- "$manifest"; then
+              echo "Bucket already at $version; nothing to push."
+              exit 0
+            fi
+            git add "$manifest"
+            git commit --quiet -m "provenant ${version}"
+            if git push; then
+              echo "Bumped bucket to $version."
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}); re-syncing and retrying." >&2
+            sleep 3
+          done
+          echo "Failed to push manifest bump after retries." >&2
+          exit 1

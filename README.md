@@ -22,7 +22,7 @@ brew install getprovenant/tap/provenant
 provenant scan --json-pp - --license --package /path/to/repo
 ```
 
-Not on Homebrew (or on Windows)? `cargo install --locked provenant-cli`, grab a [prebuilt archive](https://github.com/getprovenant/provenant/releases), or run the [container image](#container-image).
+Not on Homebrew? On Windows, use [Scoop](#scoop-windows). Otherwise `cargo install --locked provenant-cli`, grab a [prebuilt archive](https://github.com/getprovenant/provenant/releases), or run the [container image](#container-image).
 
 ## Why Provenant?
 
@@ -69,6 +69,15 @@ brew install getprovenant/tap/provenant
 ```
 
 Installs a prebuilt `provenant` binary from the [Provenant tap](https://github.com/getprovenant/homebrew-tap); covers macOS (Apple Silicon and Intel) and Linux (arm64 and x86_64).
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add provenant https://github.com/getprovenant/scoop-bucket
+scoop install provenant
+```
+
+Installs the prebuilt Windows (x86_64) binary from the [Provenant bucket](https://github.com/getprovenant/scoop-bucket) and puts it on your `PATH`.
 
 ### From Crates.io
 
