@@ -1404,3 +1404,105 @@ fn crlf_files_report_correct_line_spans() {
         .expect("should detect MIT on the CRLF file");
     assert_eq!(mit_match.start_line, LineNumber::ONE);
 }
+
+#[test]
+fn test_scanner_preserves_maven_license_heading_in_page() {
+    let temp_dir = tempfile::TempDir::new().expect("temporary scan root");
+    let page =
+        include_str!("../testdata/license-golden/datadriven/external/maven-project-licenses.html");
+    fs::write(temp_dir.path().join("licenses.html"), page).unwrap();
+    fs::write(
+        temp_dir.path().join("heading.html"),
+        page.lines().nth(4).unwrap(),
+    )
+    .unwrap();
+    let result = scan(
+        temp_dir.path(),
+        10,
+        &[],
+        create_license_detection_engine(),
+        false,
+        None,
+    );
+    for filename in ["licenses.html", "heading.html"] {
+        let file = result
+            .files
+            .iter()
+            .find(|f| f.path.ends_with(filename))
+            .unwrap();
+        assert_eq!(
+            file.detected_license_expression.as_deref(),
+            Some("apache-2.0"),
+            "{filename}: {file:#?}"
+        );
+        assert!(
+            file.license_clues.is_empty(),
+            "{filename}: {:?}",
+            file.license_clues
+        );
+        assert!(
+            file.license_detections
+                .iter()
+                .flat_map(|d| &d.matches)
+                .any(|m| m.rule_identifier == "apache-2.0_1039.RULE"
+                    && m.match_coverage == Some(100.0))
+        );
+    }
+}
+
+#[test]
+fn test_scanner_preserves_license_tables_in_legal_notices() {
+    let temp_dir = tempfile::TempDir::new().expect("temporary scan root");
+    let mut expected = Vec::new();
+    for (spdx, key) in [
+        ("Apache-2.0", "apache-2.0"),
+        ("BSD-3-Clause", "bsd-new"),
+        ("MPL-2.0", "mpl-2.0"),
+    ] {
+        let dir = temp_dir.path().join(spdx);
+        fs::create_dir(&dir).unwrap();
+        let text =
+            include_str!("../testdata/license-golden/datadriven/external/maven-license-table.md")
+                .replace("Apache-2.0", spdx);
+        for filename in [
+            "LICENSE.md",
+            "LICENCE",
+            "COPYING.txt",
+            "NOTICE.md",
+            "Copyright",
+            "THIRD_PARTY_NOTICES.md",
+            "THIRD-PARTY-LICENSES.txt",
+        ] {
+            fs::write(dir.join(filename), &text).unwrap();
+            expected.push((format!("{spdx}/{filename}"), Some(key)));
+        }
+    }
+    let result = scan(
+        temp_dir.path(),
+        10,
+        &[],
+        create_license_detection_engine(),
+        false,
+        None,
+    );
+    for (suffix, expression) in expected {
+        let file = result
+            .files
+            .iter()
+            .find(|f| f.path.replace('\\', "/").ends_with(&suffix))
+            .unwrap();
+        assert_eq!(
+            file.detected_license_expression.as_deref(),
+            expression,
+            "{suffix}: {file:#?}"
+        );
+        if expression.is_some() {
+            assert!(
+                file.license_detections
+                    .iter()
+                    .flat_map(|d| &d.matches)
+                    .any(|m| m.start_line.get() <= 5 && m.end_line.get() == 5)
+            );
+        }
+    }
+}

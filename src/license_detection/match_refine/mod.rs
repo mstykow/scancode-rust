@@ -19,7 +19,9 @@ mod merge;
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
+use crate::license_detection::position_set::PositionSet;
 use crate::license_detection::query::Query;
+use std::collections::HashMap;
 
 // Internal use only
 use filter_low_quality::{
@@ -260,6 +262,7 @@ fn refine_matches_internal(
     let merged_again = merge_overlapping_matches(&non_gibberish);
 
     let merged_again = filter_binary_low_coverage_same_expression_seq_bridges(merged_again, query);
+    let merged_again = filter_redundant_partial_matches(index, merged_again);
 
     let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
 
@@ -300,6 +303,50 @@ fn refine_matches_internal(
     update_match_scores(&mut final_scored, query);
 
     final_scored
+}
+
+fn filter_redundant_partial_matches(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+) -> Vec<LicenseMatch> {
+    if !matches
+        .iter()
+        .any(|m| m.matcher == MatcherKind::Seq && m.coverage() < 100.0)
+    {
+        return matches;
+    }
+
+    let mut exact_positions = HashMap::<String, PositionSet>::new();
+    for m in &matches {
+        if m.matcher == MatcherKind::Aho
+            && m.coverage() == 100.0
+            && !m.is_license_clue()
+            && !m.is_license_intro()
+            && !m.has_unknown()
+            && !index.is_false_positive(m.rid)
+        {
+            exact_positions
+                .entry(m.license_expression.clone())
+                .or_default()
+                .extend_from_span(m.query_span());
+        }
+    }
+
+    // A partial rule assembled entirely from exact references adds no evidence.
+    // Letting its greater length win overlap filtering can demote them to a clue.
+    matches
+        .into_iter()
+        .filter(|m| {
+            m.matcher != MatcherKind::Seq
+                || m.coverage() == 100.0
+                || index.is_false_positive(m.rid)
+                || !exact_positions
+                    .get(&m.license_expression)
+                    .is_some_and(|positions| {
+                        m.query_span().iter().all(|pos| positions.contains(pos))
+                    })
+        })
+        .collect()
 }
 
 fn filter_binary_low_coverage_same_expression_seq_bridges(
@@ -541,6 +588,61 @@ mod tests {
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
+    }
+
+    #[test]
+    fn test_partial_matches_cannot_replace_exact_evidence() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let first = create_test_match("#1", 1, 5, MatchScore::MAX, 100.0, 100);
+        let second = create_test_match("#2", 6, 10, MatchScore::MAX, 100.0, 100);
+        let mut partial =
+            create_test_match("#3", 1, 10, MatchScore::from_percentage(50.0), 50.0, 100);
+        partial.matcher = MatcherKind::Seq;
+        partial.rule_length = 20;
+        let exact = vec![first.clone(), second.clone()];
+        assert_eq!(
+            filter_redundant_partial_matches(
+                &index,
+                vec![first.clone(), partial.clone(), second.clone()]
+            ),
+            exact
+        );
+
+        // Extra matched evidence, a different expression, and a complete rule
+        // must still compete normally with the exact matches.
+        let mut extra = partial.clone();
+        extra.coordinates = MatchCoordinates::query_region(PositionSpan::range(0, 11));
+        let mut different = partial.clone();
+        different.license_expression = "apache-2.0".to_string();
+        let mut complete = partial.clone();
+        complete.match_coverage = 100.0;
+        for candidate in [extra, different, complete] {
+            let matches = vec![first.clone(), candidate, second.clone()];
+            assert_eq!(
+                filter_redundant_partial_matches(&index, matches.clone()),
+                matches
+            );
+        }
+
+        for kind in [
+            crate::license_detection::models::RuleKind::Clue,
+            crate::license_detection::models::RuleKind::Intro,
+        ] {
+            let mut weak = first.clone();
+            weak.rule_kind = kind;
+            let matches = vec![weak, partial.clone(), second.clone()];
+            assert_eq!(
+                filter_redundant_partial_matches(&index, matches.clone()),
+                matches
+            );
+        }
+        let mut fp_index = LicenseIndex::with_legalese_count(10);
+        insert_fp_rule(&mut fp_index, 1);
+        let matches = vec![first, partial, second];
+        assert_eq!(
+            filter_redundant_partial_matches(&fp_index, matches.clone()),
+            matches
+        );
     }
 
     #[test]
