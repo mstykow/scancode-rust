@@ -29,6 +29,8 @@ ignored_rules = [
 ignored_licenses = []
 
 [overlay_reasons.rules]
+"bsd-new_and_bsd-simplified_1.RULE" = "Require both BSD-3-Clause and BSD-2-Clause names so repeated BSD-3-Clause HTML headings cannot be consumed by a partial composite match that invents BSD-2-Clause (issue #1457)."
+"elastic-license-v2_or_mongodb-sspl-1.0_5.RULE" = "Require both Elastic License 2.0 and Server Side Public License names so generic XML/HTML license markup and MPL-2.0 headings cannot claim unrelated Elastic/SSPL terms (issue #1457)."
 "agpl-3.0-plus_101.RULE" = "Treat bare AGPL mentions as clue-only evidence so short comparative references stay inspectable without becoming hard detections."
 "apache-2.0_and_lgpl-2.1_1.RULE" = "Keep the mixed Apache-2.0/LGPL-2.1 notice detectable only when both COPYING.LGPL and COPYING.ASL2 references are actually present."
 "apache-2.0_and_lgpl-2.1_2.RULE" = "Preserve a real typoed Apache-2.0/LGPL-2.1 notice seen in the wild without broadening generic dual-license detection."
