@@ -679,14 +679,24 @@ fn is_legal_notice_like_path(path: &Path) -> bool {
 
     let name = name.to_ascii_lowercase();
     let base_name = base_name.to_ascii_lowercase();
-    ["notice", "copyright", "copying", "license", "licence"]
-        .iter()
-        .any(|pattern| {
-            name.starts_with(pattern)
-                || name.ends_with(pattern)
-                || base_name.starts_with(pattern)
-                || base_name.ends_with(pattern)
-        })
+    [
+        "notice",
+        "notices",
+        "copyright",
+        "copyrights",
+        "copying",
+        "license",
+        "licenses",
+        "licence",
+        "licences",
+    ]
+    .iter()
+    .any(|pattern| {
+        name.starts_with(pattern)
+            || name.ends_with(pattern)
+            || base_name.starts_with(pattern)
+            || base_name.ends_with(pattern)
+    })
 }
 
 fn prune_redundant_readme_conjunctive_detections(
@@ -773,15 +783,25 @@ fn prune_contextual_short_reference_matches(
     if source_lines.is_empty() {
         return;
     }
+    // Tables in legal notices declare component licenses rather than compare products.
+    let prune_license_tables = !is_legal_notice_like_path(path);
 
     clues.retain(|detection_match| {
-        !should_prune_contextual_short_reference_match(detection_match, &source_lines)
+        !should_prune_contextual_short_reference_match(
+            detection_match,
+            &source_lines,
+            prune_license_tables,
+        )
     });
 
     detections.retain_mut(|detection| {
         let original_match_count = detection.matches.len();
         detection.matches.retain(|detection_match| {
-            !should_prune_contextual_short_reference_match(detection_match, &source_lines)
+            !should_prune_contextual_short_reference_match(
+                detection_match,
+                &source_lines,
+                prune_license_tables,
+            )
         });
 
         if detection.matches.is_empty() {
@@ -840,6 +860,7 @@ fn refresh_public_detection_after_context_prune(
 fn should_prune_contextual_short_reference_match(
     detection_match: &Match,
     source_lines: &[&str],
+    prune_license_tables: bool,
 ) -> bool {
     if !(is_short_reference_like_public_match(detection_match)
         || is_unknown_reference_like_public_match(detection_match))
@@ -865,7 +886,7 @@ fn should_prune_contextual_short_reference_match(
         if line.len() > MAX_CONTEXTUAL_PRUNE_LINE_LEN {
             return false;
         }
-        is_markdown_license_table_row(line_number, source_lines)
+        (prune_license_tables && is_markdown_license_table_row(line_number, source_lines))
             || is_negative_or_comparative_license_mention_line(line)
     })
 }

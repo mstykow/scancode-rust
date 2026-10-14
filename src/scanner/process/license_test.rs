@@ -608,6 +608,68 @@ fn test_prune_contextual_short_reference_matches_drops_markdown_license_table_ro
 }
 
 #[test]
+fn test_prune_contextual_short_reference_matches_preserves_legal_notice_tables() {
+    let text = "| Component | License |\n|---|---|\n| src | [Apache-2.0](./src/LICENSE.md) |\n";
+    for filename in [
+        "LICENSE.md",
+        "LICENCE",
+        "COPYING.txt",
+        "NOTICE.md",
+        "Copyright",
+        "THIRD_PARTY_NOTICES.md",
+        "THIRD-PARTY-LICENSES.txt",
+    ] {
+        let mut detections = vec![make_public_detection_with_matches(
+            "apache-2.0",
+            "Apache-2.0",
+            vec![make_public_match(
+                "apache-2.0",
+                "Apache-2.0",
+                3,
+                3,
+                3,
+                "spdx_license_id_apache-2.0_for_apache-2.0.RULE",
+            )],
+        )];
+        let original = detections.clone();
+        let mut clues = Vec::new();
+        prune_contextual_short_reference_matches(
+            Path::new(filename),
+            text,
+            false,
+            &mut detections,
+            &mut clues,
+        );
+        assert_eq!(detections, original, "{filename}");
+    }
+}
+
+#[test]
+fn test_prune_contextual_short_reference_matches_still_prunes_negative_legal_mentions() {
+    let text = "No GPL/AGPL/SSPL\n";
+    let mut detections = vec![make_public_detection_with_matches(
+        "agpl-3.0",
+        "AGPL-3.0-only",
+        vec![make_public_match(
+            "agpl-3.0",
+            "AGPL-3.0-only",
+            1,
+            1,
+            3,
+            "agpl-3.0_5.RULE",
+        )],
+    )];
+    prune_contextual_short_reference_matches(
+        Path::new("LICENSE.md"),
+        text,
+        false,
+        &mut detections,
+        &mut Vec::new(),
+    );
+    assert!(detections.is_empty());
+}
+
+#[test]
 fn test_prune_contextual_short_reference_matches_drops_doc_comment_markdown_license_table_rows() {
     let text = concat!(
         "//! | Library | Mean | License |\n",
