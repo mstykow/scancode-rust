@@ -1506,3 +1506,86 @@ fn test_scanner_preserves_license_tables_in_legal_notices() {
         }
     }
 }
+
+#[test]
+fn test_scanner_rejects_unrelated_composite_licenses_in_html_headings() {
+    let temp_dir = tempfile::TempDir::new().expect("temporary scan root");
+    let templates = [
+        include_str!("../testdata/license-golden/datadriven/external/maven-bsd-heading.html")
+            .replace("BSD_3-Clause", "LICENSE_ANCHOR")
+            .replace("BSD 3-Clause", "LICENSE_NAME"),
+        include_str!("../testdata/license-golden/datadriven/external/maven-mpl-heading.html")
+            .replace("Mozilla_Public_License_2.0", "LICENSE_ANCHOR")
+            .replace("Mozilla Public License 2.0", "LICENSE_NAME"),
+    ];
+    let mut expected = Vec::new();
+    for (anchor, name, expression) in [
+        ("BSD_3-Clause", "BSD 3-Clause", "bsd-new"),
+        ("BSD_2-Clause", "BSD 2-Clause", "bsd-simplified"),
+        (
+            "Mozilla_Public_License_2.0",
+            "Mozilla Public License 2.0",
+            "mpl-2.0",
+        ),
+        ("Apache_License_2.0", "Apache License 2.0", "apache-2.0"),
+        (
+            "Eclipse_Public_License_2.0",
+            "Eclipse Public License 2.0",
+            "epl-2.0",
+        ),
+    ] {
+        for (i, template) in templates.iter().enumerate() {
+            let filename = format!("{expression}-{i}.html");
+            fs::write(
+                temp_dir.path().join(&filename),
+                template
+                    .replace("LICENSE_ANCHOR", anchor)
+                    .replace("LICENSE_NAME", name),
+            )
+            .unwrap();
+            expected.push((filename, expression));
+        }
+    }
+    for (filename, text, expression) in [
+        (
+            "composite-bsd.txt",
+            include_str!("../testdata/license-golden/datadriven/external/maven-composite-bsd.txt"),
+            "bsd-new AND bsd-simplified",
+        ),
+        (
+            "composite-elastic.xml",
+            include_str!(
+                "../testdata/license-golden/datadriven/external/maven-composite-elastic.xml"
+            ),
+            "elastic-license-v2 OR mongodb-sspl-1.0",
+        ),
+    ] {
+        fs::write(temp_dir.path().join(filename), text).unwrap();
+        expected.push((filename.to_string(), expression));
+    }
+    let result = scan(
+        temp_dir.path(),
+        10,
+        &[],
+        create_license_detection_engine(),
+        false,
+        None,
+    );
+    for (filename, expression) in expected {
+        let file = result
+            .files
+            .iter()
+            .find(|f| f.path.ends_with(&filename))
+            .unwrap();
+        assert_eq!(
+            file.detected_license_expression.as_deref(),
+            Some(expression),
+            "{filename}: {file:#?}"
+        );
+        assert!(
+            file.license_clues.is_empty(),
+            "{filename}: {:?}",
+            file.license_clues
+        );
+    }
+}

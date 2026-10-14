@@ -1,0 +1,5 @@
+license_expressions:
+  - bsd-new
+  - bsd-new
+  - bsd-new
+notes: Synthetic HTML license-heading regression for issue 1457.
